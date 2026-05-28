@@ -1,0 +1,4454 @@
+﻿<!DOCTYPE html>
+
+<html lang="zh-CN">
+
+
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>智能分析助手 v2.0</title>
+
+    <!-- Tailwind CSS -->
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Excel Processing -->
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <!-- Icons -->
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- CodeMirror -->
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+
+    <!-- Marked.js -->
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+
+
+    <style>
+
+        /* Modern Scrollbar */
+
+        ::-webkit-scrollbar {
+
+            width: 6px;
+
+            height: 6px;
+
+        }
+
+
+
+        ::-webkit-scrollbar-track {
+
+            background: transparent;
+
+        }
+
+
+
+        ::-webkit-scrollbar-thumb {
+
+            background: #cbd5e1;
+
+            border-radius: 3px;
+
+        }
+
+
+
+        ::-webkit-scrollbar-thumb:hover {
+
+            background: #94a3b8;
+
+        }
+
+
+
+        /* Glassmorphism Utilities */
+
+        .glass {
+
+            background: rgba(255, 255, 255, 0.7);
+
+            backdrop-filter: blur(10px);
+
+            -webkit-backdrop-filter: blur(10px);
+
+            border: 1px solid rgba(255, 255, 255, 0.3);
+
+        }
+
+
+
+        .glass-dark {
+
+            background: rgba(15, 23, 42, 0.6);
+
+            backdrop-filter: blur(12px);
+
+            -webkit-backdrop-filter: blur(12px);
+
+            border: 1px solid rgba(255, 255, 255, 0.1);
+
+        }
+
+
+
+        /* Animations */
+
+        @keyframes fadeIn {
+
+            from {
+
+                opacity: 0;
+
+                transform: translateY(10px);
+
+            }
+
+
+
+            to {
+
+                opacity: 1;
+
+                transform: translateY(0);
+
+            }
+
+        }
+
+
+
+        .animate-fade-in {
+
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+        }
+
+
+
+        /* Custom Gradients */
+
+        .bg-gradient-primary {
+
+            background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+
+        }
+
+
+
+        /* Layout Utilities */
+
+        .sidebar-item-active {
+
+            background-color: #eff6ff;
+
+            color: #2563eb;
+
+            border-right: 3px solid #2563eb;
+
+        }
+
+
+
+        .card-hover {
+
+            transition: all 0.3s ease;
+
+        }
+
+
+
+        .card-hover:hover {
+
+            transform: translateY(-4px);
+
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+        }
+
+    </style>
+
+</head>
+
+
+
+<body
+
+    class="bg-slate-50 text-slate-800 font-sans h-screen flex overflow-hidden selection:bg-blue-100 selection:text-blue-700">
+
+
+
+    <!-- Sidebar Navigation -->
+
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col z-20 shadow-sm transition-all duration-300"
+
+        id="sidebar">
+
+        <!-- Logo Area -->
+
+        <div class="p-6 border-b border-slate-100 flex items-center gap-3">
+
+            <div
+
+                class="bg-gradient-to-br from-blue-600 to-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-blue-200">
+
+                <i data-lucide="wand-2" class="w-5 h-5"></i>
+
+            </div>
+
+            <div>
+
+                <h1 class="font-bold text-slate-800 text-lg tracking-tight">智能分析助手</h1>
+
+                <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">PRO VERSION</p>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- Navigation Menu -->
+
+        <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+
+            <button onclick="switchView('home')" id="nav-home"
+
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50 transition-colors sidebar-item-active">
+
+                <i data-lucide="layout-grid" class="w-4 h-4"></i>
+
+                功能主页
+
+            </button>
+
+
+
+            <div class="pt-4 pb-2 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Excel 处理</div>
+
+
+
+            <button onclick="switchView('translate')" id="nav-translate"
+
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+
+                <i data-lucide="languages" class="w-4 h-4"></i>
+
+                批量翻译
+
+            </button>
+
+            <button onclick="switchView('analysis')" id="nav-analysis"
+
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+
+                <i data-lucide="brain" class="w-4 h-4"></i>
+
+                评论分析
+
+            </button>
+
+            <button onclick="switchView('summary')" id="nav-summary"
+
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+
+                <i data-lucide="file-bar-chart" class="w-4 h-4"></i>
+
+                数据摘要
+
+            </button>
+
+            <button onclick="switchView('cleaning')" id="nav-cleaning"
+
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+
+                <i data-lucide="eraser" class="w-4 h-4"></i>
+
+                数据清洗
+
+            </button>
+
+
+
+            <div class="pt-4 pb-2 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">AI 助手</div>
+
+
+
+            <button onclick="switchView('text')" id="nav-text"
+
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+
+                <i data-lucide="type" class="w-4 h-4"></i>
+
+                文本翻译
+
+            </button>
+
+            <button onclick="switchView('formula')" id="nav-formula"
+
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+
+                <i data-lucide="function-square" class="w-4 h-4"></i>
+
+                公式生成
+
+            </button>
+
+        </nav>
+
+
+
+        <!-- User/Settings Area -->
+
+        <div class="p-4 border-t border-slate-100">
+
+            <button onclick="openSettings()"
+
+                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50 transition-colors border border-slate-200">
+
+                <i data-lucide="settings" class="w-4 h-4"></i>
+
+                API 设置
+
+                <span id="apiStatusDot" class="ml-auto w-2 h-2 rounded-full bg-red-400"></span>
+
+            </button>
+
+        </div>
+
+    </aside>
+
+
+
+    <!-- Main Content Area -->
+
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative bg-slate-50/50">
+
+        <!-- Top Header (Contextual) -->
+
+        <header
+
+            class="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-10">
+
+            <div class="flex items-center gap-4">
+
+                <h2 id="pageTitle" class="text-lg font-bold text-slate-800">功能主页</h2>
+
+                <div id="modelBadge"
+
+                    class="hidden px-2 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-md border border-blue-100 flex items-center gap-1">
+
+                    <i data-lucide="cpu" class="w-3 h-3"></i>
+
+                    <span id="currentModelName">DeepSeek-V3</span>
+
+                </div>
+
+            </div>
+
+            <div class="flex items-center gap-3">
+
+                <a href="https://github.com/Zhong-Ze-Wei" target="_blank"
+
+                    class="text-slate-400 hover:text-slate-600 transition-colors">
+
+                    <i data-lucide="github" class="w-5 h-5"></i>
+
+                </a>
+
+            </div>
+
+        </header>
+
+
+
+        <!-- Content Scroll Area -->
+
+        <div class="flex-1 overflow-y-auto p-6 scroll-smooth" id="contentArea">
+
+
+
+            <!-- VIEW: HOME DASHBOARD -->
+
+            <div id="view-home" class="animate-fade-in max-w-6xl mx-auto">
+
+                <div class="mb-8 text-center">
+
+                    <h1 class="text-3xl font-bold text-slate-800 mb-3">欢迎使用智能分析助手</h1>
+
+                    <p class="text-slate-500 max-w-2xl mx-auto">集成多种 AI 能力，为您提供一站式的数据处理、翻译与分析服务。请从下方选择工具开始。</p>
+
+                </div>
+
+
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                    <!-- Card 1: Translate -->
+
+                    <div onclick="switchView('translate')"
+
+                        class="group bg-white rounded-2xl p-6 border border-slate-200 shadow-sm cursor-pointer card-hover relative overflow-hidden">
+
+                        <div
+
+                            class="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110">
+
+                        </div>
+
+                        <div class="relative z-10">
+
+                            <div
+
+                                class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+
+                                <i data-lucide="languages" class="w-6 h-6"></i>
+
+                            </div>
+
+                            <h3 class="text-lg font-bold text-slate-800 mb-2">批量翻译</h3>
+
+                            <p class="text-sm text-slate-500 mb-4">上传 Excel/CSV 文件，批量翻译产品参数、评论或标题。</p>
+
+                            <span
+
+                                class="text-xs font-bold text-blue-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+
+                                立即使用 <i data-lucide="arrow-right" class="w-3 h-3"></i>
+
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Card 2: Text -->
+
+                    <div onclick="switchView('text')"
+
+                        class="group bg-white rounded-2xl p-6 border border-slate-200 shadow-sm cursor-pointer card-hover relative overflow-hidden">
+
+                        <div
+
+                            class="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110">
+
+                        </div>
+
+                        <div class="relative z-10">
+
+                            <div
+
+                                class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+
+                                <i data-lucide="type" class="w-6 h-6"></i>
+
+                            </div>
+
+                            <h3 class="text-lg font-bold text-slate-800 mb-2">文本翻译</h3>
+
+                            <p class="text-sm text-slate-500 mb-4">快速翻译一段文本，支持多种场景和语言方向。</p>
+
+                            <span
+
+                                class="text-xs font-bold text-indigo-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+
+                                立即使用 <i data-lucide="arrow-right" class="w-3 h-3"></i>
+
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Card 3: Analysis -->
+
+                    <div onclick="switchView('analysis')"
+
+                        class="group bg-white rounded-2xl p-6 border border-slate-200 shadow-sm cursor-pointer card-hover relative overflow-hidden">
+
+                        <div
+
+                            class="absolute top-0 right-0 w-24 h-24 bg-violet-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110">
+
+                        </div>
+
+                        <div class="relative z-10">
+
+                            <div
+
+                                class="w-12 h-12 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-violet-600 group-hover:text-white transition-colors">
+
+                                <i data-lucide="brain" class="w-6 h-6"></i>
+
+                            </div>
+
+                            <h3 class="text-lg font-bold text-slate-800 mb-2">评论分析</h3>
+
+                            <p class="text-sm text-slate-500 mb-4">智能分析用户评论，自动提取情感、观点和分类标签。</p>
+
+                            <span
+
+                                class="text-xs font-bold text-violet-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+
+                                立即使用 <i data-lucide="arrow-right" class="w-3 h-3"></i>
+
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Card 4: Summary -->
+
+                    <div onclick="switchView('summary')"
+
+                        class="group bg-white rounded-2xl p-6 border border-slate-200 shadow-sm cursor-pointer card-hover relative overflow-hidden">
+
+                        <div
+
+                            class="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110">
+
+                        </div>
+
+                        <div class="relative z-10">
+
+                            <div
+
+                                class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+
+                                <i data-lucide="file-bar-chart" class="w-6 h-6"></i>
+
+                            </div>
+
+                            <h3 class="text-lg font-bold text-slate-800 mb-2">数据摘要</h3>
+
+                            <p class="text-sm text-slate-500 mb-4">上传数据表，一键生成包含统计特征和业务洞察的分析报告。</p>
+
+                            <span
+
+                                class="text-xs font-bold text-emerald-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+
+                                立即使用 <i data-lucide="arrow-right" class="w-3 h-3"></i>
+
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Card 5: Formula -->
+
+                    <div onclick="switchView('formula')"
+
+                        class="group bg-white rounded-2xl p-6 border border-slate-200 shadow-sm cursor-pointer card-hover relative overflow-hidden">
+
+                        <div
+
+                            class="absolute top-0 right-0 w-24 h-24 bg-pink-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110">
+
+                        </div>
+
+                        <div class="relative z-10">
+
+                            <div
+
+                                class="w-12 h-12 bg-pink-100 text-pink-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-pink-600 group-hover:text-white transition-colors">
+
+                                <i data-lucide="function-square" class="w-6 h-6"></i>
+
+                            </div>
+
+                            <h3 class="text-lg font-bold text-slate-800 mb-2">公式生成</h3>
+
+                            <p class="text-sm text-slate-500 mb-4">描述您的需求，AI 自动为您生成复杂的 Excel/WPS 公式。</p>
+
+                            <span
+
+                                class="text-xs font-bold text-pink-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+
+                                立即使用 <i data-lucide="arrow-right" class="w-3 h-3"></i>
+
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Card 6: Cleaning -->
+
+                    <div onclick="switchView('cleaning')"
+
+                        class="group bg-white rounded-2xl p-6 border border-slate-200 shadow-sm cursor-pointer card-hover relative overflow-hidden">
+
+                        <div
+
+                            class="absolute top-0 right-0 w-24 h-24 bg-orange-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110">
+
+                        </div>
+
+                        <div class="relative z-10">
+
+                            <div
+
+                                class="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-orange-600 group-hover:text-white transition-colors">
+
+                                <i data-lucide="eraser" class="w-6 h-6"></i>
+
+                            </div>
+
+                            <h3 class="text-lg font-bold text-slate-800 mb-2">数据清洗</h3>
+
+                            <p class="text-sm text-slate-500 mb-4">智能识别并修复数据中的格式错误、缺失值和异常项。</p>
+
+                            <span
+
+                                class="text-xs font-bold text-orange-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+
+                                立即使用 <i data-lucide="arrow-right" class="w-3 h-3"></i>
+
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- VIEW: TRANSLATE -->
+
+            <div id="view-translate" class="hidden animate-fade-in max-w-6xl mx-auto space-y-6">
+
+                <!-- Top Control Bar -->
+
+                <div
+
+                    class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
+
+                    <div class="flex gap-6">
+
+                        <div>
+
+                            <label
+
+                                class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">翻译场景</label>
+
+                            <div class="relative">
+
+                                <select id="translateScenario"
+
+                                    class="w-48 pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none appearance-none transition-all hover:bg-white">
+
+                                    <option value="ecommerce_spec">产品参数 (准确/术语)</option>
+
+                                    <option value="ecommerce_comment">用户评论 (情感/口语)</option>
+
+                                    <option value="ecommerce_title">竞品标题 (SEO优化)</option>
+
+                                    <option value="email">邮件沟通 (正式商务)</option>
+
+                                    <option value="general">通用翻译</option>
+
+                                </select>
+
+                                <i data-lucide="list-filter" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+
+                                <i data-lucide="chevron-down"
+
+                                    class="w-3 h-3 text-slate-400 absolute right-3 top-3 pointer-events-none"></i>
+
+                            </div>
+
+                        </div>
+
+                        <div>
+
+                            <label
+
+                                class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">语言方向</label>
+
+                            <div class="relative">
+
+                                <select id="languageDirection"
+
+                                    class="w-48 pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none appearance-none transition-all hover:bg-white">
+
+                                    <option value="auto_to_zh">自动检测 -> 中文</option>
+
+                                    <option value="zh_to_en">中文 -> 英文</option>
+
+                                    <option value="en_to_zh">英文 -> 中文</option>
+
+                                    <option value="zh_to_jp">中文 -> 日文</option>
+
+                                </select>
+
+                                <i data-lucide="languages" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+
+                                <i data-lucide="chevron-down"
+
+                                    class="w-3 h-3 text-slate-400 absolute right-3 top-3 pointer-events-none"></i>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="flex items-center gap-3">
+
+                        <div class="text-right hidden md:block">
+
+                            <div class="text-xs font-bold text-slate-700">准备就绪</div>
+
+                            <div class="text-[10px] text-slate-400">等待文件上传</div>
+
+                        </div>
+
+                        <div
+
+                            class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+
+                            <i data-lucide="file-up" class="w-5 h-5"></i>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Main Content Grid -->
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+
+
+                    <!-- Left: Upload & Config -->
+
+                    <div class="lg:col-span-1 space-y-6">
+
+                        <!-- Upload Area -->
+
+                        <div id="translate-upload-zone"
+
+                            class="bg-white rounded-xl border-2 border-dashed border-slate-300 p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50/30 transition-all group relative">
+
+                            <div
+
+                                class="bg-blue-50 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform duration-300">
+
+                                <i data-lucide="upload-cloud" class="w-8 h-8 text-blue-600"></i>
+
+                            </div>
+
+                            <h3
+
+                                class="text-sm font-bold text-slate-700 mb-1 group-hover:text-blue-700 transition-colors">
+
+                                点击或拖拽文件</h3>
+
+                            <p class="text-xs text-slate-400 mb-4">支持 .xlsx, .xls, .csv</p>
+
+                            <input type="file" id="translate-file-input" accept=".xlsx,.xls,.csv" class="hidden">
+
+                            <button
+
+                                class="px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 text-xs font-bold hover:border-blue-400 hover:text-blue-600 transition-all shadow-sm">
+
+                                选择文件
+
+                            </button>
+
+                        </div>
+
+
+
+                        <!-- Remote Data Loader -->
+
+                        <div class="bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 p-5">
+
+                            <h4 class="text-xs font-bold text-slate-700 flex items-center gap-2 mb-3">
+
+                                <i data-lucide="globe" class="w-3 h-3 text-blue-500"></i>
+
+                                加载网络测试数据
+
+                            </h4>
+
+                            <div class="flex gap-2 mb-3">
+
+                                <input type="text" id="remote-url-input"
+
+                                    value="https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv"
+
+                                    class="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-lg focus:border-blue-500 outline-none text-slate-600"
+
+                                    placeholder="输入 CSV/Excel URL">
+
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2">
+
+                                <button onclick="fetchDemoData('specs')"
+
+                                    class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-600 hover:border-blue-400 hover:text-blue-600 transition-all text-left">
+
+                                    📦 产品参数示例
+
+                                </button>
+
+                                <button onclick="fetchDemoData('comments')"
+
+                                    class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-600 hover:border-blue-400 hover:text-blue-600 transition-all text-left">
+
+                                    💬 用户评论示例
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- Column Mapping (Hidden initially) -->
+
+                        <div id="translate-config-panel"
+
+                            class="hidden bg-white rounded-xl border border-slate-200 shadow-sm p-5 animate-fade-in">
+
+                            <div class="flex justify-between items-center mb-4">
+
+                                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+
+                                    <i data-lucide="sliders-horizontal" class="w-4 h-4 text-slate-500"></i>
+
+                                    配置映射
+
+                                </h3>
+
+                                <button onclick="resetTranslate()"
+
+                                    class="text-xs text-red-500 hover:underline">重置</button>
+
+                            </div>
+
+
+
+                            <div class="space-y-4">
+
+                                <div>
+
+                                    <label class="block text-xs font-medium text-slate-600 mb-1.5">待翻译列</label>
+
+                                    <select id="translate-source-col"
+
+                                        class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500"></select>
+
+                                </div>
+
+                                <div>
+
+                                    <label class="block text-xs font-medium text-slate-600 mb-1.5">结果列名</label>
+
+                                    <input type="text" id="translate-target-name" value="翻译结果"
+
+                                        class="w-full p-2 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500">
+
+                                </div>
+
+                                <button id="btn-start-translate" onclick="startTranslate()"
+
+                                    class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 transition-all flex items-center justify-center gap-2">
+
+                                    <i data-lucide="play" class="w-4 h-4"></i> 开始翻译
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Right: Preview Table -->
+
+                    <div
+
+                        class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[500px] overflow-hidden relative">
+
+                        <!-- Table Header -->
+
+                        <div
+
+                            class="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+
+                            <div class="flex items-center gap-2">
+
+                                <i data-lucide="table" class="w-4 h-4 text-slate-400"></i>
+
+                                <span class="text-sm font-bold text-slate-700">数据预览</span>
+
+                                <span id="translate-row-count" class="text-xs text-slate-400 ml-2">0 行</span>
+
+                            </div>
+
+                            <button id="btn-export-translate" disabled
+
+                                class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-400 hover:text-blue-600 hover:border-blue-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1">
+
+                                <i data-lucide="download" class="w-3 h-3"></i> 导出结果
+
+                            </button>
+
+                        </div>
+
+
+
+                        <!-- Table Content -->
+
+                        <div class="flex-1 overflow-auto relative">
+
+                            <table class="w-full text-left border-collapse">
+
+                                <thead class="bg-slate-50 sticky top-0 z-10 text-xs font-semibold text-slate-500">
+
+                                    <tr id="translate-table-head"></tr>
+
+                                </thead>
+
+                                <tbody id="translate-table-body"
+
+                                    class="text-sm text-slate-600 divide-y divide-slate-100">
+
+                                    <!-- Empty State -->
+
+                                    <tr id="translate-empty-state">
+
+                                        <td colspan="100" class="py-20 text-center">
+
+                                            <div class="flex flex-col items-center justify-center text-slate-300">
+
+                                                <i data-lucide="file-spreadsheet" class="w-12 h-12 mb-3 opacity-50"></i>
+
+                                                <p class="text-sm">请先上传文件或加载网络数据</p>
+
+                                            </div>
+
+                                        </td>
+
+                                    </tr>
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+
+
+                        <!-- Progress Overlay -->
+
+                        <div id="translate-progress-overlay"
+
+                            class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
+
+                            <div class="w-64 h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
+
+                                <div id="translate-progress-bar"
+
+                                    class="h-full bg-blue-600 w-0 transition-all duration-300"></div>
+
+                            </div>
+
+                            <p class="text-sm font-bold text-blue-600 animate-pulse">正在翻译中... <span
+
+                                    id="translate-progress-text">0%</span></p>
+
+
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- VIEW: SUMMARY -->
+
+            <!-- VIEW: SUMMARY -->
+
+            <div id="view-summary" class="hidden animate-fade-in max-w-6xl mx-auto space-y-6">
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                    <!-- Config Panel -->
+
+                    <div class="lg:col-span-1 space-y-6">
+
+                        <!-- Upload -->
+
+                        <div id="summary-upload-zone"
+
+                            class="bg-white rounded-xl border-2 border-dashed border-slate-300 p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group relative">
+
+                            <div
+
+                                class="bg-emerald-50 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform duration-300">
+
+                                <i data-lucide="file-bar-chart-2" class="w-8 h-8 text-emerald-600"></i>
+
+                            </div>
+
+                            <h3
+
+                                class="text-sm font-bold text-slate-700 mb-1 group-hover:text-emerald-700 transition-colors">
+
+                                上传数据文件</h3>
+
+                            <p class="text-xs text-slate-400 mb-4">支持 .xlsx, .csv</p>
+
+                            <input type="file" id="summary-file-input" accept=".xlsx,.xls,.csv" class="hidden">
+
+                            <button
+
+                                class="px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 text-xs font-bold hover:border-emerald-400 hover:text-emerald-600 transition-all shadow-sm">
+
+                                选择文件
+
+                            </button>
+
+                        </div>
+
+
+
+                        <!-- Config -->
+
+                        <div id="summary-config-panel"
+
+                            class="hidden bg-white rounded-xl border border-slate-200 shadow-sm p-5 animate-fade-in">
+
+                            <div class="flex justify-between items-center mb-4">
+
+                                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+
+                                    <i data-lucide="settings-2" class="w-4 h-4 text-slate-500"></i>
+
+                                    摘要配置
+
+                                </h3>
+
+                                <button onclick="resetSummary()"
+
+                                    class="text-xs text-red-500 hover:underline">重置</button>
+
+                            </div>
+
+
+
+                            <div class="space-y-4">
+
+                                <div>
+
+                                    <label class="block text-xs font-medium text-slate-600 mb-1.5">分析类型</label>
+
+                                    <select id="summary-type"
+
+                                        class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-emerald-500">
+
+                                        <option value="basic">基础概览 (行数/列数/缺失值)</option>
+
+                                        <option value="distribution">数值分布 (平均值/最大最小)</option>
+
+                                    </select>
+
+                                </div>
+
+
+
+                                <button onclick="startSummary()"
+
+                                    class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-md shadow-emerald-200 transition-all flex items-center justify-center gap-2">
+
+                                    <i data-lucide="activity" class="w-4 h-4"></i> 生成摘要
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Results Panel -->
+
+                    <div
+
+                        class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[600px] overflow-hidden relative">
+
+                        <!-- Header -->
+
+                        <div
+
+                            class="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+
+                            <div class="flex items-center gap-2">
+
+                                <i data-lucide="clipboard-list" class="w-4 h-4 text-slate-400"></i>
+
+                                <span class="text-sm font-bold text-slate-700">摘要报告</span>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- Content -->
+
+                        <div class="flex-1 overflow-auto p-6 relative">
+
+                            <div id="summary-empty-state"
+
+                                class="flex flex-col items-center justify-center h-full text-slate-300">
+
+                                <i data-lucide="bar-chart-big" class="w-16 h-16 mb-4 opacity-50"></i>
+
+                                <p class="text-sm">请上传数据生成摘要</p>
+
+                            </div>
+
+
+
+                            <div id="summary-results" class="hidden space-y-6">
+
+                                <!-- Basic Stats -->
+
+                                <div class="grid grid-cols-3 gap-4">
+
+                                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+
+                                        <div class="text-xs text-slate-500 font-bold mb-1">总行数</div>
+
+                                        <div class="text-2xl font-bold text-slate-700" id="sum-rows">0</div>
+
+                                    </div>
+
+                                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+
+                                        <div class="text-xs text-slate-500 font-bold mb-1">总列数</div>
+
+                                        <div class="text-2xl font-bold text-slate-700" id="sum-cols">0</div>
+
+                                    </div>
+
+                                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+
+                                        <div class="text-xs text-slate-500 font-bold mb-1">文件大小</div>
+
+                                        <div class="text-2xl font-bold text-slate-700" id="sum-size">-</div>
+
+                                    </div>
+
+                                </div>
+
+
+
+                                <!-- Detailed Info -->
+
+                                <div>
+
+                                    <h4 class="text-xs font-bold text-slate-700 mb-3">列信息概览</h4>
+
+                                    <div class="overflow-x-auto border border-slate-200 rounded-lg">
+
+                                        <table class="w-full text-left text-xs">
+
+                                            <thead class="bg-slate-50 font-bold text-slate-500">
+
+                                                <tr>
+
+                                                    <th class="p-2 border-b">列名</th>
+
+                                                    <th class="p-2 border-b">类型 (推测)</th>
+
+                                                    <th class="p-2 border-b">非空计数</th>
+
+                                                </tr>
+
+                                            </thead>
+
+                                            <tbody id="summary-table-body"
+
+                                                class="divide-y divide-slate-100 text-slate-600">
+
+                                                <!-- Rows -->
+
+                                            </tbody>
+
+                                        </table>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- VIEW: FORMULA -->
+
+            <div id="view-formula" class="hidden animate-fade-in max-w-4xl mx-auto space-y-6">
+
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+
+                    <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2 mb-4">
+
+                        <i data-lucide="function-square" class="w-4 h-4 text-purple-500"></i>
+
+                        智能公式生成
+
+                    </h3>
+
+                    <div class="space-y-4">
+
+                        <div>
+
+                            <label class="block text-xs font-medium text-slate-600 mb-1.5">描述需求</label>
+
+                            <textarea id="formulaInput" rows="3"
+
+                                class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-purple-500 transition-all placeholder-slate-400"
+
+                                placeholder="例如：计算A列和B列的和，如果大于100则显示'达标'，否则显示'未达标'"></textarea>
+
+                        </div>
+
+                        <button onclick="startFormulaGen()"
+
+                            class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-bold shadow-md shadow-purple-200 transition-all flex items-center justify-center gap-2">
+
+                            <i data-lucide="sparkles" class="w-4 h-4 text-yellow-300"></i> 生成公式
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Result -->
+
+                <div id="formula-result-card"
+
+                    class="hidden bg-white rounded-xl border border-slate-200 shadow-sm p-6 relative overflow-hidden">
+
+                    <div class="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
+
+                    <div class="mb-3">
+
+                        <span class="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md">生成结果</span>
+
+                    </div>
+
+                    <div class="bg-slate-800 rounded-lg p-4 mb-3 group relative">
+
+                        <code id="formulaOutput"
+
+                            class="text-green-400 font-mono text-sm break-all">=IF(A1+B1>100, "达标", "未达标")</code>
+
+                        <button
+
+                            onclick="navigator.clipboard.writeText(document.getElementById('formulaOutput').textContent)"
+
+                            class="absolute right-2 top-2 p-1.5 bg-white/10 hover:bg-white/20 rounded text-white opacity-0 group-hover:opacity-100 transition-opacity">
+
+                            <i data-lucide="copy" class="w-3 h-3"></i>
+
+                        </button>
+
+                    </div>
+
+                    <p class="text-xs text-slate-500" id="formulaExplanation">公式解释：判断A1与B1之和是否大于100...</p>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- VIEW: CLEANING -->
+
+            <div id="view-cleaning" class="hidden animate-fade-in max-w-6xl mx-auto space-y-6">
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                    <!-- Config -->
+
+                    <div class="lg:col-span-1 space-y-6">
+
+                        <div id="cleaning-upload-zone"
+
+                            class="bg-white rounded-xl border-2 border-dashed border-slate-300 p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:border-orange-500 hover:bg-orange-50/30 transition-all group relative">
+
+                            <div
+
+                                class="bg-orange-50 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform duration-300">
+
+                                <i data-lucide="eraser" class="w-8 h-8 text-orange-600"></i>
+
+                            </div>
+
+                            <h3
+
+                                class="text-sm font-bold text-slate-700 mb-1 group-hover:text-orange-700 transition-colors">
+
+                                上传数据文件</h3>
+
+                            <p class="text-xs text-slate-400 mb-4">支持 .xlsx, .csv</p>
+
+                            <input type="file" id="cleaning-file-input" accept=".xlsx,.xls,.csv" class="hidden">
+
+                            <button
+
+                                class="px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 text-xs font-bold hover:border-orange-400 hover:text-orange-600 transition-all shadow-sm">
+
+                                选择文件
+
+                            </button>
+
+                        </div>
+
+
+
+                        <div id="cleaning-config-panel"
+
+                            class="hidden bg-white rounded-xl border border-slate-200 shadow-sm p-5 animate-fade-in">
+
+                            <div class="flex justify-between items-center mb-4">
+
+                                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+
+                                    <i data-lucide="settings-2" class="w-4 h-4 text-slate-500"></i>
+
+                                    清洗配置
+
+                                </h3>
+
+                                <button onclick="resetCleaning()"
+
+                                    class="text-xs text-red-500 hover:underline">重置</button>
+
+                            </div>
+
+                            <div class="space-y-3">
+
+                                <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+
+                                    <input type="checkbox" checked
+
+                                        class="rounded text-orange-600 focus:ring-orange-500">
+
+                                    去除重复行
+
+                                </label>
+
+                                <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+
+                                    <input type="checkbox" checked
+
+                                        class="rounded text-orange-600 focus:ring-orange-500">
+
+                                    去除空行
+
+                                </label>
+
+                                <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+
+                                    <input type="checkbox" class="rounded text-orange-600 focus:ring-orange-500">
+
+                                    去除首尾空格
+
+                                </label>
+
+                                <button onclick="startCleaning()"
+
+                                    class="w-full mt-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-bold shadow-md shadow-orange-200 transition-all flex items-center justify-center gap-2">
+
+                                    <i data-lucide="play" class="w-4 h-4"></i> 开始清洗
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Preview -->
+
+                    <div
+
+                        class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[600px] overflow-hidden relative">
+
+                        <div
+
+                            class="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+
+                            <div class="flex items-center gap-2">
+
+                                <i data-lucide="table" class="w-4 h-4 text-slate-400"></i>
+
+                                <span class="text-sm font-bold text-slate-700">数据预览</span>
+
+                            </div>
+
+                        </div>
+
+                        <div class="flex-1 overflow-auto relative">
+
+                            <table class="w-full text-left border-collapse">
+
+                                <thead class="bg-slate-50 sticky top-0 z-10 text-xs font-semibold text-slate-500">
+
+                                    <tr id="cleaning-table-head"></tr>
+
+                                </thead>
+
+                                <tbody id="cleaning-table-body"
+
+                                    class="text-sm text-slate-600 divide-y divide-slate-100">
+
+                                    <tr>
+
+                                        <td colspan="100" class="py-20 text-center text-slate-300">
+
+                                            <i data-lucide="file-spreadsheet"
+
+                                                class="w-12 h-12 mb-3 opacity-50 mx-auto"></i>
+
+                                            <p class="text-sm">请先上传文件</p>
+
+                                        </td>
+
+                                    </tr>
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- VIEW: TEXT TRANSLATION -->
+
+            <div id="view-text" class="hidden animate-fade-in max-w-5xl mx-auto space-y-6">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-[600px]">
+
+                    <!-- Input Section -->
+
+                    <div
+
+                        class="flex flex-col h-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+
+                        <div
+
+                            class="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+
+                            <label class="text-xs font-bold text-slate-700 uppercase tracking-wider">原文</label>
+
+                            <button onclick="document.getElementById('textInput').value = ''"
+
+                                class="text-xs text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1">
+
+                                <i data-lucide="trash-2" class="w-3 h-3"></i> 清空
+
+                            </button>
+
+                        </div>
+
+                        <textarea id="textInput"
+
+                            class="flex-1 w-full p-4 outline-none resize-none text-sm leading-relaxed text-slate-700 placeholder-slate-300"
+
+                            placeholder="在此输入或粘贴需要翻译的文本..."></textarea>
+
+                    </div>
+
+
+
+                    <!-- Output Section -->
+
+                    <div
+
+                        class="flex flex-col h-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
+
+                        <div
+
+                            class="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+
+                            <label class="text-xs font-bold text-slate-700 uppercase tracking-wider">译文</label>
+
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('textOutput').value)"
+
+                                class="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+
+                                <i data-lucide="copy" class="w-3 h-3"></i> 复制
+
+                            </button>
+
+                        </div>
+
+                        <textarea id="textOutput" readonly
+
+                            class="flex-1 w-full p-4 bg-slate-50/30 outline-none resize-none text-sm leading-relaxed text-slate-700"
+
+                            placeholder="等待翻译..."></textarea>
+
+
+
+                        <!-- Loading Overlay -->
+
+                        <div id="textLoading"
+
+                            class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10">
+
+                            <div class="flex flex-col items-center gap-3">
+
+                                <i data-lucide="loader-2" class="w-8 h-8 text-blue-600 animate-spin"></i>
+
+                                <span class="text-xs text-blue-600 font-medium">正在翻译中...</span>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Action Bar -->
+
+                <div class="flex justify-center">
+
+                    <button id="startTextTranslateBtn" onclick="startTextTranslate()"
+
+                        class="px-8 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-full font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 transform active:scale-95">
+
+                        <i data-lucide="sparkles" class="w-4 h-4 text-yellow-400"></i>
+
+                        立即翻译
+
+                    </button>
+
+                </div>
+
+            </div>
+
+            <!-- VIEW: COMMENT ANALYSIS -->
+
+            <div id="view-analysis" class="hidden animate-fade-in max-w-6xl mx-auto space-y-6">
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                    <!-- Config Panel -->
+
+            <div class="lg:col-span-1 space-y-6">
+
+                <!-- Upload -->
+
+                <div id="analysis-upload-zone"
+
+                    class="bg-white rounded-xl border-2 border-dashed border-slate-300 p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:border-violet-500 hover:bg-violet-50/30 transition-all group relative">
+
+                    <div
+
+                        class="bg-violet-50 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform duration-300">
+
+                        <i data-lucide="upload-cloud" class="w-8 h-8 text-violet-600"></i>
+
+                    </div>
+
+                    <h3 class="text-sm font-bold text-slate-700 mb-1 group-hover:text-violet-700 transition-colors">
+
+                        上传评论文件</h3>
+
+                    <p class="text-xs text-slate-400 mb-4">支持 .xlsx, .csv</p>
+
+                    <input type="file" id="analysis-file-input" accept=".xlsx,.xls,.csv" class="hidden">
+
+                    <button
+
+                        class="px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 text-xs font-bold hover:border-violet-400 hover:text-violet-600 transition-all shadow-sm">
+
+                        选择文件
+
+                    </button>
+
+                </div>
+
+
+
+                
+                <!-- Remote Data Loader -->
+                <div class="bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 p-5">
+                    <h4 class="text-xs font-bold text-slate-700 flex items-center gap-2 mb-3">
+                        <i data-lucide="globe" class="w-3 h-3 text-violet-500"></i>
+                        加载网络测试数据
+                    </h4>
+                    <div class="grid grid-cols-1 gap-2">
+                        <button onclick="fetchDemoDataForAnalysis()"
+                            class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-600 hover:border-violet-400 hover:text-violet-600 transition-all text-left">
+                            💬 用户评论示例
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Config -->
+
+                <div id="analysis-config-panel"
+
+                    class="hidden bg-white rounded-xl border border-slate-200 shadow-sm p-5 animate-fade-in">
+
+                    <div class="flex justify-between items-center mb-4">
+
+                        <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+
+                            <i data-lucide="sliders-horizontal" class="w-4 h-4 text-slate-500"></i>
+
+                            分析配置
+
+                        </h3>
+
+                        <button onclick="resetAnalysis()" class="text-xs text-red-500 hover:underline">重置</button>
+
+                    </div>
+
+
+
+                    <div class="space-y-4">
+
+                        <div>
+
+                            <label class="block text-xs font-medium text-slate-600 mb-1.5">评论内容列</label>
+
+                            <select id="analysis-source-col"
+
+                                class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-violet-500"></select>
+
+                        </div>
+
+
+
+                        <!-- Categories Config -->
+
+                        <div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+
+                            <label class="block text-xs font-bold text-slate-700 mb-2">分类标签</label>
+
+                            <div class="flex gap-2 mb-2">
+
+                                <input type="text" id="newCategoryInput" placeholder="输入标签按回车"
+
+                                    class="flex-1 px-2 py-1.5 text-xs border border-slate-300 rounded focus:border-violet-500 outline-none"
+
+                                    onkeydown="if(event.key==='Enter'){addCategory();event.preventDefault();}">
+
+                                <button onclick="addCategory()"
+
+                                    class="bg-violet-600 text-white px-2 rounded hover:bg-violet-700">
+
+                                    <i data-lucide="plus" class="w-3 h-3"></i>
+
+                                </button>
+
+                            </div>
+
+                            <div id="categoryTags" class="flex flex-wrap gap-1.5 min-h-[30px]">
+
+                                <!-- Tags injected here -->
+
+                                <span class="text-[10px] text-slate-400 italic p-1">暂无标签...</span>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <button onclick="startAnalysis()"
+
+                            class="w-full py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-bold shadow-md shadow-violet-200 transition-all flex items-center justify-center gap-2">
+
+                            <i data-lucide="brain" class="w-4 h-4"></i> 开始分析
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Results Panel -->
+
+            <div
+
+                class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[600px] overflow-hidden relative">
+
+                <!-- Header -->
+
+                <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+
+                    <div class="flex items-center gap-2">
+
+                        <i data-lucide="bar-chart-2" class="w-4 h-4 text-slate-400"></i>
+
+                        <span class="text-sm font-bold text-slate-700">分析结果</span>
+
+                    </div>
+
+                    <button id="btn-export-analysis" disabled
+
+                        class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-400 hover:text-violet-600 hover:border-violet-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1">
+
+                        <i data-lucide="download" class="w-3 h-3"></i> 导出报告
+
+                    </button>
+
+                </div>
+
+
+
+                <!-- Content -->
+
+                <div class="flex-1 overflow-auto p-6 relative">
+
+                    <div id="analysis-empty-state"
+
+                        class="flex flex-col items-center justify-center h-full text-slate-300">
+
+                        <i data-lucide="pie-chart" class="w-16 h-16 mb-4 opacity-50"></i>
+
+                        <p class="text-sm">请上传数据并开始分析</p>
+
+                    </div>
+
+
+
+                    <div id="analysis-results" class="hidden space-y-6">
+
+                        <!-- Summary Cards -->
+
+                        <div class="grid grid-cols-3 gap-4">
+
+                            <div class="bg-green-50 p-4 rounded-xl border border-green-100">
+
+                                <div class="text-xs text-green-600 font-bold mb-1">正面评论</div>
+
+                                <div class="text-2xl font-bold text-green-700" id="stat-positive">0%</div>
+
+                            </div>
+
+                            <div class="bg-red-50 p-4 rounded-xl border border-red-100">
+
+                                <div class="text-xs text-red-600 font-bold mb-1">负面评论</div>
+
+                                <div class="text-2xl font-bold text-red-700" id="stat-negative">0%</div>
+
+                            </div>
+
+                            <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+
+                                <div class="text-xs text-blue-600 font-bold mb-1">总条数</div>
+
+                                <div class="text-2xl font-bold text-blue-700" id="stat-total">0</div>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- Table Preview -->
+
+                        <div>
+
+                            <h4 class="text-xs font-bold text-slate-700 mb-3">详细数据</h4>
+
+                            <div class="overflow-x-auto border border-slate-200 rounded-lg">
+
+                                <table class="w-full text-left text-xs">
+
+                                    <thead class="bg-slate-50 font-bold text-slate-500">
+
+                                        <tr>
+
+                                            <th class="p-2 border-b">评论内容</th>
+
+                                            <th class="p-2 border-b w-24">情感</th>
+
+                                            <th class="p-2 border-b w-32">标签</th>
+
+                                        </tr>
+
+                                    </thead>
+
+                                    <tbody id="analysis-table-body" class="divide-y divide-slate-100 text-slate-600">
+
+                                        <!-- Rows -->
+
+                                    </tbody>
+
+                                </table>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Loading Overlay -->
+
+                <div id="analysis-loading"
+
+                    class="hidden absolute inset-0 bg-white/90 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
+
+                    <div
+
+                        class="w-16 h-16 border-4 border-violet-100 border-t-violet-600 rounded-full animate-spin mb-4">
+
+                    </div>
+
+                    <p class="text-sm font-bold text-violet-600 animate-pulse">AI 正在分析评论情感与观点...</p>
+
+                    <p class="text-xs text-slate-400 mt-2">已处理 <span id="analysis-processed-count">0</span> 条</p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        </div>
+
+    </main>
+
+
+
+    <!-- Settings Modal -->
+
+    <div id="settingsModal"
+
+        class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center backdrop-blur-sm transition-opacity opacity-0">
+
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all scale-95 duration-300"
+
+            id="settingsContent">
+
+            <!-- Header -->
+
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+
+                <h3 class="font-bold text-slate-800 text-lg">API 配置</h3>
+
+                <button onclick="closeSettings()" class="text-slate-400 hover:text-slate-600 transition-colors">
+
+                    <i data-lucide="x" class="w-5 h-5"></i>
+
+                </button>
+
+            </div>
+
+            <!-- Body -->
+
+            <div class="p-6">
+
+                <!-- Platform Selection -->
+
+                <div class="grid grid-cols-2 gap-4 mb-6">
+
+                    
+
+                    <div id="platform-aiping" onclick="selectPlatform('aiping')"
+
+                        class="cursor-pointer border-2 border-transparent bg-slate-50 hover:bg-slate-100 rounded-xl p-4 flex flex-col items-center text-center transition-all group relative z-0">
+
+                        <div class="absolute top-2 right-2 hidden" id="badge-aiping" class="pointer-events-none">
+
+                            <i data-lucide="check-circle-2" class="w-5 h-5 text-purple-600 fill-purple-100"></i>
+
+                        </div>
+
+                        <span class="font-bold text-slate-700 text-lg">aiping.cn</span>
+
+                        <span class="text-xs text-slate-500 mt-1">AI 聚合平台</span>
+
+                    </div>
+
+                    <div id="platform-siliconflow" onclick="selectPlatform('siliconflow')"
+
+                        class="cursor-pointer border-2 border-blue-500 bg-blue-50 rounded-xl p-4 flex flex-col items-center text-center transition-all group relative">
+
+                        <div class="absolute top-2 right-2 hidden" id="badge-siliconflow" class="pointer-events-none">
+
+                            <i data-lucide="check-circle-2" class="w-5 h-5 text-blue-600 fill-blue-100"></i>
+
+                        </div>
+
+                        <span class="font-bold text-blue-700 text-lg">硅基流动</span>
+
+                        <span class="text-xs text-blue-500 mt-1">SiliconCloud</span>
+
+                    </div>
+
+</div>
+
+
+
+                <!-- Config Area: SiliconFlow -->
+
+                <div id="config-siliconflow" class="space-y-5 animate-fade-in">
+
+                    <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-4">
+
+                        <div class="flex items-start gap-3">
+
+                            <div class="bg-blue-100 p-2 rounded-lg text-blue-600">
+
+                                <i data-lucide="gift" class="w-5 h-5"></i>
+
+                            </div>
+
+                            <div>
+
+                                <h4 class="text-sm font-bold text-blue-800 mb-1">新用户福利</h4>
+
+                                <p class="text-xs text-blue-600 mb-2">送14元额度，轻量级模型免费用，速度快效果好</p>
+
+                                <div class="flex items-center gap-3">
+
+                                    <a href="https://cloud.siliconflow.cn/i/S8pG3891" target="_blank" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors font-medium">
+
+                                        去注册领取
+
+                                    </a>
+
+                                    <div class="flex items-center gap-2 bg-white px-2 py-1 rounded border border-blue-200">
+
+                                        <span class="text-[10px] text-slate-500">邀请码:</span>
+
+                                        <code class="text-xs font-mono text-blue-700 font-bold">S8pG3891</code>
+
+                                        <button onclick="navigator.clipboard.writeText('S8pG3891')" class="text-blue-400 hover:text-blue-600">
+
+                                            <i data-lucide="copy" class="w-3 h-3"></i>
+
+                                        </button>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div>
+
+                        <label class="block text-sm font-medium text-slate-700 mb-1">API Key <a href="https://cloud.siliconflow.cn/me/account/ak" target="_blank" class="text-xs text-blue-500 hover:underline ml-1">(获取 Key)</a></label>
+
+                        <div class="relative">
+
+                        <input type="password" id="apiKey-siliconflow"
+
+                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-mono text-sm"
+
+                            placeholder="sk-...">
+
+                        <button onclick="toggleApiKeyVisibility('apiKey-siliconflow')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+
+                        </button>
+
+                    </div>
+
+                    </div>
+
+                    
+
+                    <div class="grid grid-cols-2 gap-4">
+
+                        <div>
+
+                            <label class="block text-sm font-medium text-slate-700 mb-1">翻译模型</label>
+
+                            <select id="translateModel-siliconflow" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+
+                                <option value="deepseek-ai/DeepSeek-V3">DeepSeek-V3 (推荐)</option>
+
+                                <option value="Tencent/Hunyuan-MT-7B">Hunyuan-MT (腾讯专业翻译)</option>
+
+                                <option value="deepseek-ai/DeepSeek-V2.5">DeepSeek-V2.5</option>
+
+                                <option value="Qwen/Qwen2.5-7B-Instruct">Qwen2.5-7B</option>
+
+                            </select>
+
+                        </div>
+
+                        <div>
+
+                            <label class="block text-sm font-medium text-slate-700 mb-1">分析模型</label>
+
+                            <select id="workModel-siliconflow" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+
+                                <option value="deepseek-ai/DeepSeek-V3">DeepSeek-V3 (最新)</option>
+
+                                <option value="deepseek-ai/DeepSeek-R1-Distill-Llama-8B">DeepSeek-R1 (推理)</option>
+
+                                <option value="THUDM/glm-4-9b-chat">GLM-4-9B</option>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Config Area: Aiping -->
+
+                <div id="config-aiping" class="hidden space-y-5 animate-fade-in">
+
+                    <div class="bg-purple-50/50 border border-purple-100 rounded-xl p-4">
+
+                        <div class="flex items-start gap-3">
+
+                            <div class="bg-purple-100 p-2 rounded-lg text-purple-600">
+
+                                <i data-lucide="crown" class="w-5 h-5"></i>
+
+                            </div>
+
+                            <div>
+
+                                <h4 class="text-sm font-bold text-purple-800 mb-1">聚合平台优势</h4>
+
+                                <p class="text-xs text-purple-600 mb-2">顶级模型免费用，而且送20元额度</p>
+
+                                <div class="flex items-center gap-3">
+
+                                    <a href="https://www.aiping.cn/#?invitation_code=WBEJSN" target="_blank" class="text-xs bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700 transition-colors font-medium">
+
+                                        去注册 (优先推荐)
+
+                                    </a>
+
+                                    <div class="flex items-center gap-2 bg-white px-2 py-1 rounded border border-purple-200">
+
+                                        <span class="text-[10px] text-slate-500">邀请码:</span>
+
+                                        <code class="text-xs font-mono text-purple-700 font-bold">WBEJSN</code>
+
+                                        <button onclick="navigator.clipboard.writeText('WBEJSN')" class="text-purple-400 hover:text-purple-600">
+
+                                            <i data-lucide="copy" class="w-3 h-3"></i>
+
+                                        </button>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div>
+
+                        <label class="block text-sm font-medium text-slate-700 mb-1">API Key <a href="https://www.aiping.cn/user/apikey" target="_blank" class="text-xs text-purple-500 hover:underline ml-1">(获取 Key)</a></label>
+
+                        <div class="relative">
+
+                        <input type="password" id="apiKey-aiping"
+
+                            class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all font-mono text-sm"
+
+                            placeholder="sk-...">
+
+                        <button onclick="toggleApiKeyVisibility('apiKey-aiping')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+
+                        </button>
+
+                    </div>
+
+                    </div>
+
+
+
+                    <div class="grid grid-cols-2 gap-4">
+
+                        <div>
+
+                            <label class="block text-sm font-medium text-slate-700 mb-1">翻译模型</label>
+
+                            <select id="translateModel-aiping" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+
+<option value="GLM-4.7">GLM-4.7</option>
+
+                                <option value="MiniMax-M2.1">MiniMax-M2.1</option>
+
+                                <option value="Qwen3-235B-A22B">Qwen3-235B-A22B</option>
+
+                                <option value="DeepSeek-V3.2">DeepSeek-V3.2</option>
+
+                            </select>
+
+                        </div>
+
+                        <div>
+
+                            <label class="block text-sm font-medium text-slate-700 mb-1">分析模型</label>
+
+                            <select id="workModel-aiping" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none">
+
+<option value="GLM-4.7">GLM-4.7</option>
+
+                                <option value="MiniMax-M2.1">MiniMax-M2.1</option>
+
+                                <option value="Qwen3-235B-A22B">Qwen3-235B-A22B</option>
+
+                                <option value="DeepSeek-V3.2">DeepSeek-V3.2</option>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Footer -->
+
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+
+                <div id="testResultText" class="text-xs"></div>
+
+                <div class="flex gap-3">
+
+                    <button onclick="testApiConnection()"
+
+                        id="testApiBtn"
+
+                        class="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors text-sm">测试连接</button>
+
+                    <button onclick="saveSettings()"
+
+                        class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 text-sm">保存配置</button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <script>
+
+        // ==================== API 平台配置 ====================
+
+        const API_PLATFORMS = {
+
+            siliconflow: {
+
+                name: '硅基流动',
+
+                url: 'https://api.siliconflow.cn/v1/chat/completions',
+
+                registerUrl: 'https://cloud.siliconflow.cn/i/S8pG3891',
+
+                keyUrl: 'https://cloud.siliconflow.cn/me/account/ak',
+
+                inviteCode: 'S8pG3891',
+
+                models: {
+
+                    translate: 'deepseek-ai/DeepSeek-V3',
+
+                    work: 'deepseek-ai/DeepSeek-V3',
+
+                    analysis: [
+
+                        { id: 'deepseek-ai/DeepSeek-V3', name: 'DeepSeek-V3 (最新)' },
+
+                        { id: 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B', name: 'DeepSeek-R1 (推理)' },
+
+                        { id: 'THUDM/glm-4-9b-chat', name: 'GLM-4-9B' }
+
+                    ]
+
+                },
+
+                useSystemPrompt: false // 硅基流动的翻译模型不需要 system prompt
+
+            },
+
+            aiping: {
+
+                name: 'aiping.cn',
+
+                url: 'https://www.aiping.cn/api/v1/chat/completions',
+
+                registerUrl: 'https://www.aiping.cn/#?invitation_code=WBEJSN',
+
+                keyUrl: 'https://www.aiping.cn/user/apikey',
+
+                inviteCode: 'WBEJSN',
+
+                models: {
+
+                    translate: 'DeepSeek-V3.2',
+
+                    work: 'DeepSeek-V3.2',
+
+                    analysis: [
+
+                        { id: 'GLM-4.7', name: 'GLM-4.7' },
+
+                        { id: 'MiniMax-M2.1', name: 'MiniMax-M2.1' },
+
+                        { id: 'Qwen3-235B-A22B', name: 'Qwen3-235B-A22B' },
+
+                        { id: 'DeepSeek-V3.2', name: 'DeepSeek-V3.2' }
+
+                    ]
+
+                },
+
+                useSystemPrompt: true // aiping 需要 system prompt 指导翻译
+
+            }
+
+        };
+
+
+
+        // 获取当前平台配置
+
+        function getApiConfig() {
+
+            const platform = localStorage.getItem('api_platform') || 'aiping';
+
+            const config = API_PLATFORMS[platform];
+
+
+
+            // 动态获取用户选择的翻译模型
+
+            const modelSelect = document.getElementById(`translateModel-${platform}`);
+
+            const translateModel = modelSelect ? modelSelect.value : config.models.translate;
+
+
+
+            // 动态获取用户选择的工作模型
+
+            const workModelSelect = document.getElementById(`workModel-${platform}`);
+
+            const workModel = workModelSelect ? workModelSelect.value : config.models.work;
+
+
+
+            // 判断是否需要 system prompt (非专用翻译模型都需要)
+
+            const isSpecializedTranslator = translateModel === 'Tencent/Hunyuan-MT-7B';
+
+
+
+            return {
+
+                ...config,
+
+                platform: platform,
+
+                key: localStorage.getItem(`${platform}_api_key`),
+
+                models: {
+
+                    ...config.models,
+
+                    translate: translateModel,
+
+                    work: workModel
+
+                },
+
+                useSystemPrompt: platform === 'aiping' || !isSpecializedTranslator
+
+            };
+
+        }
+
+
+
+        let currentPlatform = 'aiping';
+
+
+
+        // --- 初始化 ---
+
+        window.addEventListener('DOMContentLoaded', () => {
+
+            // 加载保存的平台选择
+
+            currentPlatform = localStorage.getItem('api_platform') || 'aiping';
+
+
+
+            // 加载各平台的 API Key
+
+            const siliconflowKey = localStorage.getItem('siliconflow_api_key');
+
+            const aipingKey = localStorage.getItem('aiping_api_key');
+
+
+
+            if (siliconflowKey) {
+
+                const el = document.getElementById('apiKey-siliconflow');
+
+                if(el) el.value = siliconflowKey;
+
+            }
+
+            if (aipingKey) {
+
+                const el = document.getElementById('apiKey-aiping');
+
+                if(el) el.value = aipingKey;
+
+            }
+
+
+
+            // 检查是否有任何平台配置了 API Key
+
+            const hasAnyKey = siliconflowKey || aipingKey;
+
+            if (hasAnyKey) {
+
+                updatePlatformUI();
+
+                // 更新状态灯为绿色
+                const dot = document.getElementById('apiStatusDot');
+                if (dot) dot.className = 'ml-auto w-2 h-2 rounded-full bg-green-400';
+
+            }
+
+            // 恢复模型选择
+            ['siliconflow', 'aiping'].forEach(function(platform) {
+                const savedTranslate = localStorage.getItem(platform + '_translate_model');
+                const savedWork = localStorage.getItem(platform + '_work_model');
+                if (savedTranslate) {
+                    const el = document.getElementById('translateModel-' + platform);
+                    if (el) el.value = savedTranslate;
+                }
+                if (savedWork) {
+                    const el = document.getElementById('workModel-' + platform);
+                    if (el) el.value = savedWork;
+                }
+            });
+
+        });
+
+
+
+        // --- 平台选择逻辑 ---
+
+        window.selectPlatform = function(platform) {
+
+            currentPlatform = platform;
+
+
+
+            // 更新卡片样式
+
+            const siliconflowCard = document.getElementById('platform-siliconflow');
+
+            const aipingCard = document.getElementById('platform-aiping');
+
+            const siliconflowBadge = document.getElementById('badge-siliconflow');
+
+            const aipingBadge = document.getElementById('badge-aiping');
+
+
+
+            if (platform === 'siliconflow') {
+
+                siliconflowCard.className = 'cursor-pointer border-2 border-blue-500 bg-blue-50 rounded-xl p-4 flex flex-col items-center text-center transition-all group relative';
+
+                aipingCard.className = 'cursor-pointer border-2 border-transparent bg-slate-50 hover:bg-slate-100 rounded-xl p-4 flex flex-col items-center text-center transition-all group relative';
+
+                if(siliconflowBadge) siliconflowBadge.classList.remove('hidden');
+
+                if(aipingBadge) aipingBadge.classList.add('hidden');
+
+            } else {
+
+                siliconflowCard.className = 'cursor-pointer border-2 border-transparent bg-slate-50 hover:bg-slate-100 rounded-xl p-4 flex flex-col items-center text-center transition-all group relative';
+
+                aipingCard.className = 'cursor-pointer border-2 border-purple-500 bg-purple-50 rounded-xl p-4 flex flex-col items-center text-center transition-all group relative';
+
+                if(siliconflowBadge) siliconflowBadge.classList.add('hidden');
+
+                if(aipingBadge) aipingBadge.classList.remove('hidden');
+
+            }
+
+
+
+            // 切换配置区域
+
+            document.getElementById('config-siliconflow').classList.toggle('hidden', platform !== 'siliconflow');
+
+            document.getElementById('config-aiping').classList.toggle('hidden', platform !== 'aiping');
+
+
+
+            // 清除测试结果
+
+            const testRes = document.getElementById('testResultText');
+
+            if(testRes) testRes.textContent = '';
+
+        }
+
+
+
+        // 更新平台 UI 状态
+
+        function updatePlatformUI() {
+
+            const config = getApiConfig();
+
+            selectPlatform(config.platform);
+
+        }
+
+
+
+        // --- API 连通性测试 ---
+
+        async function testApiConnection() {
+
+            const config = getApiConfig();
+
+            const keyInput = document.getElementById(`apiKey-${currentPlatform}`);
+
+            const key = keyInput.value.trim();
+
+
+
+            if (!key) {
+
+                showTestResult('error', '请先输入 API Key');
+
+                return;
+
+            }
+
+
+
+            showTestResult('loading', '正在测试连接...');
+
+            const btn = document.getElementById('testApiBtn');
+
+            btn.disabled = true;
+
+
+
+            try {
+
+                const testConfig = API_PLATFORMS[currentPlatform];
+
+                const messages = testConfig.useSystemPrompt
+
+                    ? [{ role: 'system', content: 'You are a translator.' }, { role: 'user', content: 'Hi' }]
+
+                    : [{ role: 'user', content: 'Hi' }];
+
+
+
+                const resp = await fetch(testConfig.url, {
+
+                    method: 'POST',
+
+                    headers: {
+
+                        'Authorization': `Bearer ${key}`,
+
+                        'Content-Type': 'application/json'
+
+                    },
+
+                    body: JSON.stringify({
+
+                        model: testConfig.models.translate,
+
+                        messages: messages,
+
+                        max_tokens: 5
+
+                    })
+
+                });
+
+
+
+                if (resp.ok) {
+
+                    showTestResult('success', '连接成功!');
+
+                } else {
+
+                    const error = await resp.json();
+
+                    showTestResult('error', `连接失败: ${error.error?.message || resp.status}`);
+
+                }
+
+            } catch (e) {
+
+                showTestResult('error', `网络错误: ${e.message}`);
+
+            } finally {
+
+                btn.disabled = false;
+
+            }
+
+        }
+
+
+
+        function showTestResult(type, message) {
+
+            const el = document.getElementById('testResultText');
+
+            if (type === 'loading') {
+
+                el.className = 'text-xs text-blue-600 animate-pulse';
+
+                el.textContent = message;
+
+            } else if (type === 'success') {
+
+                el.className = 'text-xs text-green-600 font-medium';
+
+                el.textContent = message;
+
+            } else {
+
+                el.className = 'text-xs text-red-600';
+
+                el.textContent = message;
+
+            }
+
+        }
+
+
+
+        // --- 设置逻辑 ---
+
+        function openSettings() {
+
+            const modal = document.getElementById('settingsModal');
+
+            modal.classList.remove('hidden');
+
+            setTimeout(() => {
+
+                modal.classList.remove('opacity-0');
+
+                modal.classList.add('opacity-100');
+
+            }, 10);
+
+            
+
+            // Load current state
+
+            updatePlatformUI();
+
+        }
+
+
+
+        function closeSettings() {
+
+            const modal = document.getElementById('settingsModal');
+
+            modal.classList.remove('opacity-100');
+
+            modal.classList.add('opacity-0');
+
+            setTimeout(() => modal.classList.add('hidden'), 300);
+
+        }
+
+
+
+        function saveSettings() {
+
+            const keyInput = document.getElementById(`apiKey-${currentPlatform}`);
+
+            const key = keyInput.value.trim();
+
+
+
+            if (!key) {
+
+                alert('请输入 API Key');
+
+                return;
+
+            }
+
+
+
+            // 保存当前平台和对应的 API Key
+
+            localStorage.setItem('api_platform', currentPlatform);
+
+            localStorage.setItem(`${currentPlatform}_api_key`, key);
+
+
+
+            // Update Models
+
+            // (Optional: save model choices if needed, currently getApiConfig reads them dynamically)
+
+
+
+            closeSettings();
+
+            alert('配置已保存');
+
+        }
+
+
+
+
+
+        // Initialize Icons
+
+        lucide.createIcons();
+
+
+
+        // View Switching Logic
+
+        function switchView(viewName) {
+
+            // Hide all views
+
+            document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
+
+            // Show target view
+
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+
+
+
+            // Update Sidebar Active State
+
+            document.querySelectorAll('#sidebar button').forEach(btn => {
+
+                btn.classList.remove('sidebar-item-active');
+
+            });
+
+            const navBtn = document.getElementById(`nav-${viewName}`);
+
+            if (navBtn) navBtn.classList.add('sidebar-item-active');
+
+
+
+            // Update Header Title
+
+            const titles = {
+
+                'home': '功能主页',
+
+                'translate': '批量翻译',
+
+                'text': '文本翻译',
+
+                'analysis': '评论分析',
+
+                'summary': '数据摘要',
+
+                'formula': '公式生成',
+
+                'cleaning': '数据清洗'
+
+            };
+
+            document.getElementById('pageTitle').textContent = titles[viewName] || '智能分析助手';
+
+        }
+
+
+
+        // --- 文件处理逻辑 ---
+
+// --- File Handling Logic ---
+
+
+
+        const translateDropZone = document.getElementById('translate-upload-zone');
+
+        const translateFileInput = document.getElementById('translate-file-input');
+
+
+
+        if (translateDropZone) {
+
+            translateDropZone.addEventListener('click', () => translateFileInput.click());
+
+            translateFileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+
+
+            // Drag & Drop
+
+            translateDropZone.addEventListener('dragover', (e) => { e.preventDefault(); translateDropZone.classList.add('border-blue-500', 'bg-blue-50'); });
+
+            translateDropZone.addEventListener('dragleave', (e) => { e.preventDefault(); translateDropZone.classList.remove('border-blue-500', 'bg-blue-50'); });
+
+            translateDropZone.addEventListener('drop', (e) => {
+
+                e.preventDefault();
+
+                translateDropZone.classList.remove('border-blue-500', 'bg-blue-50');
+
+                handleFile(e.dataTransfer.files[0]);
+
+            });
+
+        }
+
+
+
+        function handleFile(file) {
+
+            if (!file) return;
+            if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+                alert('请上传 Excel (.xlsx, .xls) 或 CSV 文件');
+                return;
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+
+                const data = new Uint8Array(e.target.result);
+
+                const workbook = XLSX.read(data, { type: 'array', codepage: 936 });
+
+                processWorkbook(workbook);
+
+            };
+
+            reader.readAsArrayBuffer(file);
+
+        }
+
+
+
+        // --- Remote Data Fetching ---
+
+        const DEMO_DATA = {
+            specs: [
+                ['产品名称', '规格描述', '价格'],
+                ['Wireless Mouse', 'Connectivity: 2.4GHz & Bluetooth 5.0, DPI: 1600, Battery: 1 AA', '$15'],
+                ['Mechanical Keyboard', 'Switch: Blue, Layout: 87 Keys, Backlight: RGB, Material: PBT', '$45'],
+                ['Gaming Headset', 'Driver: 50mm Neodymium, Mic: Noise Cancelling, Cable: 2m Braided', '$30'],
+                ['USB-C Hub', 'Ports: 7-in-1 (HDMI 4K, USB3.0x3, SD, MicroSD, PD100W), Material: Aluminum', '$28'],
+                ['Webcam', 'Resolution: 1080P/30fps, FOV: 90 deg, Autofocus: Yes, Microphone: Built-in Noise Cancel', '$35']
+            ],
+            comments: [
+                ['用户ID', '评分', '评论内容'],
+                ['User_001', '3', 'The delivery was fast, but the packaging was damaged. Product works fine though.'],
+                ['User_002', '1', 'Terrible quality. It stopped working after 2 days. Do not buy!'],
+                ['User_003', '5', 'Absolutely love it! Best value for money. Highly recommended.'],
+                ['User_004', '4', 'Good product overall. Color slightly different from pictures but quality is solid.'],
+                ['User_005', '2', 'Customer service was unhelpful when I had issues. Product is mediocre at best.'],
+                ['User_006', '5', 'Exceeded my expectations! Fast shipping, great packaging, amazing product.'],
+                ['User_007', '1', 'Complete waste of money. Broke on first use. The seller is unresponsive.'],
+                ['User_008', '4', 'Pretty good value. Minor scratches on arrival but nothing serious. Works perfectly.']
+            ]
+        };
+
+        function fetchDemoData(type) {
+            const data = DEMO_DATA[type];
+            if (!data) return;
+            if (type === 'specs') document.getElementById('translateScenario').value = 'ecommerce_spec';
+            else if (type === 'comments') document.getElementById('translateScenario').value = 'ecommerce_comment';
+            loadDataIntoTable(data);
+        }
+        // --- 为不同模块添加的远程数据加载函数 ---
+        function fetchDemoDataForSummary() {
+            const data = DEMO_DATA.comments;
+            currentHeaders = data[0];
+            currentData = data.slice(1);
+            document.getElementById('summary-upload-zone').classList.add('hidden');
+            document.getElementById('summary-config-panel').classList.remove('hidden');
+            document.getElementById('sum-size').textContent = '-';
+        }
+
+        function fetchDemoDataForCleaning() {
+            const data = DEMO_DATA.specs;
+            currentHeaders = data[0];
+            currentData = data.slice(1);
+            document.getElementById('cleaning-upload-zone').classList.add('hidden');
+            document.getElementById('cleaning-config-panel').classList.remove('hidden');
+            renderCleaningPreview(currentHeaders, currentData.slice(0, 20));
+        }
+
+        function fetchDemoDataForAnalysis() {
+            const data = DEMO_DATA.comments;
+            currentHeaders = data[0];
+            currentData = data.slice(1);
+            analysisRawData = data.slice(1);
+            document.getElementById('analysis-upload-zone').classList.add('hidden');
+            document.getElementById('analysis-config-panel').classList.remove('hidden');
+            const select = document.getElementById('analysis-source-col');
+            select.innerHTML = '';
+            currentHeaders.forEach(function(h, i) {
+                select.add(new Option(h || ('列 ' + (i + 1)), i));
+            });
+            select.value = 2;
+        }
+
+        function processWorkbook(workbook) {
+
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+
+            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+            loadDataIntoTable(jsonData);
+
+        }
+
+
+
+        function loadDataIntoTable(jsonData) {
+
+            if (!jsonData || jsonData.length === 0) return;
+
+
+
+            currentHeaders = jsonData[0];
+
+            currentData = jsonData.slice(1);
+
+
+
+            // Update UI
+
+            document.getElementById('translate-upload-zone').classList.add('hidden');
+
+            document.getElementById('translate-config-panel').classList.remove('hidden');
+
+            document.getElementById('translate-row-count').textContent = `${currentData.length} 行`;
+
+
+
+            // Populate Column Select
+
+            const select = document.getElementById('translate-source-col');
+
+            select.innerHTML = '';
+
+            currentHeaders.forEach((h, i) => {
+
+                select.add(new Option(h || `列 ${i + 1}`, i));
+
+            });
+
+
+
+            renderTable(currentHeaders, currentData.slice(0, 50)); // Preview 50
+
+        }
+
+
+
+        function renderTable(headers, rows) {
+
+            const thead = document.getElementById('translate-table-head');
+
+            const tbody = document.getElementById('translate-table-body');
+
+
+
+            thead.innerHTML = headers.map(h => `<th class="px-4 py-3 border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">${h}</th>`).join('');
+
+
+
+            tbody.innerHTML = rows.map((row, i) => `
+
+                <tr class="hover:bg-slate-50 transition-colors">
+
+                    ${headers.map((_, colIndex) => `<td class="px-4 py-3 border-b border-slate-100 text-slate-600 whitespace-nowrap max-w-[200px] truncate">${row[colIndex] || ''}</td>`).join('')}
+
+                </tr>
+
+            `).join('');
+
+        }
+
+
+
+        function resetTranslate() {
+
+            currentData = [];
+
+            currentHeaders = [];
+
+            document.getElementById('translate-upload-zone').classList.remove('hidden');
+
+            document.getElementById('translate-config-panel').classList.add('hidden');
+
+            document.getElementById('translate-table-head').innerHTML = '';
+
+            document.getElementById('translate-table-body').innerHTML = `
+
+                <tr><td colspan="100" class="py-20 text-center text-slate-300">
+
+                    <i data-lucide="file-spreadsheet" class="w-12 h-12 mb-3 opacity-50 mx-auto"></i>
+
+                    <p class="text-sm">请先上传文件或加载网络数据</p>
+
+                </td></tr>`;
+
+            document.getElementById('translate-row-count').textContent = '0 行';
+
+            document.getElementById('translate-file-input').value = '';
+
+        }
+
+
+
+        
+
+        // --- Batch Translation Logic ---
+
+        async function startTranslate() {
+
+            if (isProcessing) return;
+
+            if (currentData.length === 0) {
+
+                alert('请先上传文件');
+
+                return;
+
+            }
+
+
+
+            const config = getApiConfig();
+
+            if (!config.key) {
+
+                alert("请先配置 API 密钥!");
+
+                openSettings();
+
+                return;
+
+            }
+
+
+
+            isProcessing = true;
+
+            const btn = document.getElementById('btn-start-translate');
+
+            const originalBtnText = btn.innerHTML;
+
+            btn.disabled = true;
+
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 翻译中...';
+
+            lucide.createIcons();
+
+
+
+            // Show progress overlay
+
+            document.getElementById('translate-progress-overlay').classList.remove('hidden');
+
+
+
+            // Get Configuration
+
+            const srcIdx = parseInt(document.getElementById('translate-source-col').value);
+
+            const newColName = document.getElementById('translate-target-name').value || '翻译结果';
+
+            const scenario = document.getElementById('translateScenario').value;
+
+            const langDir = document.getElementById('languageDirection').value;
+
+
+
+            // Add new column
+
+            const targetIdx = currentHeaders.length;
+
+            currentHeaders.push(newColName);
+
+            currentData.forEach(row => row[targetIdx] = '');
+
+
+
+            // Prepare prompts based on scenario and language
+
+            const scenarioPrompts = {
+
+                ecommerce_spec: '将以下产品参数翻译成目标语言，保持技术术语准确，数字和单位不变',
+
+                ecommerce_comment: '将以下用户评论翻译成目标语言，保持原有情感和口语化表达',
+
+                ecommerce_title: '将以下产品标题翻译成目标语言，优化SEO关键词',
+
+                email: '将以下邮件内容翻译成目标语言，使用正式商务语气',
+
+                general: '将以下文本翻译成目标语言'
+
+            };
+
+
+
+            const langPrompts = {
+
+                auto_to_zh: '目标语言是中文',
+
+                zh_to_en: '目标语言是英文',
+
+                en_to_zh: '目标语言是中文',
+
+                zh_to_jp: '目标语言是日文'
+
+            };
+
+
+
+            const systemPrompt = `${scenarioPrompts[scenario] || scenarioPrompts.general}。${langPrompts[langDir] || ''}。只返回翻译结果，不要添加任何解释。`;
+
+
+
+            // Process
+
+            let completed = 0;
+
+            const total = currentData.length;
+
+            const batchSize = 5;
+
+
+
+            for (let i = 0; i < total; i += batchSize) {
+
+                const batch = [];
+
+                for (let j = 0; j < batchSize && i + j < total; j++) {
+
+                    batch.push({ rowIndex: i + j, rowData: currentData[i + j] });
+
+                }
+
+
+
+                await Promise.all(batch.map(async (item) => {
+
+                    const row = item.rowData;
+
+                    const text = row[srcIdx] ? String(row[srcIdx]) : "";
+
+
+
+                    if (text.trim()) {
+
+                        try {
+
+                            const translated = await callAI(text, systemPrompt);
+
+                            row[targetIdx] = translated;
+
+                        } catch (e) {
+
+                            console.error(e);
+
+                            row[targetIdx] = "[Error]";
+
+                        }
+
+                    }
+
+                    completed++;
+
+                    updateTranslateProgress(completed, total);
+
+                }));
+
+            }
+
+
+
+            // Render updated table
+
+            renderTable(currentHeaders, currentData.slice(0, 50));
+
+
+
+            // Enable export
+
+            document.getElementById('btn-export-translate').disabled = false;
+
+            document.getElementById('btn-export-translate').onclick = () => exportTranslateResult();
+
+
+
+            isProcessing = false;
+
+            btn.disabled = false;
+
+            btn.innerHTML = originalBtnText;
+
+            document.getElementById('translate-progress-overlay').classList.add('hidden');
+
+            lucide.createIcons();
+
+        }
+
+
+
+        function exportTranslateResult() {
+
+            const ws = XLSX.utils.aoa_to_sheet([currentHeaders, ...currentData]);
+
+            const wb = XLSX.utils.book_new();
+
+            XLSX.utils.book_append_sheet(wb, ws, "翻译结果");
+
+            XLSX.writeFile(wb, "翻译结果.xlsx");
+
+        }
+
+
+
+        function updateTranslateProgress(current, total) {
+
+            const percent = Math.round((current / total) * 100);
+
+            document.getElementById('translate-progress-bar').style.width = `${percent}%`;
+
+            document.getElementById('translate-progress-text').textContent = `${current}/${total}`;
+
+        }
+
+
+
+
+
+        // --- getSystemPrompt helper (shared by text & batch translate) ---
+        function getSystemPrompt(scenario, direction) {
+            let targetLang = 'Chinese (Simplified)';
+            if (direction === 'zh_to_en') targetLang = 'English';
+            if (direction === 'zh_to_jp') targetLang = 'Japanese';
+            const prompts = {
+                ecommerce_spec: 'You are a product translator. Translate specs into ' + targetLang + '. Keep technical terms (e.g., mAh, IP68) and numbers unchanged. Be concise.',
+                ecommerce_comment: 'Translate user review into ' + targetLang + '. Keep the original sentiment. Use natural, colloquial language.',
+                ecommerce_title: 'Translate product title into ' + targetLang + '. Keep key model numbers/brands unchanged. Optimize for search.',
+                email: 'Translate email into ' + targetLang + '. Maintain a formal, professional business tone.',
+                general: 'Translate text into ' + targetLang + ' accurately. Only return the translation, no explanation.'
+            };
+            return prompts[scenario] || prompts.general;
+        }
+
+        // --- Text Translation Logic ---
+
+        async function startTextTranslate() {
+
+            const input = document.getElementById('textInput').value.trim();
+
+            if (!input) {
+
+                alert('请输入需要翻译的文本');
+
+                return;
+
+            }
+
+
+
+            const config = getApiConfig();
+
+            if (!config.key) {
+
+                alert("请先配置 API 密钥！");
+
+                openSettings(true);
+
+                return;
+
+            }
+
+
+
+            const loading = document.getElementById('textLoading');
+
+            const output = document.getElementById('textOutput');
+
+            const btn = document.getElementById('startTextTranslateBtn'); // Ensure ID matches HTML
+
+
+
+            loading.classList.remove('hidden');
+
+            output.value = '';
+
+            btn.disabled = true;
+
+
+
+            try {
+
+                // Get prompt type
+
+                // V2 Text View might not have prompt selector, default to general
+
+                const scenario = document.getElementById('translateScenario').value;
+                const direction = document.getElementById('languageDirection').value;
+                const systemPrompt = getSystemPrompt(scenario, direction);
+
+                
+
+                const result = await callAI(input, systemPrompt);
+
+                output.value = result;
+
+
+
+            } catch (error) {
+
+                output.value = '翻译失败: ' + error.message;
+
+            } finally {
+
+                loading.classList.add('hidden');
+
+                btn.disabled = false;
+
+            }
+
+        }
+
+
+
+
+
+
+
+        // --- Comment Analysis Logic ---
+
+        let analysisCategories = ['质量', '物流', '服务', '价格', '外观']; // Default
+
+
+
+        function addCategory() {
+
+            const input = document.getElementById('newCategoryInput');
+
+            const val = input.value.trim();
+
+            if (val && !analysisCategories.includes(val)) {
+
+                analysisCategories.push(val);
+
+                renderCategories();
+
+                input.value = '';
+
+            }
+
+        }
+
+
+
+        function renderCategories() {
+
+            const container = document.getElementById('categoryTags');
+
+            if (analysisCategories.length === 0) {
+
+                container.innerHTML = '<span class="text-[10px] text-slate-400 italic p-1">暂无标签...</span>';
+
+                return;
+
+            }
+
+            container.innerHTML = analysisCategories.map(c => `
+
+                <span class="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium bg-violet-50 text-violet-700 border border-violet-100">
+
+                    ${c}
+
+                    <button onclick="removeCategory('${c}')" class="ml-1 hover:text-violet-900"><i data-lucide="x" class="w-3 h-3"></i></button>
+
+                </span>
+
+            `).join('');
+
+            lucide.createIcons();
+
+        }
+
+
+
+        function removeCategory(c) {
+
+            analysisCategories = analysisCategories.filter(item => item !== c);
+
+            renderCategories();
+
+        }
+
+
+
+        // Initialize defaults
+
+        renderCategories();
+
+
+
+        // File handling for Analysis
+
+        const analysisDropZone = document.getElementById('analysis-upload-zone');
+
+        const analysisFileInput = document.getElementById('analysis-file-input');
+
+        if (analysisDropZone) {
+
+            analysisDropZone.addEventListener('click', () => analysisFileInput.click());
+
+            analysisFileInput.addEventListener('change', (e) => handleAnalysisFile(e.target.files[0]));
+
+        }
+
+
+
+        function handleAnalysisFile(file) {
+
+            if (!file) return;
+            if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+                alert('请上传 Excel (.xlsx, .xls) 或 CSV 文件');
+                return;
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+
+                const data = new Uint8Array(e.target.result);
+
+                const workbook = XLSX.read(data, { type: 'array', codepage: 936 });
+
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+
+
+                if (jsonData.length > 0) {
+
+                    currentHeaders = jsonData[0];
+
+                    currentData = jsonData.slice(1);
+
+                    analysisRawData = jsonData.slice(1); // Set analysis data
+
+
+
+                    document.getElementById('analysis-upload-zone').classList.add('hidden');
+
+                    document.getElementById('analysis-config-panel').classList.remove('hidden');
+
+
+
+                    const select = document.getElementById('analysis-source-col');
+
+                    select.innerHTML = '';
+
+                    currentHeaders.forEach((h, i) => {
+
+                        select.add(new Option(h || `列 ${i + 1}`, i));
+
+                    });
+
+                }
+
+            };
+
+            reader.readAsArrayBuffer(file);
+
+        }
+
+
+
+        
+
+
+
+        async function startAnalysis() {
+
+            if (isAnalysisProcessing) return;
+
+
+
+            if (analysisRawData.length === 0) return alert('请先上传文件');
+
+            const config = getApiConfig();
+
+            if (!config.key) return alert('请先配置 API Key');
+
+
+
+            selectedAnalysisColumn = parseInt(document.getElementById('analysis-source-col').value);
+
+            if (selectedAnalysisColumn === null || isNaN(selectedAnalysisColumn)) return alert('请选择哪一列是"评论内容"');
+
+
+
+            // Get Taxonomy
+
+            let taxonomyJson;
+
+            try {
+
+                // Check if we are in simple mode (V2 uses tags) or advanced (CodeMirror)
+
+                // V2 seems to rely on 'analysisCategories' array for simple tags
+
+                // Let's construct a simple taxonomy from the tags
+
+                const taxonomy = {};
+
+                analysisCategories.forEach(cat => {
+
+                    taxonomy[cat] = ["正面", "负面", "中性"]; // Simple default sub-categories
+
+                });
+
+                
+
+                // If user has advanced editor (V2 has jsonEditor), use that if visible
+
+                // For now, let's stick to the tags for simplicity as V2 UI emphasizes tags
+
+                taxonomyJson = JSON.stringify(taxonomy);
+
+            } catch (e) {
+
+                return alert('分类配置有误');
+
+            }
+
+
+
+            isAnalysisProcessing = true;
+
+            analysisAbortController = new AbortController();
+
+            
+
+            // UI Updates
+
+            const btn = document.querySelector('#analysis-config-panel button[onclick="startAnalysis()"]');
+
+            const originalBtnHtml = btn.innerHTML;
+
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 分析中...';
+
+            btn.disabled = true;
+
+            
+
+            document.getElementById('analysis-loading').classList.remove('hidden');
+
+            document.getElementById('analysis-results').classList.add('hidden');
+
+            document.getElementById('analysis-empty-state').classList.add('hidden');
+
+
+
+            analysisProcessedData = JSON.parse(JSON.stringify(analysisRawData)); // Deep Clone
+
+            const total = analysisRawData.length;
+
+            let positive = 0, negative = 0;
+
+
+
+            // Prepare Table
+
+            const tbody = document.getElementById('analysis-table-body');
+
+            tbody.innerHTML = '';
+
+
+
+            // Process
+
+            const model = config.models.analysis[0]?.id || config.models.work; // Use analysis model
+
+
+
+            for (let i = 0; i < total; i++) {
+
+                if (analysisAbortController.signal.aborted) break;
+
+
+
+                const content = analysisProcessedData[i][selectedAnalysisColumn];
+
+                
+
+                // Update Progress
+
+                document.getElementById('analysis-processed-count').textContent = `${i+1}/${total}`;
+
+
+
+                try {
+
+                    // We will use a simpler prompt for V2's tag-based approach
+
+                    const systemPrompt = `Analyze the sentiment and category of the review based on these tags: ${analysisCategories.join(', ')}. Return JSON: {"sentiment": "Positive/Negative/Neutral", "category": "Matched Tag"}`;
+
+                    const resultStr = await callAI(content, systemPrompt, model);
+
+                    
+
+                    let result;
+
+                    try {
+
+                        result = JSON.parse(resultStr.replace(/```json/g, '').replace(/```/g, ''));
+
+                    } catch(e) {
+
+                        result = { sentiment: "Neutral", category: "Other" };
+
+                    }
+
+
+
+                    // Update Stats
+
+                    if (result.sentiment === 'Positive') positive++;
+
+                    if (result.sentiment === 'Negative') negative++;
+
+
+
+                    // Render Row
+
+                    const tr = document.createElement('tr');
+
+                    tr.className = "hover:bg-slate-50 border-b border-slate-100";
+
+                    tr.innerHTML = `
+
+                        <td class="p-2 truncate max-w-[200px] text-xs text-slate-600" title="${content}">${content}</td>
+
+                        <td class="p-2"><span class="px-2 py-0.5 rounded-full ${result.sentiment === 'Positive' ? 'bg-green-100 text-green-700' : (result.sentiment === 'Negative' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600')} text-[10px]">${result.sentiment}</span></td>
+
+                        <td class="p-2"><span class="px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 text-[10px]">${result.category}</span></td>
+
+                    `;
+
+                    tbody.appendChild(tr);
+
+
+
+                } catch (error) {
+
+                    console.error(error);
+
+                }
+
+            }
+
+
+
+            // Finalize
+
+            document.getElementById('stat-positive').textContent = `${Math.round((positive/total)*100)}%`;
+
+            document.getElementById('stat-negative').textContent = `${Math.round((negative/total)*100)}%`;
+
+            document.getElementById('stat-total').textContent = total;
+
+
+
+            document.getElementById('analysis-loading').classList.add('hidden');
+
+            document.getElementById('analysis-results').classList.remove('hidden');
+
+            
+
+            isAnalysisProcessing = false;
+
+            btn.disabled = false;
+
+            btn.innerHTML = originalBtnHtml;
+
+            lucide.createIcons();
+
+        }
+
+
+
+        function resetAnalysis() {
+
+            document.getElementById('analysis-upload-zone').classList.remove('hidden');
+
+            document.getElementById('analysis-config-panel').classList.add('hidden');
+
+            document.getElementById('analysis-results').classList.add('hidden');
+
+            document.getElementById('analysis-empty-state').classList.remove('hidden');
+
+            document.getElementById('btn-export-analysis').disabled = true;
+
+            currentData = [];
+
+        }
+
+
+
+        // --- Data Summary Logic ---
+
+        const summaryDropZone = document.getElementById('summary-upload-zone');
+
+        const summaryFileInput = document.getElementById('summary-file-input');
+
+        if (summaryDropZone) {
+
+            summaryDropZone.addEventListener('click', () => summaryFileInput.click());
+
+            summaryFileInput.addEventListener('change', (e) => handleSummaryFile(e.target.files[0]));
+
+        }
+
+
+
+        function handleSummaryFile(file) {
+
+            if (!file) return;
+            if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+                alert('请上传 Excel (.xlsx, .xls) 或 CSV 文件');
+                return;
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+
+                const data = new Uint8Array(e.target.result);
+
+                const workbook = XLSX.read(data, { type: 'array', codepage: 936 });
+
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+
+
+                if (jsonData.length > 0) {
+
+                    currentHeaders = jsonData[0];
+
+                    currentData = jsonData.slice(1);
+
+
+
+                    document.getElementById('summary-upload-zone').classList.add('hidden');
+
+                    document.getElementById('summary-config-panel').classList.remove('hidden');
+
+                    document.getElementById('sum-size').textContent = (file.size / 1024).toFixed(2) + ' KB';
+
+                }
+
+            };
+
+            reader.readAsArrayBuffer(file);
+
+        }
+
+
+
+        
+
+
+
+        function startSummary() {
+
+            if (currentData.length === 0) {
+
+                alert('请先上传文件');
+
+                return;
+
+            }
+
+
+
+            const config = getApiConfig();
+
+            if (!config.key) {
+
+                alert('请先配置 API 密钥');
+
+                openSettings();
+
+                return;
+
+            }
+
+
+
+            // Show results
+
+            document.getElementById('summary-empty-state').classList.add('hidden');
+
+            document.getElementById('summary-results').classList.remove('hidden');
+
+
+
+            // Calculate stats
+
+            const rows = currentData.length;
+
+            const cols = currentHeaders.length;
+
+
+
+            document.getElementById('sum-rows').textContent = rows;
+
+            document.getElementById('sum-cols').textContent = cols;
+
+
+
+            // Generate column info
+
+            const tbody = document.getElementById('summary-table-body');
+
+            tbody.innerHTML = '';
+
+
+
+            currentHeaders.forEach((header, idx) => {
+
+                let nonEmptyCount = 0;
+
+                let isNumeric = true;
+
+
+
+                currentData.forEach(row => {
+
+                    const val = row[idx];
+
+                    if (val !== null && val !== undefined && val !== '') {
+
+                        nonEmptyCount++;
+
+                        if (isNumeric && isNaN(Number(val))) {
+
+                            isNumeric = false;
+
+                        }
+
+                    }
+
+                });
+
+
+
+                const type = isNumeric ? '数值' : '文本';
+
+                const tr = document.createElement('tr');
+
+                tr.innerHTML = `
+
+                    <td class="p-2 text-slate-700 font-medium">${header || '列 ' + (idx + 1)}</td>
+
+                    <td class="p-2"><span class="px-2 py-0.5 rounded text-[10px] ${isNumeric ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}">${type}</span></td>
+
+                    <td class="p-2 text-slate-600">${nonEmptyCount} / ${rows}</td>
+
+                `;
+
+                tbody.appendChild(tr);
+
+            });
+
+        }
+
+
+
+        function resetSummary() {
+
+            document.getElementById('summary-upload-zone').classList.remove('hidden');
+
+            document.getElementById('summary-config-panel').classList.add('hidden');
+
+            document.getElementById('summary-results').classList.add('hidden');
+
+            document.getElementById('summary-empty-state').classList.remove('hidden');
+
+            currentData = [];
+
+        }
+
+
+
+        // --- Formula Logic ---
+
+        async function startFormulaGen() {
+
+            const requirement = document.getElementById('formulaInput').value.trim();
+
+            if (!requirement) {
+
+                alert('请描述您的需求');
+
+                return;
+
+            }
+
+
+
+            const config = getApiConfig();
+
+            if (!config.key) {
+
+                alert('请先配置 API 密钥');
+
+                openSettings();
+
+                return;
+
+            }
+
+
+
+            const model = config.models.work;
+
+            const resultCard = document.getElementById('formula-result-card');
+
+
+
+            const systemPrompt = `你是一个Excel公式专家。根据用户需求生成Excel公式。
+
+要求：
+
+1. 返回JSON格式：{"formula": "=公式", "explanation": "使用说明"}
+
+2. 公式要准确可用
+
+3. 只返回JSON，不要其他内容`;
+
+
+
+            try {
+
+                const resultStr = await callAI(requirement, systemPrompt, model);
+
+                const content = resultStr.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+
+                const parsed = JSON.parse(content);
+
+
+
+                document.getElementById('formulaOutput').textContent = parsed.formula;
+
+                document.getElementById('formulaExplanation').textContent = parsed.explanation;
+
+
+
+                resultCard.classList.remove('hidden');
+
+            } catch (error) {
+
+                alert('生成公式失败: ' + error.message);
+
+            }
+
+        }
+
+
+
+
+
+
+
+        // --- Cleaning Logic ---
+
+        const cleaningDropZone = document.getElementById('cleaning-upload-zone');
+
+        const cleaningFileInput = document.getElementById('cleaning-file-input');
+
+        if (cleaningDropZone) {
+
+            cleaningDropZone.addEventListener('click', () => cleaningFileInput.click());
+
+            cleaningFileInput.addEventListener('change', (e) => handleCleaningFile(e.target.files[0]));
+
+        }
+
+
+
+        function handleCleaningFile(file) {
+
+            if (!file) return;
+            if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+                alert('请上传 Excel (.xlsx, .xls) 或 CSV 文件');
+                return;
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+
+                const data = new Uint8Array(e.target.result);
+
+                const workbook = XLSX.read(data, { type: 'array', codepage: 936 });
+
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+
+
+                if (jsonData.length > 0) {
+
+                    currentHeaders = jsonData[0];
+
+                    currentData = jsonData.slice(1);
+
+
+
+                    document.getElementById('cleaning-upload-zone').classList.add('hidden');
+
+                    document.getElementById('cleaning-config-panel').classList.remove('hidden');
+
+                    renderCleaningPreview(currentHeaders, currentData.slice(0, 20));
+
+                }
+
+            };
+
+            reader.readAsArrayBuffer(file);
+
+        }
+
+
+
+        function renderCleaningPreview(headers, rows) {
+
+            const thead = document.getElementById('cleaning-table-head');
+
+            const tbody = document.getElementById('cleaning-table-body');
+
+            thead.innerHTML = headers.map(h => `<th class="px-4 py-3 border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 whitespace-nowrap">${h}</th>`).join('');
+
+            tbody.innerHTML = rows.map(row => `
+
+                <tr class="hover:bg-slate-50">
+
+                    ${headers.map((_, i) => `<td class="px-4 py-3 border-b border-slate-100 text-slate-600 whitespace-nowrap max-w-[150px] truncate">${row[i] || ''}</td>`).join('')}
+
+                </tr>
+
+            `).join('');
+
+        }
+
+
+
+        
+
+
+
+        function startCleaning() {
+
+            if (currentData.length === 0) {
+
+                alert('请先上传文件');
+
+                return;
+
+            }
+
+
+
+            // Get checkbox values
+
+            const checkboxes = document.querySelectorAll('#cleaning-config-panel input[type="checkbox"]');
+
+            let removeDuplicates = false;
+
+            let removeEmptyRows = false;
+
+            let trimSpaces = false;
+
+
+
+            checkboxes.forEach((cb, idx) => {
+
+                if (idx === 0) removeDuplicates = cb.checked;
+
+                if (idx === 1) removeEmptyRows = cb.checked;
+
+                if (idx === 2) trimSpaces = cb.checked;
+
+            });
+
+
+
+            let processedData = [...currentData.map(row => [...row])];
+
+            let stats = { removed: 0, trimmed: 0 };
+
+
+
+            // Remove empty rows
+
+            if (removeEmptyRows) {
+
+                const before = processedData.length;
+
+                processedData = processedData.filter(row => row.some(cell => cell !== null && cell !== undefined && cell !== ''));
+
+                stats.removed += before - processedData.length;
+
+            }
+
+
+
+            // Remove duplicates
+
+            if (removeDuplicates) {
+
+                const before = processedData.length;
+
+                const seen = new Set();
+
+                processedData = processedData.filter(row => {
+
+                    const key = JSON.stringify(row);
+
+                    if (seen.has(key)) return false;
+
+                    seen.add(key);
+
+                    return true;
+
+                });
+
+                stats.removed += before - processedData.length;
+
+            }
+
+
+
+            // Trim spaces
+
+            if (trimSpaces) {
+
+                processedData = processedData.map(row => row.map(cell => {
+
+                    if (typeof cell === 'string') {
+
+                        const trimmed = cell.trim();
+
+                        if (trimmed !== cell) stats.trimmed++;
+
+                        return trimmed;
+
+                    }
+
+                    return cell;
+
+                }));
+
+            }
+
+
+
+            // Update data
+
+            currentData = processedData;
+
+            cleanedData = processedData;
+
+
+
+            // Render preview
+
+            renderCleaningPreview(currentHeaders, currentData.slice(0, 20));
+
+
+
+            alert(`清洗完成! 删除 ${stats.removed} 行，修剪 ${stats.trimmed} 个单元格的空格。`);
+
+        }
+
+
+
+        function resetCleaning() {
+
+            document.getElementById('cleaning-upload-zone').classList.remove('hidden');
+
+            document.getElementById('cleaning-config-panel').classList.add('hidden');
+
+            currentData = [];
+
+        }
+
+
+
+    
+
+        function toggleApiKeyVisibility(id) {
+
+            const input = document.getElementById(id);
+
+            const btn = input.nextElementSibling;
+
+            const icon = btn.querySelector('i');
+
+            
+
+            if (input.type === 'password') {
+
+                input.type = 'text';
+
+                icon.setAttribute('data-lucide', 'eye-off');
+
+            } else {
+
+                input.type = 'password';
+
+                icon.setAttribute('data-lucide', 'eye');
+
+            }
+
+            lucide.createIcons();
+
+        }
+
+
+
+        // ==================== API Utilities ====================
+
+
+
+        function renderMarkdown(text) {
+
+            if (typeof marked !== 'undefined') {
+
+                return marked.parse(text);
+
+            }
+
+            return text.replace(/\n/g, '<br>');
+
+        }
+
+
+
+        async function callAI(content, systemPrompt, modelOverride) {
+
+            const config = getApiConfig();
+
+            
+
+            let messages;
+
+            if (config.useSystemPrompt) {
+
+                messages = [
+
+                    { role: "system", content: systemPrompt },
+
+                    { role: "user", content: content }
+
+                ];
+
+            } else {
+
+                messages = [
+
+                    { role: "user", content: content }
+
+                ];
+
+            }
+
+
+
+            const resp = await fetch(config.url, {
+
+                method: 'POST',
+
+                headers: {
+
+                    'Authorization': `Bearer ${config.key}`,
+
+                    'Content-Type': 'application/json'
+
+                },
+
+                body: JSON.stringify({
+
+                    model: modelOverride || config.models.translate,
+
+                    messages: messages,
+
+                    temperature: 0.3,
+
+                    max_tokens: 2048
+
+                })
+
+            });
+
+
+
+            if (!resp.ok) throw new Error(`API Error ${resp.status}`);
+
+            const json = await resp.json();
+
+            return json.choices[0].message.content.trim();
+
+        }
+
+
+
+        async function callStreamingAPI(model, systemPrompt, userPrompt, onChunk) {
+
+            const config = getApiConfig();
+
+
+
+            const response = await fetch(config.url, {
+
+                method: 'POST',
+
+                headers: {
+
+                    'Authorization': `Bearer ${config.key}`,
+
+                    'Content-Type': 'application/json'
+
+                },
+
+                body: JSON.stringify({
+
+                    model: model,
+
+                    messages: [
+
+                        { role: 'system', content: systemPrompt },
+
+                        { role: 'user', content: userPrompt }
+
+                    ],
+
+                    temperature: 0.7,
+
+                    max_tokens: 4096,
+
+                    stream: true
+
+                })
+
+            });
+
+
+
+            if (!response.ok) {
+
+                const errorText = await response.text().catch(() => '');
+
+                throw new Error(`API Error: ${response.status} - ${errorText.slice(0, 100)}`);
+
+            }
+
+
+
+            const reader = response.body.getReader();
+
+            const decoder = new TextDecoder();
+
+            
+
+            while (true) {
+
+                const { done, value } = await reader.read();
+
+                if (done) break;
+
+
+
+                const chunk = decoder.decode(value);
+
+                const lines = chunk.split('\n');
+
+
+
+                for (const line of lines) {
+
+                    if (line.startsWith('data: ')) {
+
+                        const data = line.slice(6);
+
+                        if (data === '[DONE]') continue;
+
+                        try {
+
+                            const json = JSON.parse(data);
+
+                            const content = json.choices[0]?.delta?.content || '';
+
+                            if (content) {
+
+                                onChunk(content);
+
+                            }
+
+                        } catch (e) {}
+
+                    }
+
+                }
+
+            }
+
+        }
+
+
+
+</script>
+
+</body>
+
+
+
+</html>

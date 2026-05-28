@@ -1,0 +1,83 @@
+<template>
+  <aside class="w-64 bg-white border-r border-slate-200 flex flex-col z-20 shadow-sm">
+    <!-- Logo -->
+    <div class="p-6 border-b border-slate-100 flex items-center gap-3">
+      <div class="bg-gradient-to-br from-blue-600 to-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-blue-200">
+        <Wand2 class="w-5 h-5" />
+      </div>
+      <div>
+        <h1 class="font-bold text-slate-800 text-lg tracking-tight">智能分析助手</h1>
+        <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">PRO VERSION</p>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+      <button @click="$router.push('/')" :class="navClass('home')"
+        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
+        <LayoutGrid class="w-4 h-4" /> 功能主页
+      </button>
+
+      <div class="pt-4 pb-2 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Excel 处理</div>
+
+      <button @click="$router.push('/cleaning')" :class="navClass('cleaning')"
+        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
+        <Eraser class="w-4 h-4" /> 数据清洗
+      </button>
+      <button @click="$router.push('/translate')" :class="navClass('translate')"
+        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
+        <Languages class="w-4 h-4" /> 批量翻译
+      </button>
+      <button @click="$router.push('/analysis')" :class="navClass('analysis')"
+        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
+        <Brain class="w-4 h-4" /> 数据分析
+      </button>
+      <button @click="$router.push('/summary')" :class="navClass('summary')"
+        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
+        <FileBarChart class="w-4 h-4" /> 数据摘要
+      </button>
+
+      <div class="pt-4 pb-2 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">AI 助手</div>
+
+      <button @click="$router.push('/text')" :class="navClass('text')"
+        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
+        <Type class="w-4 h-4" /> 文本翻译
+      </button>
+      <button @click="$router.push('/formula')" :class="navClass('formula')"
+        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
+        <FunctionSquare class="w-4 h-4" /> 公式生成
+      </button>
+    </nav>
+
+    <!-- Settings Button -->
+    <div class="p-4 border-t border-slate-100">
+      <button @click="settings.showSettings = true"
+        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50 transition-colors border border-slate-200">
+        <Settings class="w-4 h-4" />
+        API 设置
+        <span class="ml-auto w-2 h-2 rounded-full" :class="settings.isConfigured ? 'bg-green-400' : 'bg-red-400'"></span>
+      </button>
+    </div>
+  </aside>
+</template>
+
+<script setup>
+import { useRoute } from 'vue-router'
+import { useSettingsStore } from '../../stores/settings'
+import { Wand2, LayoutGrid, Languages, Brain, FileBarChart, Eraser, Type, FunctionSquare, Settings } from 'lucide-vue-next'
+
+const route = useRoute()
+const settings = useSettingsStore()
+
+const routeMap = {
+  home: '/', translate: '/translate', text: '/text',
+  analysis: '/analysis', summary: '/summary', formula: '/formula', cleaning: '/cleaning'
+}
+
+function navClass(name) {
+  const isActive = route.path === routeMap[name]
+  return isActive
+    ? 'sidebar-item-active'
+    : 'text-slate-600 hover:bg-slate-50'
+}
+</script>

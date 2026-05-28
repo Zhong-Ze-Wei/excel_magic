@@ -1,0 +1,3536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能分析助手 - 翻译与评论分析</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Excel 处理库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- 引入 图标库 Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- CodeMirror 用于代码编辑体验 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+    <!-- Marked.js 用于 Markdown 渲染 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .drag-active {
+            border-color: #2563eb !important;
+            background-color: #eff6ff !important;
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .blur-backdrop { backdrop-filter: blur(12px); }
+
+        /* Tab 选中状态 */
+        .tab-active {
+            border-bottom: 2px solid #2563eb;
+            color: #1d4ed8;
+            background-color: #eff6ff;
+        }
+
+        /* 呼吸灯按钮 */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+            50% { box-shadow: 0 0 0 12px rgba(59, 130, 246, 0); }
+        }
+        .btn-pulse {
+            animation: pulse-glow 2s infinite;
+        }
+
+        /* CodeMirror 样式 */
+        .CodeMirror {
+            height: 200px;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            font-size: 13px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+
+        /* Markdown 渲染样式 */
+        .markdown-body h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; color: #1e293b; }
+        .markdown-body h2 { font-size: 1.25rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #334155; }
+        .markdown-body h3 { font-size: 1rem; font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; color: #475569; }
+        .markdown-body p { margin-bottom: 0.75rem; line-height: 1.7; }
+        .markdown-body ul, .markdown-body ol { margin-left: 1.5rem; margin-bottom: 0.75rem; }
+        .markdown-body li { margin-bottom: 0.25rem; }
+        .markdown-body strong { font-weight: 600; color: #1e293b; }
+        .markdown-body code { background: #f1f5f9; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.875rem; }
+        .markdown-body pre { background: #f8fafc; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin: 1rem 0; }
+        .markdown-body pre code { background: transparent; padding: 0; }
+        .markdown-body table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .markdown-body th, .markdown-body td { border: 1px solid #e2e8f0; padding: 0.5rem; text-align: left; }
+        .markdown-body th { background: #f8fafc; font-weight: 600; }
+        .markdown-body blockquote { border-left: 4px solid #e2e8f0; padding-left: 1rem; color: #64748b; margin: 1rem 0; }
+
+        /* 公式代码框样式 */
+        .formula-box { font-family: 'Consolas', 'Monaco', 'Courier New', monospace; }
+
+        /* 流式输出光标动画 */
+        .streaming-cursor::after {
+            content: '|';
+            animation: blink 1s infinite;
+            color: #3b82f6;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- 顶部优雅提示条 -->
+    <div id="apiWarningBar" class="hidden bg-amber-50 border-b border-amber-100 px-4 py-3 flex justify-between items-center relative z-50 cursor-pointer hover:bg-amber-100 transition-colors group" onclick="openSettings(true)">
+        <div class="flex items-center gap-3 mx-auto max-w-6xl w-full">
+            <div class="p-1.5 bg-amber-100 rounded-full text-amber-600 group-hover:scale-110 transition-transform">
+                <i data-lucide="sparkles" class="w-4 h-4"></i>
+            </div>
+            <span class="text-sm font-medium text-amber-800">
+                ✨ 尚未激活 AI 引擎，点击此处配置密钥以开启智能分析
+            </span>
+        </div>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-amber-400"></i>
+    </div>
+
+    <!-- 顶部导航 -->
+    <nav class="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+        <div class="flex items-center gap-3">
+            <div class="bg-gradient-to-br from-blue-600 to-indigo-600 p-2 rounded-xl text-white shadow-blue-200 shadow-lg">
+                <i data-lucide="wand-2" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold text-slate-800 tracking-tight">
+                    智能分析助手
+                </h1>
+                <p class="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Translation & Analysis Tool</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <!-- 当前平台状态 -->
+            <div class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-full border border-slate-200">
+                <span class="text-[10px] text-slate-500">当前平台:</span>
+                <span id="currentPlatformBadge" class="text-xs font-bold text-blue-700 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                    硅基流动
+                </span>
+            </div>
+            <button onclick="openSettings(false)" class="group px-3 py-2 hover:bg-slate-50 rounded-full transition-all text-slate-500 hover:text-blue-600 flex items-center gap-2 border border-transparent hover:border-slate-200" title="重置 API">
+                <span class="text-xs font-medium hidden md:inline">API 设置</span>
+                <i data-lucide="settings" class="w-4 h-4 group-hover:rotate-90 transition-transform duration-500"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- 分步引导模态框 (全屏强制) -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center blur-backdrop transition-opacity opacity-0 overflow-y-auto p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all scale-95 duration-300 ring-1 ring-black/5 relative" id="settingsContent">
+
+            <!-- 关闭按钮 (右上角) -->
+            <button onclick="skipSettings()" class="absolute top-5 right-5 text-slate-300 hover:text-slate-500 z-20 transition-colors" title="暂不配置">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+
+            <!-- STEP 1: 价值展示 -->
+            <div id="step1" class="p-8 md:p-12 flex flex-col items-center text-center animate-fade-in">
+                <div class="mb-6">
+                    <div class="inline-flex items-center justify-center p-3 bg-blue-50 rounded-2xl mb-4 text-blue-600">
+                        <i data-lucide="wand-2" class="w-8 h-8"></i>
+                    </div>
+                    <h2 class="text-2xl md:text-3xl font-bold text-slate-800 mb-3">让 AI 读懂你的数据</h2>
+                    <p class="text-slate-500 text-sm max-w-md mx-auto">智能翻译 + 评论分析，双重功能助力产品经理高效工作。</p>
+                </div>
+
+                <!-- 功能图示 -->
+                <div class="flex items-center gap-4 text-xs text-slate-400 font-medium mb-8">
+                    <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
+                        <i data-lucide="languages" class="w-3.5 h-3.5"></i>
+                        智能翻译
+                    </div>
+                    <i data-lucide="plus" class="w-3 h-3"></i>
+                    <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
+                        <i data-lucide="brain" class="w-3.5 h-3.5"></i>
+                        评论分析
+                    </div>
+                </div>
+
+                <button onclick="goToStep(2)" class="w-full max-w-xs bg-slate-900 hover:bg-slate-800 text-white py-3.5 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 group">
+                    开始配置
+                    <i data-lucide="arrow-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+                </button>
+
+                <button onclick="skipSettings()" class="mt-4 text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                    暂不配置，先看看界面
+                </button>
+            </div>
+
+            <!-- STEP 2: 平台选择与激活 -->
+            <div id="step2" class="hidden p-8 md:p-10 flex flex-col h-full animate-fade-in">
+                <div class="flex items-center gap-2 mb-6">
+                    <button onclick="goToStep(1)" class="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
+                        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                    </button>
+                    <h2 class="text-xl font-bold text-slate-800">选择 API 服务平台</h2>
+                </div>
+
+                <div class="space-y-6">
+                    <!-- 双平台卡片选择 -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- 硅基流动卡片 -->
+                        <div id="platformCard-siliconflow" onclick="selectPlatform('siliconflow')" class="cursor-pointer group relative bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border-2 border-blue-400 shadow-md hover:shadow-lg transition-all min-h-[280px] flex flex-col">
+                            <div class="absolute -top-2 -right-2 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm" id="badge-siliconflow">
+                                当前选中
+                            </div>
+                            <div class="text-center flex-1 flex flex-col">
+                                <div class="inline-flex items-center justify-center p-2 bg-blue-100 rounded-xl mb-3 text-blue-600 mx-auto">
+                                    <i data-lucide="cloud" class="w-6 h-6"></i>
+                                </div>
+                                <h4 class="font-bold text-blue-900 text-sm">硅基流动</h4>
+                                <p class="text-[10px] text-blue-700/70 mt-1">SiliconCloud</p>
+                                <div class="mt-3 space-y-1">
+                                    <span class="inline-block text-[10px] bg-white/60 text-blue-800 px-2 py-0.5 rounded-full">翻译模型无限免费</span>
+                                    <span class="inline-block text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">邀请送14元</span>
+                                </div>
+                                <div class="mt-3 flex-1">
+                                    <p class="text-[10px] text-blue-800 font-medium mb-1">可用模型:</p>
+                                    <div class="flex flex-wrap gap-1 justify-center">
+                                        <span class="text-[9px] bg-white/80 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">Hunyuan-MT-7B</span>
+                                        <span class="text-[9px] bg-white/80 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">DeepSeek-V3.2</span>
+                                        <span class="text-[9px] bg-white/80 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">GLM-Z1-9B</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="https://cloud.siliconflow.cn/i/S8pG3891" target="_blank" onclick="event.stopPropagation()" class="mt-4 block w-full text-center py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors">
+                                点击注册
+                                <i data-lucide="external-link" class="w-3 h-3 inline ml-1"></i>
+                            </a>
+                        </div>
+
+                        <!-- aiping.cn 卡片 -->
+                        <div id="platformCard-aiping" onclick="selectPlatform('aiping')" class="cursor-pointer group relative bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-5 border-2 border-transparent hover:border-purple-300 transition-all min-h-[280px] flex flex-col">
+                            <div class="absolute -top-2 -right-2 bg-purple-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm hidden" id="badge-aiping">
+                                当前选中
+                            </div>
+                            <div class="text-center flex-1 flex flex-col">
+                                <div class="inline-flex items-center justify-center p-2 bg-purple-100 rounded-xl mb-3 text-purple-600 mx-auto">
+                                    <i data-lucide="sparkles" class="w-6 h-6"></i>
+                                </div>
+                                <h4 class="font-bold text-purple-900 text-sm">aiping.cn</h4>
+                                <p class="text-[10px] text-purple-700/70 mt-1">AI 聚合平台</p>
+                                <div class="mt-3 space-y-1">
+                                    <span class="inline-block text-[10px] bg-white/60 text-purple-800 px-2 py-0.5 rounded-full">各家主流大模型</span>
+                                    <span class="inline-block text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">限时免费</span>
+                                </div>
+                                <div class="mt-3 flex-1">
+                                    <p class="text-[10px] text-purple-800 font-medium mb-1">可用模型:</p>
+                                    <div class="flex flex-wrap gap-1 justify-center">
+                                        <span class="text-[9px] bg-white/80 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">DeepSeek-V3.2</span>
+                                        <span class="text-[9px] bg-white/80 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">GLM-4.7</span>
+                                        <span class="text-[9px] bg-white/80 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">MiniMax-M2.1</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="https://www.aiping.cn/#?invitation_code=WBEJSN" target="_blank" onclick="event.stopPropagation()" class="mt-4 block w-full text-center py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-colors">
+                                点击注册
+                                <i data-lucide="external-link" class="w-3 h-3 inline ml-1"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- 动态配置区域 -->
+                    <div id="platformConfigArea" class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                        <!-- 硅基流动配置 -->
+                        <div id="config-siliconflow" class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                    <i data-lucide="key" class="w-4 h-4 text-slate-500"></i>
+                                    配置 硅基流动 密钥
+                                </h4>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded cursor-pointer hover:bg-blue-200 transition-colors" onclick="copyInviteCode('S8pG3891')">
+                                        邀请码: <span class="font-mono font-bold">S8pG3891</span>
+                                        <i data-lucide="copy" class="w-2.5 h-2.5 inline ml-0.5"></i>
+                                    </span>
+                                    <span id="copyTip" class="text-[10px] text-green-600 font-bold opacity-0 transition-opacity">已复制</span>
+                                </div>
+                            </div>
+                            <a href="https://cloud.siliconflow.cn/me/account/ak" target="_blank" class="flex items-center justify-center w-full p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-all font-bold text-sm group shadow-sm">
+                                <i data-lucide="external-link" class="w-4 h-4 mr-2 group-hover:scale-110 transition-transform"></i>
+                                点击前往官网获取 API 密钥
+                            </a>
+                            <div class="relative group">
+                                <input type="text" id="apiKey-siliconflow" class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-sm font-mono transition-all placeholder:text-slate-400" placeholder="粘贴 sk- 开头的密钥" autocomplete="off">
+                                <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 group-focus-within:text-blue-500 transition-colors"></i>
+                            </div>
+                            <!-- 模型选择 -->
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1.5">翻译模型</label>
+                                <div class="relative">
+                                    <select id="translateModel-siliconflow" class="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer text-slate-700 appearance-none transition-all hover:bg-white">
+                                        <option value="Tencent/Hunyuan-MT-7B" selected>Hunyuan-MT-7B (翻译专用/免费)</option>
+                                        <option value="deepseek-ai/DeepSeek-V3">DeepSeek-V3</option>
+                                        <option value="THUDM/GLM-Z1-9B-0414">GLM-Z1-9B (免费)</option>
+                                        <option value="Qwen/Qwen2.5-7B-Instruct">Qwen2.5-7B (免费)</option>
+                                    </select>
+                                    <i data-lucide="cpu" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                                    <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 absolute right-3 top-3 pointer-events-none"></i>
+                                </div>
+                            </div>
+                            <!-- 工作模型选择 -->
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1.5">分析模型 (摘要/公式/清洗/评论分析)</label>
+                                <div class="relative">
+                                    <select id="workModel-siliconflow" onchange="updateAnalysisModelIndicators()" class="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer text-slate-700 appearance-none transition-all hover:bg-white">
+                                        <option value="deepseek-ai/DeepSeek-V3" selected>DeepSeek-V3 (推荐)</option>
+                                        <option value="deepseek-ai/DeepSeek-R1-0528-Qwen3-8B">DeepSeek-R1-Qwen3-8B (免费)</option>
+                                        <option value="THUDM/GLM-Z1-9B-0414">GLM-Z1-9B (免费)</option>
+                                        <option value="Qwen/Qwen2.5-7B-Instruct">Qwen2.5-7B (免费)</option>
+                                    </select>
+                                    <i data-lucide="brain" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                                    <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 absolute right-3 top-3 pointer-events-none"></i>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-1">用于评论分析、数据摘要、公式生成、数据清洗</p>
+                            </div>
+                        </div>
+
+                        <!-- aiping 配置 (默认隐藏) -->
+                        <div id="config-aiping" class="space-y-4 hidden">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                    <i data-lucide="key" class="w-4 h-4 text-slate-500"></i>
+                                    配置 aiping.cn 密钥
+                                </h4>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded cursor-pointer hover:bg-purple-200 transition-colors" onclick="copyInviteCode('WBEJSN')">
+                                        邀请码: <span class="font-mono font-bold">WBEJSN</span>
+                                        <i data-lucide="copy" class="w-2.5 h-2.5 inline ml-0.5"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <a href="https://www.aiping.cn/user/apikey" target="_blank" class="flex items-center justify-center w-full p-3 bg-purple-50 border border-purple-200 rounded-lg text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-all font-bold text-sm group shadow-sm">
+                                <i data-lucide="external-link" class="w-4 h-4 mr-2 group-hover:scale-110 transition-transform"></i>
+                                点击前往官网获取 API 密钥
+                            </a>
+                            <div class="relative group">
+                                <input type="text" id="apiKey-aiping" class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none text-sm font-mono transition-all placeholder:text-slate-400" placeholder="粘贴 API 密钥" autocomplete="off">
+                                <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 group-focus-within:text-purple-500 transition-colors"></i>
+                            </div>
+                            <!-- 模型选择 -->
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1.5">翻译模型</label>
+                                <div class="relative">
+                                    <select id="translateModel-aiping" class="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none cursor-pointer text-slate-700 appearance-none transition-all hover:bg-white">
+                                        <option value="DeepSeek-V3.2" selected>DeepSeek-V3.2 (推荐)</option>
+                                        <option value="GLM-4.7">GLM-4.7</option>
+                                        <option value="MiniMax-M2.1">MiniMax-M2.1</option>
+                                    </select>
+                                    <i data-lucide="cpu" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                                    <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 absolute right-3 top-3 pointer-events-none"></i>
+                                </div>
+                            </div>
+                            <!-- 工作模型选择 -->
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1.5">分析模型 (摘要/公式/清洗/评论分析)</label>
+                                <div class="relative">
+                                    <select id="workModel-aiping" onchange="updateAnalysisModelIndicators()" class="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none cursor-pointer text-slate-700 appearance-none transition-all hover:bg-white">
+                                        <option value="DeepSeek-V3.2" selected>DeepSeek-V3.2 (推荐)</option>
+                                        <option value="GLM-4.7">GLM-4.7</option>
+                                        <option value="MiniMax-M2.1">MiniMax-M2.1</option>
+                                    </select>
+                                    <i data-lucide="brain" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                                    <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 absolute right-3 top-3 pointer-events-none"></i>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-1">用于评论分析、数据摘要、公式生成、数据清洗</p>
+                            </div>
+                        </div>
+
+                        <!-- API 测试按钮 -->
+                        <div class="mt-4 flex items-center gap-3">
+                            <button onclick="testApiConnection()" id="testApiBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition-colors flex items-center gap-2">
+                                <i data-lucide="activity" class="w-3 h-3"></i>
+                                测试连接
+                            </button>
+                            <span id="testResultText" class="text-xs"></span>
+                        </div>
+
+                        <div class="mt-4 flex items-start gap-2">
+                            <i data-lucide="shield-check" class="w-3 h-3 text-green-500 mt-0.5"></i>
+                            <p class="text-[10px] text-slate-400 leading-tight">
+                                数据安全声明：您的文件仅在本地浏览器处理，绝不上传至任何服务器。API 密钥仅保存在您的本地缓存中。
+                            </p>
+                        </div>
+                    </div>
+
+                    <button onclick="saveAndCloseSettings()" class="w-full btn-pulse bg-slate-900 hover:bg-slate-800 text-white py-3.5 rounded-xl font-bold text-base transition-all shadow-lg flex justify-center items-center gap-2 active:scale-[0.98]">
+                        <i data-lucide="zap" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i>
+                        立即启动
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 主内容区域 -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+
+        <!-- 功能切换 Tabs -->
+        <div class="flex flex-wrap border-b border-slate-200 mb-6 gap-1">
+            <button onclick="switchTab('translate')" id="tab-translate" class="px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors tab-active flex items-center gap-2">
+                <i data-lucide="languages" class="w-4 h-4"></i>
+                批量翻译
+            </button>
+            <button onclick="switchTab('text')" id="tab-text" class="px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-t-lg transition-colors flex items-center gap-2">
+                <i data-lucide="type" class="w-4 h-4"></i>
+                文本翻译
+            </button>
+            <button onclick="switchTab('analysis')" id="tab-analysis" class="px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-t-lg transition-colors flex items-center gap-2">
+                <i data-lucide="brain" class="w-4 h-4"></i>
+                评论分析
+            </button>
+            <button onclick="switchTab('summary')" id="tab-summary" class="px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-t-lg transition-colors flex items-center gap-2">
+                <i data-lucide="file-bar-chart" class="w-4 h-4"></i>
+                数据摘要
+            </button>
+            <button onclick="switchTab('formula')" id="tab-formula" class="px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-t-lg transition-colors flex items-center gap-2">
+                <i data-lucide="function-square" class="w-4 h-4"></i>
+                公式生成
+            </button>
+            <button onclick="switchTab('cleaning')" id="tab-cleaning" class="px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-t-lg transition-colors flex items-center gap-2">
+                <i data-lucide="eraser" class="w-4 h-4"></i>
+                数据清洗
+            </button>
+        </div>
+
+        <!-- 模式 1: Excel/CSV 批量翻译 -->
+        <div id="view-translate" class="space-y-4 animate-fade-in">
+
+            <!-- 核心控制栏 -->
+            <div class="bg-white rounded-xl border border-slate-200 p-3 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between shadow-sm">
+                <div class="flex flex-col md:flex-row gap-6 w-full md:w-auto">
+
+                    <!-- 翻译场景选择 -->
+                    <div class="w-full md:w-56">
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
+                            翻译场景
+                        </label>
+                        <div class="relative">
+                            <select id="translateScenario" class="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer text-slate-700 appearance-none transition-all hover:bg-white">
+                                <option value="ecommerce_spec" selected>产品参数 (准确/术语)</option>
+                                <option value="ecommerce_comment">用户评论 (情感/口语)</option>
+                                <option value="ecommerce_title">竞品标题 (保留核心词)</option>
+                                <option value="email">邮件沟通 (正式)</option>
+                                <option value="general">通用翻译</option>
+                            </select>
+                            <i data-lucide="list-filter" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+                            <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 absolute right-3 top-3 pointer-events-none"></i>
+                        </div>
+                    </div>
+
+                    <!-- 语言方向 -->
+                    <div class="w-full md:w-56">
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
+                            语言方向
+                        </label>
+                        <div class="relative">
+                            <select id="languageDirection" class="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer text-slate-700 appearance-none transition-all hover:bg-white">
+                                <option value="auto_to_zh" selected>自动检测 -> 中文</option>
+                                <option value="zh_to_en">中文 -> 英文</option>
+                                <option value="en_to_zh">英文 -> 中文</option>
+                                <option value="zh_to_jp">中文 -> 日文</option>
+                            </select>
+                            <i data-lucide="languages" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+                            <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 absolute right-3 top-3 pointer-events-none"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hidden md:block text-right">
+                    <div class="flex items-center gap-2 justify-end">
+                        <div class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                        <p class="text-xs font-medium text-slate-600">Translation Ready</p>
+                    </div>
+                    <p id="translateModelStatus" class="text-[10px] text-slate-400 mt-1">Tencent Hunyuan-MT-7B</p>
+                </div>
+            </div>
+
+            <!-- 上传与试用区域 (Grid布局) -->
+            <div id="uploadSection" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- 左侧：文件拖拽 (占2/3) -->
+                <div class="md:col-span-2 bg-white rounded-xl border-2 border-dashed border-slate-300 p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50/30 transition-all group relative" id="dropZone">
+                    <div class="bg-blue-50 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <i data-lucide="upload-cloud" class="w-8 h-8 text-blue-600"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-700 mb-1 group-hover:text-blue-700 transition-colors">点击或拖拽文件到这里</h3>
+                    <p class="text-slate-400 text-sm mb-6">支持 .xlsx, .xls, .csv</p>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="hidden">
+                    <button class="px-6 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 text-sm font-medium hover:bg-white hover:border-blue-400 hover:text-blue-600 transition-all shadow-sm">
+                        选择文件
+                    </button>
+                </div>
+
+                <!-- 右侧：快速试用 (占1/3) -->
+                <div class="md:col-span-1 bg-gradient-to-b from-white to-slate-50 rounded-xl border border-slate-200 p-6 flex flex-col justify-center">
+                    <div class="mb-5">
+                        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-1">
+                            <i data-lucide="sparkles" class="w-4 h-4 text-amber-500 fill-amber-500"></i>
+                            没有文件？试用样例
+                        </h3>
+                        <p class="text-xs text-slate-500">
+                            直接加载预设数据，快速了解工具如何工作。
+                        </p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <button onclick="loadDemoData('specs')" class="w-full text-left px-4 py-3 bg-white border border-slate-200 rounded-lg hover:border-blue-400 hover:shadow-md transition-all flex items-center justify-between group">
+                            <div>
+                                <div class="text-xs font-bold text-slate-700 group-hover:text-blue-600">产品参数示例</div>
+                                <div class="text-[10px] text-slate-400">模拟竞品规格表 (IP68, 材质等)</div>
+                            </div>
+                            <div class="p-1 rounded-full bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                <i data-lucide="chevron-right" class="w-3 h-3 text-slate-400 group-hover:text-blue-600"></i>
+                            </div>
+                        </button>
+
+                        <button onclick="loadDemoData('comments')" class="w-full text-left px-4 py-3 bg-white border border-slate-200 rounded-lg hover:border-blue-400 hover:shadow-md transition-all flex items-center justify-between group">
+                            <div>
+                                <div class="text-xs font-bold text-slate-700 group-hover:text-blue-600">用户评论示例</div>
+                                <div class="text-[10px] text-slate-400">模拟海外用户反馈 (缺点/吐槽)</div>
+                            </div>
+                            <div class="p-1 rounded-full bg-slate-100 group-hover:bg-blue-100 transition-colors">
+                                <i data-lucide="chevron-right" class="w-3 h-3 text-slate-400 group-hover:text-blue-600"></i>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 配置与预览区 (上传后显示) -->
+            <div id="fileConfigSection" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <!-- 左侧控制面板 -->
+                <div class="lg:col-span-1 space-y-4">
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                <i data-lucide="sliders-horizontal" class="w-4 h-4 text-slate-500"></i>
+                                字段映射
+                            </h3>
+                            <button onclick="resetUpload()" class="text-xs text-blue-600 hover:underline">重置文件</button>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1.5">待翻译的列</label>
+                                <div class="relative">
+                                    <select id="sourceColumn" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none appearance-none">
+                                        <!-- 动态填充 -->
+                                    </select>
+                                    <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 absolute right-3 top-3 pointer-events-none"></i>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1.5">结果存放位置</label>
+                                <div class="flex gap-2 bg-slate-100 p-1 rounded-lg mb-2">
+                                    <button onclick="setTargetMode('new')" id="btnModeNew" class="flex-1 py-1.5 text-xs rounded-md bg-white text-slate-800 font-bold shadow-sm transition-all">新建列</button>
+                                    <button onclick="setTargetMode('overwrite')" id="btnModeOverwrite" class="flex-1 py-1.5 text-xs rounded-md text-slate-500 hover:text-slate-700 transition-all">覆盖原列</button>
+                                </div>
+                                <input type="text" id="targetColumnNewName" value="翻译结果" placeholder="输入列名" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                                <div class="relative hidden" id="targetColumnSelectWrapper">
+                                    <select id="targetColumnSelect" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none appearance-none"></select>
+                                    <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 absolute right-3 top-3 pointer-events-none"></i>
+                                </div>
+                            </div>
+
+                            <button id="startFileBtn" class="w-full mt-2 bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-lg font-bold shadow flex items-center justify-center gap-2 transition-all active:scale-95 text-sm">
+                                <i data-lucide="play" class="w-3 h-3"></i>
+                                开始翻译处理
+                            </button>
+
+                            <button id="downloadBtn" class="hidden w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow flex items-center justify-center gap-2 transition-all active:scale-95 text-sm">
+                                <i data-lucide="download" class="w-3 h-3"></i>
+                                导出翻译结果
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 进度状态卡片 -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-slate-800 text-xs">任务状态</h3>
+                            <span id="statusText" class="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">待机</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2 mb-2 overflow-hidden">
+                            <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300 w-0"></div>
+                        </div>
+                        <div class="flex justify-between text-[10px] text-slate-400">
+                            <span>处理行数: <span id="progressCount">0</span>/<span id="totalCount">0</span></span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧预览 -->
+                <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[380px] overflow-hidden">
+                    <div class="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <span class="font-bold text-slate-700 text-xs flex items-center gap-2">
+                            <i data-lucide="eye" class="w-3 h-3 text-blue-500"></i> 数据预览
+                        </span>
+                        <span class="text-[10px] text-slate-400">仅预览前 100 行</span>
+                    </div>
+                    <div class="flex-1 overflow-auto">
+                        <table class="w-full text-sm text-left border-collapse">
+                            <thead class="text-xs text-slate-500 bg-slate-50 sticky top-0 z-10 shadow-sm">
+                                <tr id="tableHeader"></tr>
+                            </thead>
+                            <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模式 2: 文本快速翻译 -->
+        <div id="view-text" class="hidden space-y-4 animate-fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 h-[380px]">
+                <!-- 输入 -->
+                <div class="flex flex-col h-full">
+                    <label class="block text-xs font-bold text-slate-700 mb-2 flex justify-between">
+                        <span>原文 (参数/评论/邮件)</span>
+                        <button onclick="clearText()" class="text-xs text-slate-400 hover:text-red-500 transition-colors">清空</button>
+                    </label>
+                    <textarea id="textInput" class="flex-1 w-full p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none resize-none text-sm leading-relaxed shadow-sm placeholder-slate-300 transition-colors" placeholder="在此粘贴需要翻译的文本..."></textarea>
+                </div>
+
+                <!-- 输出 -->
+                <div class="flex flex-col h-full">
+                    <label class="block text-xs font-bold text-slate-700 mb-2 flex justify-between">
+                        <span>AI 翻译结果</span>
+                        <button onclick="copyResult()" class="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+                            <i data-lucide="copy" class="w-3 h-3"></i> 复制结果
+                        </button>
+                    </label>
+                    <div class="relative flex-1">
+                        <textarea id="textOutput" readonly class="w-full h-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none text-sm leading-relaxed text-slate-700" placeholder="等待处理..."></textarea>
+                        <!-- 加载动画 -->
+                        <div id="textLoading" class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                            <div class="flex flex-col items-center gap-3">
+                                <div class="w-8 h-8 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin"></div>
+                                <span class="text-xs text-blue-600 font-medium">正在智能翻译中...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-center">
+                <button id="startTextBtn" class="px-10 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-full font-bold shadow-lg flex items-center gap-2 transition-all active:translate-y-0 text-sm">
+                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                    执行翻译
+                </button>
+            </div>
+        </div>
+
+        <!-- 模式 3: 智能评论分析 -->
+        <div id="view-analysis" class="hidden space-y-4 animate-fade-in">
+            <!-- 分析配置区域 -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <!-- 左侧配置面板 -->
+                <div class="lg:col-span-1 space-y-4">
+                    <!-- 当前模型指示 -->
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100 p-3 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="brain" class="w-4 h-4 text-blue-500"></i>
+                            <span class="text-xs font-medium text-blue-700">分析模型</span>
+                        </div>
+                        <span id="analysisCurrentModel" class="text-xs font-bold text-blue-600 bg-white px-2 py-0.5 rounded">-</span>
+                    </div>
+                    <!-- 数据源设置 -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm mb-4">
+                            <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
+                            数据源设置
+                        </h3>
+
+                        <div class="space-y-4">
+                            <div class="relative group">
+                                <input type="file" id="analysisFileInput" accept=".csv, .xlsx, .xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                                <div class="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center group-hover:border-blue-500 group-hover:bg-blue-50 transition-all">
+                                    <div class="text-blue-500 mb-1">
+                                        <i data-lucide="upload" class="w-6 h-6 mx-auto"></i>
+                                    </div>
+                                    <p class="text-xs text-slate-600 font-medium" id="analysisFileNameDisplay">点击上传评论文件</p>
+                                </div>
+                            </div>
+
+                            <div id="analysisColumnContainer" class="hidden opacity-0 transition-opacity duration-300">
+                                <label class="block text-xs font-medium text-slate-600 mb-1">待分析的列</label>
+                                <div class="relative">
+                                    <select id="analysisColumnSelect" class="w-full p-2.5 bg-white border border-blue-300 rounded-lg text-sm text-blue-800 font-medium focus:ring-2 focus:ring-blue-500 shadow-sm appearance-none">
+                                        <option value="">请先上传文件...</option>
+                                    </select>
+                                    <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 absolute right-3 top-3 pointer-events-none"></i>
+                                </div>
+                            </div>
+
+                            <!-- 结果存放位置 -->
+                            <div id="analysisTargetContainer" class="hidden opacity-0 transition-opacity duration-300">
+                                <label class="block text-xs font-medium text-slate-600 mb-1">结果存放位置</label>
+                                <div class="flex gap-2 bg-slate-100 p-1 rounded-lg mb-2">
+                                    <button onclick="setAnalysisTargetMode('new')" id="btnAnalysisModeNew" class="flex-1 py-1.5 text-xs rounded-md bg-white text-slate-800 font-bold shadow-sm transition-all">新建列</button>
+                                    <button onclick="setAnalysisTargetMode('overwrite')" id="btnAnalysisModeOverwrite" class="flex-1 py-1.5 text-xs rounded-md text-slate-500 hover:text-slate-700 transition-all">覆盖原列</button>
+                                </div>
+                                <input type="text" id="analysisTargetColumnNewName" value="分析结果" placeholder="输入列名" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none">
+                                <div class="relative hidden" id="analysisTargetColumnSelectWrapper">
+                                    <select id="analysisTargetColumnSelect" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none appearance-none"></select>
+                                    <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 absolute right-3 top-3 pointer-events-none"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 分类体系设置 -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                <i data-lucide="git-branch" class="w-4 h-4 text-slate-500"></i>
+                                评论分类设置
+                            </h3>
+                            <div class="flex gap-2">
+                                <button onclick="toggleEditMode()" id="editModeBtn" class="text-[10px] bg-blue-100 text-blue-600 hover:bg-blue-200 px-2 py-1 rounded cursor-pointer transition-colors">简化编辑</button>
+                                <button onclick="resetAnalysisTemplate()" class="text-[10px] text-slate-500 hover:text-slate-700 underline cursor-pointer">重置</button>
+                            </div>
+                        </div>
+
+                        <!-- 简化编辑模式 -->
+                        <div id="simpleEditMode" class="space-y-4">
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                <p class="text-xs text-blue-800 mb-3 flex items-center gap-2">
+                                    <i data-lucide="lightbulb" class="w-3 h-3"></i>
+                                    可视化分类配置
+                                </p>
+                                <!-- 内联添加分类输入框 -->
+                                <div class="flex gap-2 mb-2">
+                                    <input type="text" id="newCategoryInput" placeholder="输入分类名称，按回车添加"
+                                        class="flex-1 px-3 py-2 text-xs border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                        onkeydown="if(event.key==='Enter'){addCategoryFromInput();event.preventDefault();}">
+                                    <button onclick="addCategoryFromInput()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-2 px-3 rounded-lg transition-colors flex items-center gap-1">
+                                        <i data-lucide="plus" class="w-3 h-3"></i>
+                                    </button>
+                                </div>
+                                <!-- AI 自动提取分类 -->
+                                <button onclick="autoExtractCategories()" id="autoExtractBtn" class="w-full bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white text-xs font-medium py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                    <i data-lucide="sparkles" class="w-3 h-3"></i>
+                                    AI 智能提取分类
+                                    <span class="text-[10px] opacity-80">(需先上传数据)</span>
+                                </button>
+                            </div>
+
+                            <!-- 自定义分类设置 -->
+                            <div id="quickCategories" class="space-y-3">
+                                <div class="text-center text-slate-400 text-xs py-8 border-2 border-dashed border-slate-200 rounded-lg" id="emptyCategoriesMessage">
+                                    <i data-lucide="folder-plus" class="w-6 h-6 mx-auto mb-2 opacity-50"></i>
+                                    <p>暂无分类，点击上方按钮添加</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 高级编辑模式 -->
+                        <div id="advancedEditMode" class="hidden space-y-3">
+                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                <p class="text-xs text-amber-800 flex items-center gap-2 mb-2">
+                                    <i data-lucide="code" class="w-3 h-3"></i>
+                                    高级模式：JSON格式精确控制分类结构
+                                </p>
+                                <div class="text-[10px] text-amber-700 space-y-1">
+                                    <p><strong>结构说明：</strong></p>
+                                    <p>• 一级分类: 大类（如"好评"、"差评"）</p>
+                                    <p>• 二级分类: 子类（如"效果"、"包装"）</p>
+                                    <p>• 三级分类 []: 细分标签（如["持久", "自然"]）</p>
+                                    <p class="text-amber-600">⭐ [] 数组用于更精细的三级分类，AI会优先匹配最具体的标签</p>
+                                </div>
+                            </div>
+                            <div class="border border-slate-200 rounded overflow-hidden shadow-inner">
+                                <textarea id="jsonEditor"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 操作按钮 -->
+                    <div class="space-y-3">
+                        <button onclick="startAnalysis()" id="startAnalysisBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i data-lucide="play" class="w-4 h-4"></i>
+                            开始智能分析
+                        </button>
+                        <div class="flex gap-2">
+                             <button onclick="exportAnalysisData()" id="exportAnalysisBtn" disabled class="flex-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium py-2 px-3 rounded-lg shadow-sm transition-all disabled:opacity-50">
+                                导出分析结果
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧结果展示 -->
+                <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[420px] overflow-hidden">
+                    <!-- 进度条 -->
+                    <div id="analysisProgressOverlay" class="absolute top-0 left-0 right-0 h-1 bg-slate-200 z-30 hidden">
+                        <div id="analysisProgressBar" class="h-full bg-blue-500 transition-all duration-300 w-0"></div>
+                    </div>
+
+                    <!-- 工具栏 -->
+                    <div class="bg-white border-b border-slate-100 px-4 py-3 flex justify-between items-center shadow-sm">
+                        <div class="text-sm text-slate-500">
+                            <span id="analysisRecordCount">暂无数据</span>
+                        </div>
+                        <div class="text-sm text-slate-500 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-slate-300" id="analysisProcessingIndicator"></span>
+                            <span id="analysisStatusText">等待操作</span>
+                        </div>
+                    </div>
+
+                    <!-- 表格容器 -->
+                    <div class="flex-1 overflow-auto custom-scrollbar p-4">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-50 sticky top-0 z-10">
+                                <tr>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-16">No.</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-5/12">评论内容</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-blue-600 uppercase tracking-wider">
+                                        AI 分析结果
+                                    </th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-20">状态</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-slate-100" id="analysisTableBody">
+                                <tr>
+                                    <td colspan="4" class="px-4 py-20 text-center">
+                                        <div class="flex flex-col items-center justify-center text-slate-400">
+                                            <i data-lucide="file-text" class="w-12 h-12 mb-3 opacity-20"></i>
+                                            <p class="text-sm">请在左侧上传评论文件并配置分析参数</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模式 4: 数据摘要生成器 -->
+        <div id="view-summary" class="hidden space-y-4 animate-fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <!-- 左侧配置 -->
+                <div class="lg:col-span-1 space-y-4">
+                    <!-- 当前模型指示 -->
+                    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg border border-emerald-100 p-3 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="brain" class="w-4 h-4 text-emerald-500"></i>
+                            <span class="text-xs font-medium text-emerald-700">分析模型</span>
+                        </div>
+                        <span id="summaryCurrentModel" class="text-xs font-bold text-emerald-600 bg-white px-2 py-0.5 rounded">-</span>
+                    </div>
+                    <!-- 文件上传与试用样例 -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm mb-4">
+                            <i data-lucide="upload" class="w-4 h-4 text-slate-500"></i>
+                            上传数据文件
+                        </h3>
+                        <div id="summaryUploadSection">
+                            <div id="summaryDropZone" class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group">
+                                <div class="bg-emerald-50 p-3 rounded-full mb-3 inline-block group-hover:scale-110 transition-transform">
+                                    <i data-lucide="file-spreadsheet" class="w-6 h-6 text-emerald-600"></i>
+                                </div>
+                                <p class="text-sm font-medium text-slate-700 mb-1">点击或拖拽文件</p>
+                                <p class="text-xs text-slate-400">支持 .xlsx, .xls, .csv</p>
+                                <input type="file" id="summaryFileInput" accept=".xlsx,.xls,.csv" class="hidden">
+                            </div>
+                            <!-- 试用样例区域 -->
+                            <div class="mt-4 p-4 bg-gradient-to-b from-emerald-50/50 to-white rounded-lg border border-emerald-100">
+                                <h4 class="text-xs font-bold text-slate-700 flex items-center gap-2 mb-3">
+                                    <i data-lucide="sparkles" class="w-3 h-3 text-amber-500 fill-amber-500"></i>
+                                    没有文件？试用样例
+                                </h4>
+                                <div class="space-y-2">
+                                    <button onclick="loadSummaryDemoData('sales')" class="w-full text-left px-3 py-2 bg-white border border-slate-200 rounded-lg hover:border-emerald-400 hover:shadow-sm transition-all flex items-center justify-between group">
+                                        <div>
+                                            <div class="text-xs font-medium text-slate-700 group-hover:text-emerald-600">销售数据</div>
+                                            <div class="text-[10px] text-slate-400">季度销售额、产品分类统计</div>
+                                        </div>
+                                        <i data-lucide="chevron-right" class="w-3 h-3 text-slate-400 group-hover:text-emerald-600"></i>
+                                    </button>
+                                    <button onclick="loadSummaryDemoData('employees')" class="w-full text-left px-3 py-2 bg-white border border-slate-200 rounded-lg hover:border-emerald-400 hover:shadow-sm transition-all flex items-center justify-between group">
+                                        <div>
+                                            <div class="text-xs font-medium text-slate-700 group-hover:text-emerald-600">员工信息</div>
+                                            <div class="text-[10px] text-slate-400">部门、薪资、入职日期分析</div>
+                                        </div>
+                                        <i data-lucide="chevron-right" class="w-3 h-3 text-slate-400 group-hover:text-emerald-600"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="summaryFileInfo" class="hidden mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="file-check" class="w-4 h-4 text-emerald-600"></i>
+                                    <span id="summaryFileName" class="text-sm font-medium text-emerald-800"></span>
+                                </div>
+                                <button onclick="resetSummaryFile()" class="text-xs text-slate-500 hover:text-red-500">重置</button>
+                            </div>
+                            <p id="summaryFileStats" class="text-xs text-emerald-600 mt-1"></p>
+                        </div>
+                    </div>
+
+                    <!-- 分析配置 -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm mb-4">
+                            <i data-lucide="settings" class="w-4 h-4 text-slate-500"></i>
+                            分析配置
+                        </h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1.5">分析深度</label>
+                                <select id="summaryDepth" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm">
+                                    <option value="quick">快速概览</option>
+                                    <option value="standard" selected>标准分析</option>
+                                    <option value="detailed">深度分析</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1.5">报告语言</label>
+                                <select id="summaryLanguage" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm">
+                                    <option value="zh" selected>中文</option>
+                                    <option value="en">English</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="summaryGenerateBtn" onclick="generateSummary()" disabled class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        生成数据摘要
+                    </button>
+                </div>
+
+                <!-- 右侧结果 -->
+                <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[380px] overflow-hidden">
+                    <div class="border-b border-slate-100 px-5 py-3 flex justify-between items-center bg-slate-50/50">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="file-text" class="w-4 h-4 text-emerald-600"></i>
+                            <span class="font-bold text-slate-700 text-sm">分析报告</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="copySummaryReport()" id="summaryCopyBtn" disabled class="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1">
+                                <i data-lucide="copy" class="w-3 h-3"></i> 复制
+                            </button>
+                            <button onclick="downloadSummaryReport()" id="summaryDownloadBtn" disabled class="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1">
+                                <i data-lucide="download" class="w-3 h-3"></i> 下载
+                            </button>
+                        </div>
+                    </div>
+                    <div id="summaryReportContainer" class="flex-1 p-6 overflow-auto">
+                        <div id="summaryEmptyState" class="flex flex-col items-center justify-center h-full text-slate-400">
+                            <i data-lucide="file-bar-chart-2" class="w-16 h-16 mb-4 opacity-20"></i>
+                            <p class="text-sm">上传文件后点击"生成数据摘要"按钮</p>
+                        </div>
+                        <div id="summaryLoadingState" class="hidden flex flex-col items-center justify-center h-full">
+                            <div class="w-12 h-12 border-4 border-slate-100 border-t-emerald-600 rounded-full animate-spin mb-4"></div>
+                            <p class="text-sm text-emerald-600 font-medium">AI 正在分析您的数据...</p>
+                        </div>
+                        <div id="summaryReportContent" class="hidden markdown-body prose prose-slate max-w-none"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模式 5: 公式生成器 -->
+        <div id="view-formula" class="hidden space-y-4 animate-fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- 左侧输入 -->
+                <div class="space-y-4">
+                    <!-- 当前模型指示 -->
+                    <div class="bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg border border-violet-100 p-3 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="brain" class="w-4 h-4 text-violet-500"></i>
+                            <span class="text-xs font-medium text-violet-700">分析模型</span>
+                        </div>
+                        <span id="formulaCurrentModel" class="text-xs font-bold text-violet-600 bg-white px-2 py-0.5 rounded">-</span>
+                    </div>
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm mb-4">
+                            <i data-lucide="message-square" class="w-4 h-4 text-slate-500"></i>
+                            描述您的需求
+                        </h3>
+                        <textarea id="formulaRequirement" class="w-full h-32 p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none resize-none text-sm" placeholder="例如：&#10;- 如果A列的值大于100，则显示'高'，否则显示'低'&#10;- 在B列中查找与D1匹配的值，返回对应C列内容&#10;- 计算A列中所有'销售部'对应的B列数值总和"></textarea>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm mb-4">
+                            <i data-lucide="table" class="w-4 h-4 text-slate-500"></i>
+                            数据上下文 (可选)
+                        </h3>
+                        <textarea id="formulaContext" class="w-full h-20 p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none resize-none text-sm" placeholder="例如：A列是部门名称，B列是销售额，C列是日期"></textarea>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1.5">Excel 版本</label>
+                                <select id="formulaExcelVersion" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm">
+                                    <option value="365">Microsoft 365</option>
+                                    <option value="2019">Excel 2019</option>
+                                    <option value="2016">Excel 2016</option>
+                                    <option value="wps">WPS 表格</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="formulaGenerateBtn" onclick="generateFormula()" class="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        生成公式
+                    </button>
+
+                    <!-- 快捷示例 -->
+                    <div class="bg-slate-50 rounded-xl border border-slate-200 p-4">
+                        <p class="text-xs font-medium text-slate-500 mb-3">常用场景:</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="setFormulaExample('vlookup')" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:border-violet-400 hover:text-violet-600">VLOOKUP 查找</button>
+                            <button onclick="setFormulaExample('sumif')" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:border-violet-400 hover:text-violet-600">条件求和</button>
+                            <button onclick="setFormulaExample('ifnested')" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:border-violet-400 hover:text-violet-600">多条件判断</button>
+                            <button onclick="setFormulaExample('text')" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:border-violet-400 hover:text-violet-600">文本提取</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧结果 -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[380px] overflow-hidden">
+                    <div class="border-b border-slate-100 px-5 py-3 flex items-center gap-2 bg-slate-50/50">
+                        <i data-lucide="code" class="w-4 h-4 text-violet-600"></i>
+                        <span class="font-bold text-slate-700 text-sm">生成结果</span>
+                    </div>
+                    <div id="formulaResultContainer" class="flex-1 p-5 overflow-auto">
+                        <div id="formulaEmptyState" class="flex flex-col items-center justify-center h-full text-slate-400">
+                            <i data-lucide="function-square" class="w-16 h-16 mb-4 opacity-20"></i>
+                            <p class="text-sm">输入需求后点击"生成公式"按钮</p>
+                        </div>
+                        <div id="formulaLoadingState" class="hidden flex flex-col items-center justify-center h-full">
+                            <div class="w-12 h-12 border-4 border-slate-100 border-t-violet-600 rounded-full animate-spin mb-4"></div>
+                            <p class="text-sm text-violet-600 font-medium">AI 正在生成公式...</p>
+                        </div>
+                        <div id="formulaResultContent" class="hidden space-y-4">
+                            <div class="bg-violet-50 border border-violet-200 rounded-xl p-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-bold text-violet-800">Excel 公式</span>
+                                    <button onclick="copyFormula()" class="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1">
+                                        <i data-lucide="copy" class="w-3 h-3"></i> 复制公式
+                                    </button>
+                                </div>
+                                <div id="formulaBox" class="formula-box bg-white border border-violet-300 rounded-lg p-4 text-sm text-violet-900 break-all select-all"></div>
+                            </div>
+                            <div class="border border-slate-200 rounded-xl p-4">
+                                <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                    <i data-lucide="info" class="w-4 h-4 text-slate-500"></i>
+                                    使用说明
+                                </h4>
+                                <div id="formulaExplanation" class="text-sm text-slate-600 leading-relaxed markdown-body"></div>
+                            </div>
+                            <div id="formulaNotesBox" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                <h4 class="text-sm font-bold text-amber-800 mb-2 flex items-center gap-2">
+                                    <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                                    注意事项
+                                </h4>
+                                <div id="formulaNotes" class="text-sm text-amber-700"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模式 6: 数据清洗工具 -->
+        <div id="view-cleaning" class="hidden space-y-4 animate-fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <!-- 左侧配置 -->
+                <div class="lg:col-span-1 space-y-4">
+                    <!-- 当前模型指示 -->
+                    <div class="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-100 p-3 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="brain" class="w-4 h-4 text-orange-500"></i>
+                            <span class="text-xs font-medium text-orange-700">分析模型</span>
+                        </div>
+                        <span id="cleaningCurrentModel" class="text-xs font-bold text-orange-600 bg-white px-2 py-0.5 rounded">-</span>
+                    </div>
+                    <!-- 文件上传与试用样例 -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm mb-4">
+                            <i data-lucide="upload" class="w-4 h-4 text-slate-500"></i>
+                            上传数据文件
+                        </h3>
+                        <div id="cleaningUploadSection">
+                            <div id="cleaningDropZone" class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-orange-500 hover:bg-orange-50/30 transition-all group">
+                                <div class="bg-orange-50 p-3 rounded-full mb-3 inline-block group-hover:scale-110 transition-transform">
+                                    <i data-lucide="file-spreadsheet" class="w-6 h-6 text-orange-600"></i>
+                                </div>
+                                <p class="text-sm font-medium text-slate-700 mb-1">点击或拖拽文件</p>
+                                <p class="text-xs text-slate-400">支持 .xlsx, .xls, .csv</p>
+                                <input type="file" id="cleaningFileInput" accept=".xlsx,.xls,.csv" class="hidden">
+                            </div>
+                            <!-- 试用样例区域 -->
+                            <div class="mt-4 p-4 bg-gradient-to-b from-orange-50/50 to-white rounded-lg border border-orange-100">
+                                <h4 class="text-xs font-bold text-slate-700 flex items-center gap-2 mb-3">
+                                    <i data-lucide="sparkles" class="w-3 h-3 text-amber-500 fill-amber-500"></i>
+                                    没有文件？试用样例
+                                </h4>
+                                <div class="space-y-2">
+                                    <button onclick="loadCleaningDemoData('contacts')" class="w-full text-left px-3 py-2 bg-white border border-slate-200 rounded-lg hover:border-orange-400 hover:shadow-sm transition-all flex items-center justify-between group">
+                                        <div>
+                                            <div class="text-xs font-medium text-slate-700 group-hover:text-orange-600">客户联系人</div>
+                                            <div class="text-[10px] text-slate-400">姓名/手机/邮箱格式混乱</div>
+                                        </div>
+                                        <i data-lucide="chevron-right" class="w-3 h-3 text-slate-400 group-hover:text-orange-600"></i>
+                                    </button>
+                                    <button onclick="loadCleaningDemoData('addresses')" class="w-full text-left px-3 py-2 bg-white border border-slate-200 rounded-lg hover:border-orange-400 hover:shadow-sm transition-all flex items-center justify-between group">
+                                        <div>
+                                            <div class="text-xs font-medium text-slate-700 group-hover:text-orange-600">地址数据</div>
+                                            <div class="text-[10px] text-slate-400">地址缺省/日期格式不统一</div>
+                                        </div>
+                                        <i data-lucide="chevron-right" class="w-3 h-3 text-slate-400 group-hover:text-orange-600"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="cleaningFileInfo" class="hidden mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="file-check" class="w-4 h-4 text-orange-600"></i>
+                                    <span id="cleaningFileName" class="text-sm font-medium text-orange-800"></span>
+                                </div>
+                                <button onclick="resetCleaningFile()" class="text-xs text-slate-500 hover:text-red-500">重置</button>
+                            </div>
+                            <p id="cleaningFileStats" class="text-xs text-orange-600 mt-1"></p>
+                        </div>
+                    </div>
+
+                    <!-- 清洗任务 -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm mb-4">
+                            <i data-lucide="list-checks" class="w-4 h-4 text-slate-500"></i>
+                            选择清洗任务
+                        </h3>
+                        <div class="space-y-2">
+                            <label class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-orange-50 transition-colors">
+                                <input type="checkbox" id="cleaning-task-name" class="w-4 h-4 text-orange-600 rounded">
+                                <div class="flex-1">
+                                    <span class="text-xs font-medium text-slate-700">姓名规范化</span>
+                                </div>
+                            </label>
+                            <label class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-orange-50 transition-colors">
+                                <input type="checkbox" id="cleaning-task-phone" class="w-4 h-4 text-orange-600 rounded">
+                                <div class="flex-1">
+                                    <span class="text-xs font-medium text-slate-700">手机号格式化</span>
+                                </div>
+                            </label>
+                            <label class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-orange-50 transition-colors">
+                                <input type="checkbox" id="cleaning-task-address" class="w-4 h-4 text-orange-600 rounded">
+                                <div class="flex-1">
+                                    <span class="text-xs font-medium text-slate-700">地址标准化</span>
+                                </div>
+                            </label>
+                            <label class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-orange-50 transition-colors">
+                                <input type="checkbox" id="cleaning-task-date" class="w-4 h-4 text-orange-600 rounded">
+                                <div class="flex-1">
+                                    <span class="text-xs font-medium text-slate-700">日期格式统一</span>
+                                </div>
+                            </label>
+                            <label class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-orange-50 transition-colors">
+                                <input type="checkbox" id="cleaning-task-email" class="w-4 h-4 text-orange-600 rounded">
+                                <div class="flex-1">
+                                    <span class="text-xs font-medium text-slate-700">邮箱验证清洗</span>
+                                </div>
+                            </label>
+                            <label class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-orange-50 transition-colors">
+                                <input type="checkbox" id="cleaning-task-custom" class="w-4 h-4 text-orange-600 rounded">
+                                <div class="flex-1">
+                                    <span class="text-xs font-medium text-slate-700">自定义规则</span>
+                                </div>
+                            </label>
+                        </div>
+                        <div id="cleaningCustomRuleBox" class="hidden mt-3">
+                            <textarea id="cleaningCustomRule" class="w-full h-16 p-3 border border-slate-200 rounded-lg text-sm resize-none" placeholder="例如：将所有的&quot;株式会社&quot;替换为&quot;公司&quot;..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 列选择 -->
+                    <div id="cleaningColumnSection" class="hidden bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm mb-4">
+                            <i data-lucide="columns" class="w-4 h-4 text-slate-500"></i>
+                            选择要清洗的列
+                        </h3>
+                        <div id="cleaningColumnCheckboxes" class="space-y-2 max-h-40 overflow-y-auto"></div>
+                    </div>
+
+                    <button id="cleaningBtn" onclick="startCleaning()" disabled class="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        开始清洗
+                    </button>
+                </div>
+
+                <!-- 右侧结果 -->
+                <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[420px] overflow-hidden">
+                    <div class="border-b border-slate-100 px-5 py-3 flex justify-between items-center bg-slate-50/50">
+                        <div class="flex items-center gap-4">
+                            <button onclick="showCleaningTab('preview')" id="cleaningTabPreview" class="text-sm font-medium text-orange-600 border-b-2 border-orange-600 pb-1">数据预览</button>
+                            <button onclick="showCleaningTab('result')" id="cleaningTabResult" class="text-sm font-medium text-slate-500 hover:text-slate-700 pb-1">清洗结果</button>
+                        </div>
+                        <button onclick="downloadCleaningResult()" id="cleaningDownloadBtn" disabled class="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg disabled:opacity-50 flex items-center gap-1">
+                            <i data-lucide="download" class="w-3 h-3"></i> 导出结果
+                        </button>
+                    </div>
+                    <div id="cleaningPreviewTab" class="flex-1 overflow-auto">
+                        <div id="cleaningEmptyPreview" class="flex flex-col items-center justify-center h-full text-slate-400">
+                            <i data-lucide="table" class="w-16 h-16 mb-4 opacity-20"></i>
+                            <p class="text-sm">上传文件后可在此预览数据</p>
+                        </div>
+                        <table id="cleaningPreviewTable" class="hidden w-full text-sm">
+                            <thead class="bg-slate-50 sticky top-0">
+                                <tr id="cleaningPreviewHeader"></tr>
+                            </thead>
+                            <tbody id="cleaningPreviewBody" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                    <div id="cleaningResultTab" class="hidden flex-1 overflow-auto">
+                        <div id="cleaningEmptyResult" class="flex flex-col items-center justify-center h-full text-slate-400">
+                            <i data-lucide="eraser" class="w-16 h-16 mb-4 opacity-20"></i>
+                            <p class="text-sm">清洗完成后可在此查看结果</p>
+                        </div>
+                        <div id="cleaningLoadingResult" class="hidden flex flex-col items-center justify-center h-full">
+                            <div class="w-12 h-12 border-4 border-slate-100 border-t-orange-600 rounded-full animate-spin mb-4"></div>
+                            <p class="text-sm text-orange-600 font-medium">AI 正在清洗数据...</p>
+                            <p id="cleaningProgressText" class="text-xs text-slate-400 mt-1">处理中...</p>
+                        </div>
+                        <table id="cleaningResultTable" class="hidden w-full text-sm">
+                            <thead class="bg-slate-50 sticky top-0">
+                                <tr id="cleaningResultHeader"></tr>
+                            </thead>
+                            <tbody id="cleaningResultBody" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                    <div id="cleaningStatsBar" class="hidden border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+                        <div class="flex items-center gap-6 text-xs">
+                            <span class="text-slate-500">总行数: <span id="cleaningTotalRows" class="font-medium text-slate-700">0</span></span>
+                            <span class="text-slate-500">已清洗: <span id="cleaningCleanedRows" class="font-medium text-green-600">0</span></span>
+                            <span class="text-slate-500">有变更: <span id="cleaningChangedRows" class="font-medium text-orange-600">0</span></span>
+                            <span class="text-slate-500">问题数据: <span id="cleaningErrorRows" class="font-medium text-red-600">0</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        lucide.createIcons();
+
+        // ==================== API 平台配置 ====================
+        const API_PLATFORMS = {
+            siliconflow: {
+                name: '硅基流动',
+                url: 'https://api.siliconflow.cn/v1/chat/completions',
+                registerUrl: 'https://cloud.siliconflow.cn/i/S8pG3891',
+                keyUrl: 'https://cloud.siliconflow.cn/me/account/ak',
+                inviteCode: 'S8pG3891',
+                models: {
+                    translate: 'Tencent/Hunyuan-MT-7B',
+                    work: 'deepseek-ai/DeepSeek-R1-0528-Qwen3-8B',
+                    analysis: [
+                        { id: 'deepseek-ai/DeepSeek-V3.2-Exp', name: 'DeepSeek-V3.2-Exp (最新版)' },
+                        { id: 'deepseek-ai/DeepSeek-R1-0528-Qwen3-8B', name: 'DeepSeek-R1-Qwen3-8B (免费)' },
+                        { id: 'THUDM/GLM-Z1-9B-0414', name: 'GLM-Z1-9B (免费)' }
+                    ]
+                },
+                useSystemPrompt: false // 硅基流动的翻译模型不需要 system prompt
+            },
+            aiping: {
+                name: 'aiping.cn',
+                url: 'https://www.aiping.cn/api/v1/chat/completions',
+                registerUrl: 'https://www.aiping.cn/#?invitation_code=WBEJSN',
+                keyUrl: 'https://www.aiping.cn/user/apikey',
+                inviteCode: 'WBEJSN',
+                models: {
+                    translate: 'DeepSeek-V3.2',
+                    work: 'DeepSeek-V3.2',
+                    analysis: [
+                        { id: 'DeepSeek-V3.2', name: 'DeepSeek-V3.2 (推荐)' },
+                        { id: 'GLM-4.7', name: 'GLM-4.7' },
+                        { id: 'MiniMax-M2.1', name: 'MiniMax-M2.1' }
+                    ]
+                },
+                useSystemPrompt: true // aiping 需要 system prompt 指导翻译
+            }
+        };
+
+        // 获取当前平台配置
+        function getApiConfig() {
+            const platform = localStorage.getItem('api_platform') || 'siliconflow';
+            const config = API_PLATFORMS[platform];
+
+            // 动态获取用户选择的翻译模型
+            const modelSelect = document.getElementById(`translateModel-${platform}`);
+            const translateModel = modelSelect ? modelSelect.value : config.models.translate;
+
+            // 动态获取用户选择的工作模型
+            const workModelSelect = document.getElementById(`workModel-${platform}`);
+            const workModel = workModelSelect ? workModelSelect.value : config.models.work;
+
+            // 判断是否需要 system prompt (非专用翻译模型都需要)
+            const isSpecializedTranslator = translateModel === 'Tencent/Hunyuan-MT-7B';
+
+            return {
+                ...config,
+                platform: platform,
+                key: localStorage.getItem(`${platform}_api_key`),
+                models: {
+                    ...config.models,
+                    translate: translateModel,
+                    work: workModel
+                },
+                useSystemPrompt: platform === 'aiping' || !isSpecializedTranslator
+            };
+        }
+
+        // 核心状态
+        let currentMode = 'translate';
+        let currentPlatform = 'siliconflow';
+        let targetFileMode = 'new';
+        let rawData = [];
+        let headers = [];
+        let dataRows = [];
+        let isProcessing = false;
+
+        // 评论分析相关状态
+        let analysisRawData = [];
+        let analysisProcessedData = [];
+        let isAnalysisProcessing = false;
+        let selectedAnalysisColumn = "";
+        let analysisTargetMode = 'new'; // 结果存放模式
+        let analysisEditor = null; // CodeMirror instance
+        let analysisAbortController = null;
+        let isSimpleEditMode = true; // 编辑模式状态
+
+        // DOM Elements
+        const settingsModal = document.getElementById('settingsModal');
+        const apiWarningBar = document.getElementById('apiWarningBar');
+
+        // --- 初始化 ---
+        window.addEventListener('DOMContentLoaded', () => {
+            // 加载保存的平台选择
+            currentPlatform = localStorage.getItem('api_platform') || 'siliconflow';
+
+            // 加载各平台的 API Key
+            const siliconflowKey = localStorage.getItem('siliconflow_api_key');
+            const aipingKey = localStorage.getItem('aiping_api_key');
+
+            if (siliconflowKey) {
+                document.getElementById('apiKey-siliconflow').value = siliconflowKey;
+            }
+            if (aipingKey) {
+                document.getElementById('apiKey-aiping').value = aipingKey;
+            }
+
+            // 检查是否有任何平台配置了 API Key
+            const hasAnyKey = siliconflowKey || aipingKey;
+            if (hasAnyKey) {
+                updatePlatformUI();
+                updateTranslateStatusBar();
+                updateAnalysisModelIndicators();
+            } else {
+                openSettings(true);
+            }
+
+            // 初始化CodeMirror编辑器
+            analysisEditor = CodeMirror.fromTextArea(document.getElementById("jsonEditor"), {
+                mode: "application/json",
+                theme: "default",
+                lineNumbers: true,
+                matchBrackets: true,
+                autoCloseBrackets: true,
+                indentUnit: 2,
+                tabSize: 2
+            });
+            analysisEditor.setValue(JSON.stringify(getDefaultAnalysisTemplate(), null, 2));
+
+            // 初始化简化编辑模式
+            initSimpleEditMode();
+        });
+
+        // --- 平台选择逻辑 ---
+        function selectPlatform(platform) {
+            currentPlatform = platform;
+
+            // 更新卡片样式
+            const siliconflowCard = document.getElementById('platformCard-siliconflow');
+            const aipingCard = document.getElementById('platformCard-aiping');
+            const siliconflowBadge = document.getElementById('badge-siliconflow');
+            const aipingBadge = document.getElementById('badge-aiping');
+
+            if (platform === 'siliconflow') {
+                siliconflowCard.className = 'cursor-pointer group relative bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border-2 border-blue-400 shadow-md hover:shadow-lg transition-all';
+                aipingCard.className = 'cursor-pointer group relative bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-5 border-2 border-transparent hover:border-purple-300 transition-all';
+                siliconflowBadge.classList.remove('hidden');
+                aipingBadge.classList.add('hidden');
+            } else {
+                siliconflowCard.className = 'cursor-pointer group relative bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border-2 border-transparent hover:border-blue-300 transition-all';
+                aipingCard.className = 'cursor-pointer group relative bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-5 border-2 border-purple-400 shadow-md hover:shadow-lg transition-all';
+                siliconflowBadge.classList.add('hidden');
+                aipingBadge.classList.remove('hidden');
+            }
+
+            // 切换配置区域
+            document.getElementById('config-siliconflow').classList.toggle('hidden', platform !== 'siliconflow');
+            document.getElementById('config-aiping').classList.toggle('hidden', platform !== 'aiping');
+
+            // 清除测试结果
+            document.getElementById('testResultText').textContent = '';
+
+            // 重新初始化图标
+            lucide.createIcons();
+        }
+
+        // 更新平台 UI 状态
+        function updatePlatformUI() {
+            const config = getApiConfig();
+
+            // 更新导航栏平台显示
+            const badge = document.getElementById('currentPlatformBadge');
+            if (badge) {
+                badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>${config.name}`;
+            }
+
+            // 更新设置面板中的平台选择
+            selectPlatform(config.platform);
+        }
+
+        // 更新翻译状态栏
+        function updateTranslateStatusBar() {
+            const config = getApiConfig();
+            const statusText = document.getElementById('translateModelStatus');
+            if (statusText) {
+                statusText.textContent = `${config.name} - ${config.models.translate}`;
+            }
+        }
+
+        // 更新所有分析模型指示器
+        function updateAnalysisModelIndicators() {
+            const config = getApiConfig();
+            const modelName = config.models.work.split('/').pop().replace(/-/g, ' ');
+
+            const indicators = [
+                'analysisCurrentModel',
+                'summaryCurrentModel',
+                'formulaCurrentModel',
+                'cleaningCurrentModel'
+            ];
+
+            indicators.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = modelName;
+            });
+        }
+
+        // --- API 连通性测试 ---
+        async function testApiConnection() {
+            const config = getApiConfig();
+            const keyInput = document.getElementById(`apiKey-${currentPlatform}`);
+            const key = keyInput.value.trim();
+
+            if (!key) {
+                showTestResult('error', '请先输入 API Key');
+                return;
+            }
+
+            showTestResult('loading', '正在测试连接...');
+            const btn = document.getElementById('testApiBtn');
+            btn.disabled = true;
+
+            try {
+                const testConfig = API_PLATFORMS[currentPlatform];
+                const messages = testConfig.useSystemPrompt
+                    ? [{ role: 'system', content: 'You are a translator.' }, { role: 'user', content: 'Hi' }]
+                    : [{ role: 'user', content: 'Hi' }];
+
+                const resp = await fetch(testConfig.url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${key}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: testConfig.models.translate,
+                        messages: messages,
+                        max_tokens: 5
+                    })
+                });
+
+                if (resp.ok) {
+                    showTestResult('success', '连接成功!');
+                } else {
+                    const error = await resp.json();
+                    showTestResult('error', `连接失败: ${error.error?.message || resp.status}`);
+                }
+            } catch (e) {
+                showTestResult('error', `网络错误: ${e.message}`);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function showTestResult(type, message) {
+            const el = document.getElementById('testResultText');
+            if (type === 'loading') {
+                el.className = 'text-xs text-blue-600 animate-pulse';
+                el.textContent = message;
+            } else if (type === 'success') {
+                el.className = 'text-xs text-green-600 font-medium';
+                el.textContent = message;
+            } else {
+                el.className = 'text-xs text-red-600';
+                el.textContent = message;
+            }
+        }
+
+        // --- 设置逻辑 ---
+        function openSettings(force = false) {
+            settingsModal.classList.remove('hidden');
+            apiWarningBar.classList.add('hidden');
+
+            // 加载当前平台配置到设置面板
+            const savedPlatform = localStorage.getItem('api_platform') || 'siliconflow';
+            selectPlatform(savedPlatform);
+
+            goToStep(1);
+            setTimeout(() => {
+                settingsModal.classList.remove('opacity-0');
+                settingsModal.classList.add('opacity-100');
+            }, 10);
+            settingsModal.onclick = (e) => {
+                if (e.target === settingsModal) skipSettings();
+            };
+        }
+
+        function closeSettings() {
+            settingsModal.classList.remove('opacity-100');
+            settingsModal.classList.add('opacity-0');
+            setTimeout(() => settingsModal.classList.add('hidden'), 300);
+        }
+
+        function skipSettings() {
+            closeSettings();
+            const config = getApiConfig();
+            if (!config.key) {
+                apiWarningBar.classList.remove('hidden');
+            }
+        }
+
+        function goToStep(step) {
+            const step1 = document.getElementById('step1');
+            const step2 = document.getElementById('step2');
+
+            if (step === 1) {
+                step2.classList.add('hidden');
+                step1.classList.remove('hidden');
+            } else {
+                step1.classList.add('hidden');
+                step2.classList.remove('hidden');
+                lucide.createIcons();
+            }
+        }
+
+        function saveAndCloseSettings() {
+            const keyInput = document.getElementById(`apiKey-${currentPlatform}`);
+            const key = keyInput.value.trim();
+
+            if (!key) {
+                alert('请输入 API Key');
+                return;
+            }
+
+            // 保存当前平台和对应的 API Key
+            localStorage.setItem('api_platform', currentPlatform);
+            localStorage.setItem(`${currentPlatform}_api_key`, key);
+
+            // 更新 UI
+            updatePlatformUI();
+            updateTranslateStatusBar();
+            updateAnalysisModelIndicators();
+
+            closeSettings();
+            apiWarningBar.classList.add('hidden');
+        }
+
+        function copyInviteCode(code) {
+            navigator.clipboard.writeText(code).then(() => {
+                const tip = document.getElementById('copyTip');
+                tip.style.opacity = '1';
+                setTimeout(() => tip.style.opacity = '0', 2000);
+            });
+        }
+
+        // --- Tab 切换 ---
+        window.switchTab = function(mode) {
+            currentMode = mode;
+            document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${mode}`).classList.remove('hidden');
+
+            const activeClass = 'px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors tab-active flex items-center gap-2';
+            const inactiveClass = 'px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-t-lg transition-colors flex items-center gap-2';
+
+            const tabs = ['translate', 'text', 'analysis', 'summary', 'formula', 'cleaning'];
+            tabs.forEach(tab => {
+                const el = document.getElementById(`tab-${tab}`);
+                if (el) el.className = mode === tab ? activeClass : inactiveClass;
+            });
+
+            lucide.createIcons();
+        }
+
+        // ==================== 翻译功能模块 ====================
+
+        // --- 文件处理逻辑 ---
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('drag-active'); });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-active');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+            if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+                alert('请上传 Excel (.xlsx, .xls) 或 CSV 文件');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    // codepage: 936 支持 GBK/GB2312 中文编码
+                    const workbook = XLSX.read(data, {type: 'array', codepage: 936});
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    rawData = XLSX.utils.sheet_to_json(sheet, {header: 1});
+                    processLoadedData();
+                } catch (err) {
+                    alert("读取文件失败: " + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        window.loadDemoData = function(type) {
+            if(type === 'specs') {
+                rawData = [
+                    ["产品名称", "规格描述", "价格"],
+                    ["Wireless Mouse", "Connectivity: 2.4GHz & Bluetooth 5.0, DPI: 1600, Battery: 1 AA", "$15"],
+                    ["Mechanical Keyboard", "Switch: Blue, Layout: 87 Keys, Backlight: RGB, Material: PBT", "$45"],
+                    ["Gaming Headset", "Driver: 50mm Neodymium, Mic: Noise Cancelling, Cable: 2m Braided", "$30"]
+                ];
+                document.getElementById('translateScenario').value = 'ecommerce_spec';
+            } else if (type === 'comments') {
+                rawData = [
+                    ["用户ID", "评分", "评论内容"],
+                    ["User_001", "3", "The delivery was fast, but the packaging was damaged. Product works fine though."],
+                    ["User_002", "1", "Terrible quality. It stopped working after 2 days. Do not buy!"],
+                    ["User_003", "5", "Absolutely love it! Best value for money. Highly recommended."]
+                ];
+                document.getElementById('translateScenario').value = 'ecommerce_comment';
+            }
+            processLoadedData();
+        }
+
+        function processLoadedData() {
+            if (rawData.length < 1) {
+                alert("数据为空");
+                return;
+            }
+
+            headers = rawData[0];
+            dataRows = rawData.slice(1);
+
+            initFileUI();
+        }
+
+        function initFileUI() {
+            document.getElementById('uploadSection').classList.add('hidden');
+            document.getElementById('fileConfigSection').classList.remove('hidden');
+
+            const srcSel = document.getElementById('sourceColumn');
+            const tgtSel = document.getElementById('targetColumnSelect');
+            srcSel.innerHTML = '';
+            tgtSel.innerHTML = '';
+
+            headers.forEach((h, i) => {
+                const label = h || `列 ${i+1}`;
+                srcSel.add(new Option(label, i));
+                tgtSel.add(new Option(label, i));
+            });
+
+            if (headers.length > 1) srcSel.value = 1;
+
+            document.getElementById('totalCount').textContent = dataRows.length;
+            updateNewColumnNameDefault();
+            renderTable();
+        }
+
+        window.resetUpload = function() {
+            rawData = [];
+            headers = [];
+            dataRows = [];
+            document.getElementById('fileInput').value = '';
+            document.getElementById('uploadSection').classList.remove('hidden');
+            document.getElementById('fileConfigSection').classList.add('hidden');
+        }
+
+        // 监听场景和语言变化
+        document.getElementById('languageDirection').addEventListener('change', updateNewColumnNameDefault);
+        document.getElementById('translateScenario').addEventListener('change', updateNewColumnNameDefault);
+
+        function updateNewColumnNameDefault() {
+             const dir = document.getElementById('languageDirection').value;
+             const scenario = document.getElementById('translateScenario').value;
+             const input = document.getElementById('targetColumnNewName');
+
+             let suffix = "翻译结果";
+             if (scenario === 'ecommerce_spec') suffix = "规格_中文";
+             else if (scenario === 'ecommerce_comment') suffix = "评论_中文";
+             else if (scenario === 'ecommerce_title') suffix = "标题_中文";
+
+             if (dir === 'zh_to_en') suffix = suffix.replace("中文", "EN");
+             if (dir === 'zh_to_jp') suffix = suffix.replace("中文", "JP");
+
+             input.value = suffix;
+
+             if(targetFileMode === 'new') renderTable();
+        }
+
+        function renderTable() {
+            const thead = document.getElementById('tableHeader');
+            const tbody = document.getElementById('tableBody');
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            // Header
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.className = 'px-4 py-3 font-medium text-slate-500 bg-slate-50 text-xs border-b border-slate-200';
+                th.textContent = h || '-';
+                thead.appendChild(th);
+            });
+
+            if (targetFileMode === 'new') {
+                const th = document.createElement('th');
+                th.className = 'px-4 py-3 font-medium text-blue-600 border-l border-blue-100 bg-blue-50/30 text-xs border-b border-slate-200';
+                th.textContent = document.getElementById('targetColumnNewName').value;
+                th.id = 'previewNewHeader';
+                thead.appendChild(th);
+            }
+
+            // Body (Limit 100)
+            dataRows.slice(0, 100).forEach((row, rIdx) => {
+                const tr = document.createElement('tr');
+                tr.id = `row-${rIdx}`;
+                tr.className = 'hover:bg-slate-50 transition-colors';
+
+                headers.forEach((_, cIdx) => {
+                    const td = document.createElement('td');
+                    td.className = 'px-4 py-2 text-slate-700 border-b border-slate-100 truncate max-w-[200px]';
+                    td.textContent = row[cIdx] || '';
+                    tr.appendChild(td);
+                });
+
+                if (targetFileMode === 'new') {
+                    const td = document.createElement('td');
+                    td.className = 'px-4 py-2 text-slate-400 italic border-b border-slate-100 border-l border-blue-50 bg-blue-50/10';
+                    td.id = `cell-new-${rIdx}`;
+                    tr.appendChild(td);
+                }
+                tbody.appendChild(tr);
+            });
+        }
+
+        window.setTargetMode = function(mode) {
+            targetFileMode = mode;
+            const btnNew = document.getElementById('btnModeNew');
+            const btnOver = document.getElementById('btnModeOverwrite');
+            const inputNew = document.getElementById('targetColumnNewName');
+            const selectOverWrapper = document.getElementById('targetColumnSelectWrapper');
+
+            if(mode === 'new') {
+                btnNew.className = 'flex-1 py-1.5 text-xs rounded-md bg-white text-slate-800 font-bold shadow-sm transition-all';
+                btnOver.className = 'flex-1 py-1.5 text-xs rounded-md text-slate-500 hover:text-slate-700 transition-all';
+                inputNew.classList.remove('hidden');
+                selectOverWrapper.classList.add('hidden');
+            } else {
+                btnNew.className = 'flex-1 py-1.5 text-xs rounded-md text-slate-500 hover:text-slate-700 transition-all';
+                btnOver.className = 'flex-1 py-1.5 text-xs rounded-md bg-white text-slate-800 font-bold shadow-sm transition-all';
+                inputNew.classList.add('hidden');
+                selectOverWrapper.classList.remove('hidden');
+            }
+            renderTable();
+        }
+
+        document.getElementById('targetColumnNewName').addEventListener('input', (e) => {
+            if(targetFileMode === 'new') {
+                const el = document.getElementById('previewNewHeader');
+                if(el) el.textContent = e.target.value;
+            }
+        });
+
+        // --- AI Prompt 核心逻辑 ---
+
+        function getSystemPrompt(scenario, direction) {
+            let targetLang = "Chinese (Simplified)";
+            if (direction === 'zh_to_en') targetLang = "English";
+            if (direction === 'zh_to_jp') targetLang = "Japanese";
+
+            const prompts = {
+                ecommerce_spec: `You are a product translator. Translate specs into ${targetLang}. Keep technical terms (e.g., 'mAh', 'IP68') and numbers unchanged. Be concise.`,
+                ecommerce_comment: `Translate user review into ${targetLang}. Keep the original sentiment. Use natural, colloquial language.`,
+                ecommerce_title: `Translate product title into ${targetLang}. Keep key model numbers/brands unchanged. Optimize for search.`,
+                email: `Translate email into ${targetLang}. Maintain a formal, professional business tone.`,
+                general: `Translate text into ${targetLang} accurately.`
+            };
+
+            return prompts[scenario] || prompts.general;
+        }
+
+        // 文件处理开始
+        document.getElementById('startFileBtn').addEventListener('click', async () => {
+            if (isProcessing) return;
+
+            const config = getApiConfig();
+            if (!config.key) {
+                alert("请先配置 API 密钥！");
+                openSettings(true);
+                return;
+            }
+
+            isProcessing = true;
+            const btn = document.getElementById('startFileBtn');
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            document.getElementById('statusText').textContent = "翻译中...";
+            document.getElementById('statusText').className = "text-[10px] font-medium text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full animate-pulse";
+
+            const srcIdx = parseInt(document.getElementById('sourceColumn').value);
+            const scenario = document.getElementById('translateScenario').value;
+            const direction = document.getElementById('languageDirection').value;
+
+            // Update Headers
+            let targetIdx;
+            if (targetFileMode === 'new') {
+                targetIdx = headers.length;
+                headers.push(document.getElementById('targetColumnNewName').value);
+            } else {
+                targetIdx = parseInt(document.getElementById('targetColumnSelect').value);
+            }
+
+            let completed = 0;
+            const total = dataRows.length;
+            const systemPrompt = getSystemPrompt(scenario, direction);
+
+            for (let i = 0; i < total; i++) {
+                const row = dataRows[i];
+                const text = row[srcIdx] ? String(row[srcIdx]) : "";
+
+                if (text.trim()) {
+                    try {
+                        const translated = await callAI(text, systemPrompt);
+                        row[targetIdx] = translated;
+                        updateTableRow(i, targetIdx, translated);
+                    } catch (e) {
+                        console.error(e);
+                        row[targetIdx] = "[Error]";
+                        updateTableRow(i, targetIdx, "[Error]", true);
+                    }
+                }
+
+                completed++;
+                updateProgress(completed, total);
+                await new Promise(r => setTimeout(r, 100));
+            }
+
+            finishFileProcessing();
+        });
+
+        function updateTableRow(rIdx, cIdx, text, error=false) {
+            if (rIdx >= 100) return;
+
+            let cell;
+            if (targetFileMode === 'new') {
+                cell = document.getElementById(`cell-new-${rIdx}`);
+            } else {
+                const tr = document.getElementById(`row-${rIdx}`);
+                if(tr) cell = tr.children[cIdx];
+            }
+
+            if(cell) {
+                cell.textContent = text;
+                cell.className = error
+                    ? 'px-4 py-2 text-red-500 border-b border-slate-100 bg-red-50'
+                    : 'px-4 py-2 text-slate-800 font-medium border-b border-slate-100 bg-blue-50/30';
+            }
+        }
+
+        function updateProgress(count, total) {
+            const pct = Math.round((count/total)*100);
+            document.getElementById('progressBar').style.width = `${pct}%`;
+            document.getElementById('progressCount').textContent = count;
+            document.getElementById('progressPercent').textContent = `${pct}%`;
+        }
+
+        function finishFileProcessing() {
+            isProcessing = false;
+            document.getElementById('startFileBtn').textContent = "翻译完成";
+            document.getElementById('downloadBtn').classList.remove('hidden');
+            document.getElementById('statusText').textContent = "完成";
+            document.getElementById('statusText').className = "text-[10px] font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full";
+        }
+
+        // 文本处理开始
+        document.getElementById('startTextBtn').addEventListener('click', async () => {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) { alert("请输入内容"); return; }
+
+            const config = getApiConfig();
+            if (!config.key) {
+                alert("请先配置 API 密钥！");
+                openSettings(true);
+                return;
+            }
+
+            const btn = document.getElementById('startTextBtn');
+            const output = document.getElementById('textOutput');
+            const loader = document.getElementById('textLoading');
+
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+            loader.classList.remove('hidden');
+            output.value = '';
+
+            const scenario = document.getElementById('translateScenario').value;
+            const direction = document.getElementById('languageDirection').value;
+            const systemPrompt = getSystemPrompt(scenario, direction);
+
+            try {
+                const result = await callAI(text, systemPrompt);
+                output.value = result;
+            } catch (e) {
+                output.value = "Error: " + e.message;
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+                loader.classList.add('hidden');
+            }
+        });
+
+        // API Call - 翻译功能
+        async function callAI(content, systemPrompt) {
+            const config = getApiConfig();
+
+            // 根据平台决定是否使用 system prompt
+            // 硅基流动的 Hunyuan-MT 是专用翻译模型，不需要 system prompt
+            // aiping.cn 的通用模型需要 system prompt 指导翻译
+            let messages;
+            if (config.useSystemPrompt) {
+                messages = [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: content }
+                ];
+            } else {
+                // 硅基流动翻译模型直接发送内容
+                messages = [
+                    { role: "user", content: content }
+                ];
+            }
+
+            const resp = await fetch(config.url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${config.key}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: config.models.translate,
+                    messages: messages,
+                    temperature: 0.3,
+                    max_tokens: 2048
+                })
+            });
+
+            if (!resp.ok) throw new Error(`API Error ${resp.status}`);
+            const json = await resp.json();
+            return json.choices[0].message.content.trim();
+        }
+
+        // Utils
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const finalData = [headers, ...dataRows];
+            const ws = XLSX.utils.aoa_to_sheet(finalData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Translation_Result");
+            const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g, '-');
+            XLSX.writeFile(wb, `Translation_${ts}.xlsx`);
+        });
+
+        window.clearText = () => document.getElementById('textInput').value = '';
+
+        window.copyResult = () => {
+            const el = document.getElementById('textOutput');
+            el.select();
+            document.execCommand('copy');
+            const originalText = el.value;
+            el.value = "已复制！";
+            setTimeout(() => el.value = originalText, 1000);
+        }
+
+        // ==================== 评论分析功能模块 ====================
+
+        // 获取默认分析模板
+        function getDefaultAnalysisTemplate() {
+            return {
+                "好评": {
+                    "效果": ["定型持久", "增加蓬松感", "控制毛躁", "不僵硬", "抗潮湿"],
+                    "气味": ["味道好闻", "味道清淡"],
+                    "体验": ["喷雾细腻", "容易清洗", "不油腻"]
+                },
+                "差评": {
+                    "包装/质量": ["喷头破损", "喷头堵塞", "瓶身凹陷", "收到空瓶", "漏液"],
+                    "效果": ["定型力不够", "头发变粘", "留白屑/残留"],
+                    "价格": ["价格太贵", "性价比低"],
+                    "其他": ["配方改变", "味道难闻"]
+                },
+                "人群": {
+                    "发质": ["细软发", "卷发", "直发"],
+                    "场景": ["日常使用", "专业造型", "婚礼/活动"]
+                }
+            };
+        }
+
+        // --- 简化编辑模式相关函数 ---
+        function initSimpleEditMode() {
+            updateQuickCategories();
+        }
+
+        function toggleEditMode() {
+            const simpleMode = document.getElementById('simpleEditMode');
+            const advancedMode = document.getElementById('advancedEditMode');
+            const btn = document.getElementById('editModeBtn');
+
+            isSimpleEditMode = !isSimpleEditMode;
+
+            if (isSimpleEditMode) {
+                simpleMode.classList.remove('hidden');
+                advancedMode.classList.add('hidden');
+                btn.textContent = '高级编辑';
+                btn.classList.remove('bg-amber-100', 'text-amber-600');
+                btn.classList.add('bg-blue-100', 'text-blue-600');
+                updateQuickCategories();
+            } else {
+                simpleMode.classList.add('hidden');
+                advancedMode.classList.remove('hidden');
+                btn.textContent = '简化编辑';
+                btn.classList.remove('bg-blue-100', 'text-blue-600');
+                btn.classList.add('bg-amber-100', 'text-amber-600');
+                syncEditorWithSimpleMode();
+            }
+        }
+
+        function updateQuickCategories() {
+            const container = document.getElementById('quickCategories');
+            const existingCategories = container.querySelectorAll('.category-item');
+
+            if (existingCategories.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-slate-400 text-xs py-8 border-2 border-dashed border-slate-200 rounded-lg" id="emptyCategoriesMessage">
+                        <i data-lucide="folder-plus" class="w-6 h-6 mx-auto mb-2 opacity-50"></i>
+                        <p>暂无分类，点击上方按钮添加</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 从输入框添加分类（无弹窗）
+        function addCategoryFromInput() {
+            const input = document.getElementById('newCategoryInput');
+            const categoryName = input.value.trim();
+            if (!categoryName) return;
+
+            addCategoryToUI(categoryName);
+            input.value = '';
+            input.focus();
+        }
+
+        function addCategoryToUI(categoryName) {
+            const container = document.getElementById('quickCategories');
+            const emptyMessage = document.getElementById('emptyCategoriesMessage');
+            if (emptyMessage) {
+                emptyMessage.remove();
+            }
+
+            const categoryIndex = container.children.length;
+            const categoryDiv = document.createElement('div');
+            categoryDiv.className = 'category-item space-y-2 border border-slate-200 rounded-lg p-3 bg-white';
+            categoryDiv.dataset.index = categoryIndex;
+            categoryDiv.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <input type="text" value="${categoryName}" class="category-name text-xs font-medium bg-transparent border-none outline-none flex-1" placeholder="分类名称">
+                    <div class="flex gap-1">
+                        <button onclick="removeCategory(this)" class="text-red-500 hover:text-red-700 p-1" title="删除分类">
+                            <i data-lucide="trash-2" class="w-3 h-3"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="subcategories space-y-1 ml-2"></div>
+                <div class="flex gap-1 ml-2">
+                    <input type="text" placeholder="添加子分类，按回车" class="flex-1 px-2 py-1 text-xs border border-slate-200 rounded focus:border-blue-400 outline-none"
+                        onkeydown="if(event.key==='Enter'){addSubCategoryFromInput(this);event.preventDefault();}">
+                    <button onclick="addSubCategoryFromInput(this.previousElementSibling)" class="text-blue-500 hover:text-blue-700 p-1">
+                        <i data-lucide="plus" class="w-3 h-3"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(categoryDiv);
+            lucide.createIcons();
+        }
+
+        // 从输入框添加子分类（无弹窗）
+        function addSubCategoryFromInput(inputEl) {
+            const subCategoryName = inputEl.value.trim();
+            if (!subCategoryName) return;
+
+            const categoryDiv = inputEl.closest('.category-item');
+            const subContainer = categoryDiv.querySelector('.subcategories');
+
+            const subDiv = document.createElement('div');
+            subDiv.className = 'flex items-center justify-between p-2 bg-slate-50 rounded';
+            subDiv.innerHTML = `
+                <input type="text" value="${subCategoryName}" class="subcategory-name text-xs bg-transparent border-none outline-none flex-1" placeholder="子分类名称">
+                <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 p-1" title="删除子分类">
+                    <i data-lucide="x" class="w-3 h-3"></i>
+                </button>
+            `;
+            subContainer.appendChild(subDiv);
+
+            inputEl.value = '';
+            inputEl.focus();
+            lucide.createIcons();
+        }
+
+        function removeCategory(btn) {
+            btn.closest('.category-item').remove();
+            // 如果没有分类了，显示空状态
+            const container = document.getElementById('quickCategories');
+            if (container.children.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-slate-400 text-xs py-8 border-2 border-dashed border-slate-200 rounded-lg" id="emptyCategoriesMessage">
+                        <i data-lucide="folder-plus" class="w-6 h-6 mx-auto mb-2 opacity-50"></i>
+                        <p>暂无分类，点击上方按钮添加</p>
+                    </div>
+                `;
+                lucide.createIcons();
+            }
+        }
+
+        // AI 自动提取分类
+        async function autoExtractCategories() {
+            if (analysisRawData.length === 0) {
+                alert('请先上传数据文件');
+                return;
+            }
+
+            const config = getApiConfig();
+            if (!config.key) {
+                alert('请先配置 API 密钥');
+                openSettings(true);
+                return;
+            }
+
+            const btn = document.getElementById('autoExtractBtn');
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> AI 分析中...';
+            lucide.createIcons();
+
+            try {
+                // 获取样本数据
+                const sampleSize = Math.min(30, analysisRawData.length);
+                const sampleData = analysisRawData.slice(0, sampleSize).map(row => {
+                    const content = row[selectedAnalysisColumn] || Object.values(row)[0];
+                    return typeof content === 'string' ? content.slice(0, 200) : String(content);
+                });
+
+                const prompt = `分析以下评论/文本数据，提取出合适的分类维度。
+
+要求：
+1. 根据内容特点，提取3-6个主要分类维度（如：情感、服务、环境、价格、质量等）
+2. 每个维度下提供2-4个具体的子分类标签
+3. 分类要贴合实际内容，不要生造
+4. 直接返回JSON格式，不要其他文字
+
+返回格式示例：
+{
+  "情感倾向": ["好评", "差评", "中立"],
+  "服务体验": ["态度好", "响应快", "态度差", "响应慢"],
+  "产品质量": ["质量好", "质量差", "性价比高"]
+}
+
+待分析的文本样本：
+${sampleData.map((t, i) => `${i + 1}. ${t}`).join('\n')}
+
+请返回JSON：`;
+
+                const response = await fetch(config.url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${config.key}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: config.models.work,
+                        messages: [
+                            { role: 'system', content: '你是一个数据分析专家，擅长从文本中提取分类维度。只返回JSON，不要其他解释。' },
+                            { role: 'user', content: prompt }
+                        ],
+                        temperature: 0.3,
+                        max_tokens: 1000
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                const content = result.choices[0].message.content;
+
+                // 提取 JSON
+                const jsonMatch = content.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error('AI 返回格式错误');
+                }
+
+                const categories = JSON.parse(jsonMatch[0]);
+
+                // 清空现有分类
+                const container = document.getElementById('quickCategories');
+                container.innerHTML = '';
+
+                // 添加 AI 提取的分类
+                for (const [categoryName, subCategories] of Object.entries(categories)) {
+                    addCategoryToUI(categoryName);
+                    const categoryDiv = container.lastElementChild;
+                    const subContainer = categoryDiv.querySelector('.subcategories');
+
+                    if (Array.isArray(subCategories)) {
+                        subCategories.forEach(subName => {
+                            const subDiv = document.createElement('div');
+                            subDiv.className = 'flex items-center justify-between p-2 bg-slate-50 rounded';
+                            subDiv.innerHTML = `
+                                <input type="text" value="${subName}" class="subcategory-name text-xs bg-transparent border-none outline-none flex-1" placeholder="子分类名称">
+                                <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 p-1" title="删除子分类">
+                                    <i data-lucide="x" class="w-3 h-3"></i>
+                                </button>
+                            `;
+                            subContainer.appendChild(subDiv);
+                        });
+                    }
+                }
+
+                lucide.createIcons();
+
+            } catch (error) {
+                alert('AI 提取失败: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+                lucide.createIcons();
+            }
+        }
+
+        function addCategory() {
+            const categoryName = prompt('请输入分类名称：');
+            if (!categoryName) return;
+            addCategoryToUI(categoryName);
+        }
+
+        function addSubCategory(categoryIndex) {
+            const subCategoryName = prompt('请输入子分类名称：');
+            if (!subCategoryName) return;
+
+            const subContainer = document.getElementById(`subcategories-${categoryIndex}`);
+            const placeholder = subContainer.querySelector('.text-slate-400');
+            if (placeholder) {
+                placeholder.remove();
+            }
+
+            const subIndex = subContainer.children.length;
+            const subDiv = document.createElement('div');
+            subDiv.className = 'flex items-center justify-between p-2 bg-slate-50 rounded';
+            subDiv.innerHTML = `
+                <input type="text" value="${subCategoryName}" class="subcategory-name text-xs bg-transparent border-none outline-none flex-1" placeholder="子分类名称">
+                <button onclick="removeSubCategory(${categoryIndex}, ${subIndex})" class="text-red-500 hover:text-red-700 p-1" title="删除子分类">
+                    <i data-lucide="x" class="w-3 h-3"></i>
+                </button>
+            `;
+            subContainer.appendChild(subDiv);
+
+            // 重新初始化图标
+            lucide.createIcons();
+        }
+
+        function removeCategory(categoryIndex) {
+            if (!confirm('确定要删除这个分类吗？')) return;
+
+            const container = document.getElementById('quickCategories');
+            const categoryItem = container.children[categoryIndex];
+            categoryItem.remove();
+
+            if (container.children.length === 0) {
+                updateQuickCategories();
+            }
+        }
+
+        function removeSubCategory(categoryIndex, subIndex) {
+            const subContainer = document.getElementById(`subcategories-${categoryIndex}`);
+            const subItem = subContainer.children[subIndex];
+            subItem.remove();
+
+            if (subContainer.children.length === 0) {
+                subContainer.innerHTML = '<div class="text-slate-400 text-xs">点击 + 按钮添加子分类</div>';
+            }
+        }
+
+        function syncEditorWithSimpleMode() {
+            const taxonomy = buildTaxonomyFromSimpleMode();
+            analysisEditor.setValue(JSON.stringify(taxonomy, null, 2));
+        }
+
+        function buildTaxonomyFromSimpleMode() {
+            const taxonomy = {};
+            const categoryItems = document.querySelectorAll('.category-item');
+
+            categoryItems.forEach(categoryDiv => {
+                const categoryName = categoryDiv.querySelector('.category-name').value;
+                if (!categoryName) return;
+
+                taxonomy[categoryName] = {};
+                const subItems = categoryDiv.querySelectorAll('.subcategory-name');
+
+                subItems.forEach(subInput => {
+                    const subName = subInput.value;
+                    if (subName) {
+                        taxonomy[categoryName][subName] = [];
+                    }
+                });
+            });
+
+            return Object.keys(taxonomy).length > 0 ? taxonomy : {};
+        }
+
+        function resetAnalysisTemplate() {
+            if(confirm('确定要重置分类模板吗？当前修改将丢失。')) {
+                if (isSimpleEditMode) {
+                    const container = document.getElementById('quickCategories');
+                    container.innerHTML = '';
+                    updateQuickCategories();
+                } else {
+                    analysisEditor.setValue(JSON.stringify({}, null, 2));
+                }
+            }
+        }
+
+        // --- 分析文件处理 ---
+        document.getElementById('analysisFileInput').addEventListener('change', handleAnalysisFileSelect);
+
+        function handleAnalysisFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('analysisFileNameDisplay').innerText = file.name;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                // codepage: 936 支持 GBK/GB2312 中文编码
+                const workbook = XLSX.read(data, {type: 'array', codepage: 936});
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+
+                // Read raw data
+                analysisRawData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
+
+                if (analysisRawData.length > 0) {
+                    // Populate headers for column selection
+                    const headers = Object.keys(analysisRawData[0]);
+                    populateAnalysisColumnSelect(headers);
+
+                    document.getElementById('analysisRecordCount').innerText = `已加载 ${analysisRawData.length} 条数据`;
+                    renderAnalysisTable(analysisRawData.slice(0, 50)); // Preview
+
+                    // 启用 AI 提取分类按钮
+                    const autoExtractBtn = document.getElementById('autoExtractBtn');
+                    if (autoExtractBtn) {
+                        autoExtractBtn.disabled = false;
+                        autoExtractBtn.innerHTML = '<i data-lucide="sparkles" class="w-3 h-3"></i> AI 智能提取分类';
+                        lucide.createIcons();
+                    }
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function populateAnalysisColumnSelect(headers) {
+            const select = document.getElementById('analysisColumnSelect');
+            select.innerHTML = '<option value="">-- 请选择评论列 --</option>';
+
+            // Smart guess
+            let probableSelection = "";
+            headers.forEach(h => {
+                const option = document.createElement('option');
+                option.value = h;
+                option.text = h;
+                select.appendChild(option);
+
+                // Auto-detect common names
+                const lower = h.toLowerCase();
+                if (lower.includes('content') || lower.includes('review') || lower.includes('body') || lower.includes('内容') || lower.includes('评论')) {
+                    probableSelection = h;
+                }
+            });
+
+            if (probableSelection) {
+                select.value = probableSelection;
+            }
+
+            // Show the dropdown with animation
+            const columnContainer = document.getElementById('analysisColumnContainer');
+            const targetContainer = document.getElementById('analysisTargetContainer');
+
+            columnContainer.classList.remove('hidden');
+            targetContainer.classList.remove('hidden');
+
+            setTimeout(() => {
+                columnContainer.classList.remove('opacity-0');
+                targetContainer.classList.remove('opacity-0');
+            }, 10);
+
+            // Populate target column select for overwrite mode
+            const targetSelect = document.getElementById('analysisTargetColumnSelect');
+            targetSelect.innerHTML = '<option value="">-- 选择覆盖列 --</option>';
+            headers.forEach((h, i) => {
+                const option = document.createElement('option');
+                option.value = i;
+                option.text = h;
+                targetSelect.appendChild(option);
+            });
+        }
+
+        // --- 分析表格渲染 ---
+        function renderAnalysisTable(data, updateAll = false) {
+            const tbody = document.getElementById('analysisTableBody');
+            if (!updateAll) tbody.innerHTML = '';
+
+            const col = document.getElementById('analysisColumnSelect').value;
+
+            data.forEach((row, index) => {
+                const content = col ? row[col] : Object.values(row)[0];
+                const analysis = row['AI_Analysis'] || '-';
+                const status = row['Status'] || '待机';
+                const statusColor = status === '完成' ? 'text-green-600' : (status === '分析中...' ? 'text-blue-600' : 'text-slate-400');
+
+                // If updating existing rows (during processing), only update specific cells
+                const existingRow = document.getElementById(`analysis-row-${index}`);
+                if (existingRow && updateAll) {
+                    document.getElementById(`analysis-${index}`).innerText = analysis;
+                    const statusEl = document.getElementById(`analysis-status-${index}`);
+                    statusEl.innerText = status;
+                    statusEl.className = `px-4 py-4 whitespace-nowrap text-xs font-medium ${statusColor}`;
+                    return;
+                }
+
+                const tr = document.createElement('tr');
+                tr.id = `analysis-row-${index}`;
+                tr.className = "hover:bg-slate-50 transition-colors";
+                tr.innerHTML = `
+                    <td class="px-4 py-4 whitespace-nowrap text-xs text-slate-500 font-mono">${index + 1}</td>
+                    <td class="px-4 py-4 text-xs text-slate-700">
+                        <div class="line-clamp-3 leading-relaxed" title="${content}">${content ? content : '<span class="italic text-slate-300">空</span>'}</div>
+                    </td>
+                    <td class="px-4 py-4 text-xs font-medium text-slate-800">
+                        <div id="analysis-${index}" class="bg-blue-50 text-blue-800 px-3 py-2 rounded border border-blue-100 min-h-[20px]">${analysis}</div>
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-xs font-medium ${statusColor}" id="analysis-status-${index}">${status}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- 分析字段映射相关函数 ---
+        window.setAnalysisTargetMode = function(mode) {
+            analysisTargetMode = mode;
+            const btnNew = document.getElementById('btnAnalysisModeNew');
+            const btnOver = document.getElementById('btnAnalysisModeOverwrite');
+            const inputNew = document.getElementById('analysisTargetColumnNewName');
+            const selectOverWrapper = document.getElementById('analysisTargetColumnSelectWrapper');
+
+            if(mode === 'new') {
+                btnNew.className = 'flex-1 py-1.5 text-xs rounded-md bg-white text-slate-800 font-bold shadow-sm transition-all';
+                btnOver.className = 'flex-1 py-1.5 text-xs rounded-md text-slate-500 hover:text-slate-700 transition-all';
+                inputNew.classList.remove('hidden');
+                selectOverWrapper.classList.add('hidden');
+            } else {
+                btnNew.className = 'flex-1 py-1.5 text-xs rounded-md text-slate-500 hover:text-slate-700 transition-all';
+                btnOver.className = 'flex-1 py-1.5 text-xs rounded-md bg-white text-slate-800 font-bold shadow-sm transition-all';
+                inputNew.classList.add('hidden');
+                selectOverWrapper.classList.remove('hidden');
+            }
+        }
+
+        // --- 分析逻辑 ---
+        async function startAnalysis() {
+            if (isAnalysisProcessing) return;
+
+            // Validation
+            if (analysisRawData.length === 0) return alert('请先上传文件');
+            const config = getApiConfig();
+            if (!config.key) return alert('请先配置 API Key');
+
+            selectedAnalysisColumn = document.getElementById('analysisColumnSelect').value;
+            if (!selectedAnalysisColumn) return alert('请选择哪一列是"评论内容"');
+
+            let taxonomyJson;
+            try {
+                if (isSimpleEditMode) {
+                    // 从简化模式构建分类体系
+                    const taxonomy = buildTaxonomyFromSimpleMode();
+                    taxonomyJson = JSON.stringify(taxonomy, null, 2);
+                } else {
+                    // 从高级编辑器获取分类体系
+                    taxonomyJson = analysisEditor.getValue();
+                }
+                JSON.parse(taxonomyJson); // Validate JSON
+            } catch (e) {
+                return alert('分类体系配置有误，请检查后重试。');
+            }
+
+            // Setup
+            isAnalysisProcessing = true;
+            analysisAbortController = new AbortController();
+            toggleAnalysisUIState(true);
+            analysisProcessedData = JSON.parse(JSON.stringify(analysisRawData)); // Deep Clone
+
+            // Update Headers for target column
+            let targetIdx;
+            if (analysisTargetMode === 'new') {
+                targetIdx = Object.keys(analysisProcessedData[0]).length;
+                const newColumnName = document.getElementById('analysisTargetColumnNewName').value;
+                analysisProcessedData.forEach(row => {
+                    row[newColumnName] = '';
+                });
+            } else {
+                targetIdx = parseInt(document.getElementById('analysisTargetColumnSelect').value);
+            }
+
+            // Reset status in UI for visible rows
+            const visibleRowsCount = Math.min(analysisRawData.length, 100);
+            renderAnalysisTable(analysisProcessedData.slice(0, visibleRowsCount)); // Re-render fresh
+
+            const total = analysisRawData.length;
+            const model = config.models.work; // 使用API设置中的分析模型
+
+            // Loop
+            for (let i = 0; i < total; i++) {
+                if (analysisAbortController.signal.aborted) break;
+
+                const content = analysisProcessedData[i][selectedAnalysisColumn];
+
+                // Skip empty
+                if (!content || String(content).length < 2) {
+                    updateAnalysisRowResult(i, "内容过短/空", "跳过");
+                    updateAnalysisProgress(i, total);
+                    continue;
+                }
+
+                updateAnalysisRowResult(i, "分析中...", "分析中...");
+
+                // Scroll into view if needed (simple implementation)
+                if (i % 10 === 0 && i < 100) {
+                   const rowEl = document.getElementById(`analysis-row-${i}`);
+                   if(rowEl) rowEl.scrollIntoView({behavior: "smooth", block: "center"});
+                }
+
+                try {
+                    const result = await callAnalysisAPI(content, taxonomyJson, model);
+
+                    // Update data based on target mode
+                    const targetColumnName = analysisTargetMode === 'new' ?
+                        document.getElementById('analysisTargetColumnNewName').value :
+                        Object.keys(analysisProcessedData[i])[targetIdx];
+
+                    analysisProcessedData[i][targetColumnName] = result;
+                    updateAnalysisRowResult(i, result, "完成");
+                } catch (error) {
+                    console.error(error);
+
+                    // Update error result
+                    const targetColumnName = analysisTargetMode === 'new' ?
+                        document.getElementById('analysisTargetColumnNewName').value :
+                        Object.keys(analysisProcessedData[i])[targetIdx];
+
+                    analysisProcessedData[i][targetColumnName] = "[Error]";
+                    updateAnalysisRowResult(i, "API Error", "失败");
+                    await new Promise(r => setTimeout(r, 1000)); // Backoff
+                }
+
+                updateAnalysisProgress(i, total);
+            }
+
+            isAnalysisProcessing = false;
+            toggleAnalysisUIState(false);
+            if (!analysisAbortController.signal.aborted) {
+                alert('全部分析完成！');
+            }
+        }
+
+        async function callAnalysisAPI(review, taxonomy, model) {
+            const config = getApiConfig();
+
+            const systemPrompt = `
+            你是一个严格的数据分类助手。
+            请根据以下 JSON 定义的分类体系（Taxonomy），对用户的评论进行分类匹配。
+
+            分类体系：
+            ${taxonomy}
+
+            要求：
+            1. 只输出匹配到的分类路径。
+            2. 路径格式为：一级分类 > 二级分类 > 三级分类。
+            3. 如果一条评论包含多个观点，请用 " || " (双竖线) 分隔不同路径。
+            4. 如果评论中提到的内容不在体系内，请忽略该点。如果完全无法匹配，输出 "无匹配观点"。
+            5. 不要输出任何解释性文字，只输出路径。
+            `;
+
+            const userPrompt = `评论内容：\n"${String(review).replace(/"/g, '\\"').substring(0, 500)}"`;
+
+            try {
+                const response = await fetch(config.url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${config.key}`
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userPrompt }
+                        ],
+                        temperature: 0.1, // Low temp for strict classification
+                        max_tokens: 150,
+                        stream: false
+                    }),
+                    signal: analysisAbortController.signal
+                });
+
+                if (!response.ok) throw new Error(response.statusText);
+                const data = await response.json();
+                return data.choices[0].message.content.trim();
+            } catch (e) {
+                throw e;
+            }
+        }
+
+        // --- 分析辅助函数 ---
+        function updateAnalysisProgress(current, total) {
+            const percent = ((current + 1) / total) * 100;
+            document.getElementById('analysisProgressBar').style.width = `${percent}%`;
+            document.getElementById('analysisStatusText').innerText = `处理进度: ${current + 1} / ${total}`;
+        }
+
+        function updateAnalysisRowResult(index, result, status) {
+            analysisProcessedData[index]['AI_Analysis'] = result;
+            analysisProcessedData[index]['Status'] = status;
+
+            // DOM Update
+            const analysisCell = document.getElementById(`analysis-${index}`);
+            const statusCell = document.getElementById(`analysis-status-${index}`);
+
+            if (analysisCell) {
+                analysisCell.innerText = result;
+                // Add color tag logic
+                if (result.includes('好评')) analysisCell.className = "bg-green-50 text-green-800 px-3 py-2 rounded border border-green-100 font-medium text-xs";
+                else if (result.includes('差评')) analysisCell.className = "bg-red-50 text-red-800 px-3 py-2 rounded border border-red-100 font-medium text-xs";
+                else analysisCell.className = "bg-slate-50 text-slate-700 px-3 py-2 rounded border border-slate-200 font-medium text-xs";
+            }
+            if (statusCell) {
+                statusCell.innerText = status;
+                statusCell.className = `px-4 py-4 whitespace-nowrap text-xs font-medium ${status === '完成' ? 'text-green-600' : 'text-red-500'}`;
+            }
+        }
+
+        function toggleAnalysisUIState(processing) {
+            const btn = document.getElementById('startAnalysisBtn');
+            const exportBtn = document.getElementById('exportAnalysisBtn');
+            const overlay = document.getElementById('analysisProgressOverlay');
+            const indicator = document.getElementById('analysisProcessingIndicator');
+
+            if (processing) {
+                btn.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 停止分析`;
+                btn.onclick = () => {
+                    if(analysisAbortController) analysisAbortController.abort();
+                    isAnalysisProcessing = false;
+                    toggleAnalysisUIState(false);
+                    document.getElementById('analysisStatusText').innerText = "已手动停止";
+                };
+                btn.classList.replace('bg-blue-600', 'bg-red-500');
+                btn.classList.replace('hover:bg-blue-700', 'hover:bg-red-600');
+
+                exportBtn.disabled = true;
+                overlay.classList.remove('hidden');
+                indicator.className = "w-2 h-2 rounded-full bg-blue-500 animate-pulse";
+            } else {
+                btn.innerHTML = `<i data-lucide="play" class="w-4 h-4"></i> 开始智能分析`;
+                btn.onclick = startAnalysis;
+                btn.classList.replace('bg-red-500', 'bg-blue-600');
+                btn.classList.replace('hover:bg-red-600', 'hover:bg-blue-700');
+
+                exportBtn.disabled = false;
+                indicator.className = "w-2 h-2 rounded-full bg-green-500";
+            }
+        }
+
+        function exportAnalysisData() {
+            const ws = XLSX.utils.json_to_sheet(analysisProcessedData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "AI分析结果");
+            XLSX.writeFile(wb, `DeepSeek_Analysis_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        // ==================== 数据摘要模块 ====================
+
+        let summaryData = [];
+        let summaryHeaders = [];
+        let summaryReport = '';
+
+        function initSummaryModule() {
+            const dropZone = document.getElementById('summaryDropZone');
+            const fileInput = document.getElementById('summaryFileInput');
+
+            if (!dropZone || !fileInput) return;
+
+            dropZone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => handleSummaryFile(e.target.files[0]));
+
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
+            dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('drag-active'); });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-active');
+                handleSummaryFile(e.dataTransfer.files[0]);
+            });
+        }
+
+        function handleSummaryFile(file) {
+            if (!file) return;
+            if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+                alert('请上传 Excel (.xlsx, .xls) 或 CSV 文件');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    // codepage: 936 支持 GBK/GB2312 中文编码
+                    const workbook = XLSX.read(data, {type: 'array', codepage: 936});
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, {header: 1});
+
+                    summaryHeaders = jsonData[0] || [];
+                    summaryData = jsonData.slice(1);
+
+                    document.getElementById('summaryUploadSection').classList.add('hidden');
+                    document.getElementById('summaryFileInfo').classList.remove('hidden');
+                    document.getElementById('summaryFileName').textContent = file.name;
+                    document.getElementById('summaryFileStats').textContent = `${summaryData.length} 行 x ${summaryHeaders.length} 列`;
+                    document.getElementById('summaryGenerateBtn').disabled = false;
+
+                    lucide.createIcons();
+                } catch (err) {
+                    alert("读取文件失败: " + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 加载摘要模块的演示数据
+        function loadSummaryDemoData(type) {
+            if (type === 'sales') {
+                summaryHeaders = ['季度', '产品类别', '销售额', '销量', '利润率'];
+                summaryData = [
+                    ['Q1', '电子产品', 125000, 850, '18.5%'],
+                    ['Q1', '家居用品', 68000, 1200, '22.3%'],
+                    ['Q1', '服装', 95000, 2100, '35.2%'],
+                    ['Q2', '电子产品', 142000, 920, '19.8%'],
+                    ['Q2', '家居用品', 72000, 1350, '24.1%'],
+                    ['Q2', '服装', 118000, 2800, '38.5%'],
+                    ['Q3', '电子产品', 168000, 1050, '21.2%'],
+                    ['Q3', '家居用品', 85000, 1480, '25.6%'],
+                    ['Q3', '服装', 135000, 3200, '40.1%'],
+                    ['Q4', '电子产品', 195000, 1280, '22.8%'],
+                    ['Q4', '家居用品', 98000, 1720, '27.3%'],
+                    ['Q4', '服装', 165000, 3850, '42.5%']
+                ];
+            } else if (type === 'employees') {
+                summaryHeaders = ['员工ID', '姓名', '部门', '职位', '入职日期', '月薪'];
+                summaryData = [
+                    ['E001', '张明', '技术部', '高级工程师', '2019-03-15', 28000],
+                    ['E002', '李娜', '市场部', '市场经理', '2020-06-22', 22000],
+                    ['E003', '王强', '技术部', '架构师', '2018-01-10', 35000],
+                    ['E004', '刘芳', '人力资源', 'HR主管', '2021-04-05', 18000],
+                    ['E005', '陈伟', '销售部', '销售总监', '2017-09-18', 32000],
+                    ['E006', '赵丽', '财务部', '财务经理', '2019-11-28', 25000],
+                    ['E007', '周杰', '技术部', '初级工程师', '2023-02-14', 15000],
+                    ['E008', '吴敏', '市场部', '市场专员', '2022-08-30', 12000],
+                    ['E009', '郑浩', '销售部', '销售代表', '2023-05-20', 10000],
+                    ['E010', '孙婷', '技术部', '中级工程师', '2021-07-12', 20000]
+                ];
+            }
+
+            // 更新UI
+            document.getElementById('summaryUploadSection').classList.add('hidden');
+            document.getElementById('summaryFileInfo').classList.remove('hidden');
+            document.getElementById('summaryFileName').textContent = type === 'sales' ? '销售数据样例.xlsx' : '员工信息样例.xlsx';
+            document.getElementById('summaryFileStats').textContent = `${summaryData.length} 行 x ${summaryHeaders.length} 列`;
+            document.getElementById('summaryGenerateBtn').disabled = false;
+
+            lucide.createIcons();
+        }
+
+        function resetSummaryFile() {
+            summaryData = [];
+            summaryHeaders = [];
+            summaryReport = '';
+            document.getElementById('summaryFileInput').value = '';
+            document.getElementById('summaryUploadSection').classList.remove('hidden');
+            document.getElementById('summaryFileInfo').classList.add('hidden');
+            document.getElementById('summaryGenerateBtn').disabled = true;
+            document.getElementById('summaryCopyBtn').disabled = true;
+            document.getElementById('summaryDownloadBtn').disabled = true;
+            document.getElementById('summaryEmptyState').classList.remove('hidden');
+            document.getElementById('summaryReportContent').classList.add('hidden');
+        }
+
+        async function generateSummary() {
+            const config = getApiConfig();
+            if (!config.key) {
+                alert('请先配置 API 密钥');
+                openSettings(true);
+                return;
+            }
+
+            const depth = document.getElementById('summaryDepth').value;
+            const lang = document.getElementById('summaryLanguage').value;
+            const model = config.models.work; // 使用设置中的工作模型
+
+            document.getElementById('summaryEmptyState').classList.add('hidden');
+            document.getElementById('summaryLoadingState').classList.remove('hidden');
+            document.getElementById('summaryReportContent').classList.add('hidden');
+            document.getElementById('summaryGenerateBtn').disabled = true;
+
+            const sampleSize = depth === 'quick' ? 20 : depth === 'standard' ? 50 : 100;
+            const sampleData = summaryData.slice(0, Math.min(sampleSize, summaryData.length));
+
+            const depthDesc = {
+                quick: '简要概述数据的基本信息',
+                standard: '分析数据结构、统计特征和主要模式',
+                detailed: '深入分析数据，包括异常值检测、趋势分析和可能的业务洞察'
+            };
+
+            const systemPrompt = `你是一个专业的数据分析师。请根据用户提供的Excel数据生成分析报告。
+要求：
+1. 使用${lang === 'zh' ? '中文' : 'English'}撰写
+2. ${depthDesc[depth]}
+3. 使用Markdown格式，包含标题、列表、表格等
+4. 报告结构：数据概览、字段分析、统计特征、数据质量、建议`;
+
+            const userPrompt = `请分析以下Excel数据：
+
+列名：${summaryHeaders.join(', ')}
+
+样本数据(${sampleData.length}行，总计${summaryData.length}行)：
+${JSON.stringify(sampleData.slice(0, 10), null, 2)}`;
+
+            try {
+                const reportContent = document.getElementById('summaryReportContent');
+                document.getElementById('summaryLoadingState').classList.add('hidden');
+                reportContent.classList.remove('hidden');
+                reportContent.classList.add('streaming-cursor');
+                reportContent.innerHTML = '';
+
+                summaryReport = await callStreamingAPI(model, systemPrompt, userPrompt, (chunk) => {
+                    summaryReport += chunk;
+                    reportContent.innerHTML = renderMarkdown(summaryReport);
+                });
+
+                reportContent.classList.remove('streaming-cursor');
+                document.getElementById('summaryCopyBtn').disabled = false;
+                document.getElementById('summaryDownloadBtn').disabled = false;
+            } catch (error) {
+                alert('生成摘要失败: ' + error.message);
+                document.getElementById('summaryLoadingState').classList.add('hidden');
+                document.getElementById('summaryEmptyState').classList.remove('hidden');
+            } finally {
+                document.getElementById('summaryGenerateBtn').disabled = false;
+            }
+        }
+
+        function copySummaryReport() {
+            navigator.clipboard.writeText(summaryReport).then(() => {
+                const btn = document.getElementById('summaryCopyBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i data-lucide="check" class="w-3 h-3"></i> 已复制';
+                lucide.createIcons();
+                setTimeout(() => { btn.innerHTML = originalText; lucide.createIcons(); }, 2000);
+            });
+        }
+
+        function downloadSummaryReport() {
+            const blob = new Blob([summaryReport], { type: 'text/markdown;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `数据摘要_${new Date().toISOString().slice(0,10)}.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ==================== 公式生成模块 ====================
+
+        const FORMULA_EXAMPLES = {
+            vlookup: { requirement: '在B列中查找与D1匹配的值，返回对应C列的内容', context: 'A列是编号，B列是产品名称，C列是价格，D1是要查找的产品名' },
+            sumif: { requirement: '计算A列中所有"销售部"对应的B列数值总和', context: 'A列是部门名称，B列是销售额' },
+            ifnested: { requirement: '如果A1大于90显示"优秀"，60-90显示"及格"，否则显示"不及格"', context: 'A列是考试成绩' },
+            text: { requirement: '从A1中提取第3到第6个字符', context: 'A列包含产品编码如"ABC12345XYZ"' }
+        };
+
+        function initFormulaModule() {
+            // 工作模型在设置面板中选择，无需单独初始化
+        }
+
+        function setFormulaExample(type) {
+            const example = FORMULA_EXAMPLES[type];
+            if (example) {
+                document.getElementById('formulaRequirement').value = example.requirement;
+                document.getElementById('formulaContext').value = example.context;
+            }
+        }
+
+        async function generateFormula() {
+            const requirement = document.getElementById('formulaRequirement').value.trim();
+            if (!requirement) {
+                alert('请描述您的需求');
+                return;
+            }
+
+            const config = getApiConfig();
+            if (!config.key) {
+                alert('请先配置 API 密钥');
+                openSettings(true);
+                return;
+            }
+
+            const context = document.getElementById('formulaContext').value.trim();
+            const excelVersion = document.getElementById('formulaExcelVersion').value;
+            const model = config.models.work; // 使用设置中的工作模型
+
+            document.getElementById('formulaEmptyState').classList.add('hidden');
+            document.getElementById('formulaLoadingState').classList.remove('hidden');
+            document.getElementById('formulaResultContent').classList.add('hidden');
+            document.getElementById('formulaGenerateBtn').disabled = true;
+
+            const versionDesc = {
+                '365': 'Microsoft 365 (支持动态数组、XLOOKUP等新函数)',
+                '2019': 'Excel 2019',
+                '2016': 'Excel 2016',
+                'wps': 'WPS 表格'
+            };
+
+            const systemPrompt = `你是一个Excel公式专家。根据用户需求生成Excel公式。
+要求：
+1. 适配 ${versionDesc[excelVersion]}
+2. 返回JSON格式：{"formula": "=公式", "explanation": "使用说明(Markdown格式)", "notes": "注意事项(可选)"}
+3. 公式要准确可用
+4. 说明要清晰易懂`;
+
+            const userPrompt = `需求：${requirement}
+${context ? `数据上下文：${context}` : ''}`;
+
+            try {
+                const response = await fetch(config.url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${config.key}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: userPrompt }
+                        ],
+                        temperature: 0.3,
+                        max_tokens: 1024
+                    })
+                });
+
+                if (!response.ok) throw new Error(`API Error ${response.status}`);
+
+                const result = await response.json();
+                let content = result.choices[0].message.content.trim();
+                content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+
+                const parsed = JSON.parse(content);
+
+                document.getElementById('formulaBox').textContent = parsed.formula;
+                document.getElementById('formulaExplanation').innerHTML = renderMarkdown(parsed.explanation);
+
+                const notesBox = document.getElementById('formulaNotesBox');
+                const notesEl = document.getElementById('formulaNotes');
+                if (parsed.notes) {
+                    notesEl.innerHTML = renderMarkdown(parsed.notes);
+                    notesBox.classList.remove('hidden');
+                } else {
+                    notesBox.classList.add('hidden');
+                }
+
+                document.getElementById('formulaLoadingState').classList.add('hidden');
+                document.getElementById('formulaResultContent').classList.remove('hidden');
+
+            } catch (error) {
+                alert('生成公式失败: ' + error.message);
+                document.getElementById('formulaLoadingState').classList.add('hidden');
+                document.getElementById('formulaEmptyState').classList.remove('hidden');
+            } finally {
+                document.getElementById('formulaGenerateBtn').disabled = false;
+            }
+        }
+
+        function copyFormula() {
+            const formula = document.getElementById('formulaBox').textContent;
+            navigator.clipboard.writeText(formula).then(() => {
+                alert('公式已复制到剪贴板');
+            });
+        }
+
+        // ==================== 数据清洗模块 ====================
+
+        let cleaningData = [];
+        let cleaningHeaders = [];
+        let cleanedData = [];
+        let cleaningStats = { total: 0, cleaned: 0, changed: 0, errors: 0 };
+
+        function initCleaningModule() {
+            const dropZone = document.getElementById('cleaningDropZone');
+            const fileInput = document.getElementById('cleaningFileInput');
+
+            if (!dropZone || !fileInput) return;
+
+            dropZone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => handleCleaningFile(e.target.files[0]));
+
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
+            dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('drag-active'); });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-active');
+                handleCleaningFile(e.dataTransfer.files[0]);
+            });
+
+            // 自定义规则切换
+            const customCheckbox = document.getElementById('cleaning-task-custom');
+            if (customCheckbox) {
+                customCheckbox.addEventListener('change', (e) => {
+                    document.getElementById('cleaningCustomRuleBox').classList.toggle('hidden', !e.target.checked);
+                });
+            }
+        }
+
+        function handleCleaningFile(file) {
+            if (!file) return;
+            if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+                alert('请上传 Excel (.xlsx, .xls) 或 CSV 文件');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    // codepage: 936 支持 GBK/GB2312 中文编码
+                    const workbook = XLSX.read(data, {type: 'array', codepage: 936});
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, {header: 1});
+
+                    cleaningHeaders = jsonData[0] || [];
+                    cleaningData = jsonData.slice(1);
+
+                    document.getElementById('cleaningUploadSection').classList.add('hidden');
+                    document.getElementById('cleaningFileInfo').classList.remove('hidden');
+                    document.getElementById('cleaningFileName').textContent = file.name;
+                    document.getElementById('cleaningFileStats').textContent = `${cleaningData.length} 行 x ${cleaningHeaders.length} 列`;
+                    document.getElementById('cleaningBtn').disabled = false;
+
+                    showCleaningColumnSelect();
+                    showCleaningPreview();
+
+                    lucide.createIcons();
+                } catch (err) {
+                    alert("读取文件失败: " + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 加载清洗模块的演示数据
+        function loadCleaningDemoData(type) {
+            if (type === 'contacts') {
+                cleaningHeaders = ['姓名', '手机号', '邮箱', '公司'];
+                cleaningData = [
+                    ['张 三', '138 1234 5678', 'zhangsan@qq.com', '阿里巴巴集团'],
+                    ['李  四', '1391234-5678', 'LISI@GMAIL.COM', '腾讯科技'],
+                    ['王五', '13612345678', 'wangwu@@163.com', '字节跳动'],
+                    ['赵 小 六', '137-1234-5678', 'zhaoliu@', '百度公司'],
+                    ['钱七', '135 12345678', 'qianqi@outlook.com', '华为技术有限公司'],
+                    ['孙   八', '1341234 5678', 'sunba#hotmail.com', '小米科技'],
+                    ['周九', '133.1234.5678', 'zhoujiu@163.com', 'OPPO广东'],
+                    ['吴十', '+86 13212345678', 'wushi@vip.qq.com', 'vivo移动通信']
+                ];
+            } else if (type === 'addresses') {
+                cleaningHeaders = ['姓名', '地址', '入职日期', '状态'];
+                cleaningData = [
+                    ['张明', '北京市海淀区中关村大街1号', '2023-01-15', '在职'],
+                    ['李娜', '上海浦东新区陆家嘴', '23/02/20', '在职'],
+                    ['王强', '广东深圳南山区科技园', '2022.12.01', '离职'],
+                    ['刘芳', '杭州西湖区', '2023年3月10日', '在职'],
+                    ['陈伟', '成都高新区天府软件园', '2022-11-28', '在职'],
+                    ['赵丽', '武汉市洪山区光谷', '22/10/05', '试用'],
+                    ['周杰', '南京鼓楼区', '2023.04.18', '在职'],
+                    ['吴敏', '苏州工业园区', '2023年5月1日', '在职']
+                ];
+            }
+
+            // 更新UI
+            document.getElementById('cleaningUploadSection').classList.add('hidden');
+            document.getElementById('cleaningFileInfo').classList.remove('hidden');
+            document.getElementById('cleaningFileName').textContent = type === 'contacts' ? '客户联系人样例.xlsx' : '地址数据样例.xlsx';
+            document.getElementById('cleaningFileStats').textContent = `${cleaningData.length} 行 x ${cleaningHeaders.length} 列`;
+            document.getElementById('cleaningBtn').disabled = false;
+
+            showCleaningColumnSelect();
+            showCleaningPreview();
+
+            lucide.createIcons();
+        }
+
+        function showCleaningColumnSelect() {
+            const container = document.getElementById('cleaningColumnCheckboxes');
+            container.innerHTML = cleaningHeaders.map((h, i) => `
+                <label class="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
+                    <input type="checkbox" class="cleaning-column-checkbox w-4 h-4 text-orange-600 rounded" data-index="${i}" checked>
+                    <span class="text-sm text-slate-700">${h || '列' + (i+1)}</span>
+                </label>
+            `).join('');
+            document.getElementById('cleaningColumnSection').classList.remove('hidden');
+        }
+
+        function showCleaningPreview() {
+            const headerRow = document.getElementById('cleaningPreviewHeader');
+            const body = document.getElementById('cleaningPreviewBody');
+
+            headerRow.innerHTML = cleaningHeaders.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">${h || '-'}</th>`).join('');
+
+            body.innerHTML = cleaningData.slice(0, 50).map(row => `
+                <tr class="hover:bg-slate-50">
+                    ${cleaningHeaders.map((_, i) => `<td class="px-4 py-2 text-slate-700 max-w-[200px] truncate">${row[i] ?? ''}</td>`).join('')}
+                </tr>
+            `).join('');
+
+            document.getElementById('cleaningEmptyPreview').classList.add('hidden');
+            document.getElementById('cleaningPreviewTable').classList.remove('hidden');
+        }
+
+        function showCleaningTab(tab) {
+            const previewTab = document.getElementById('cleaningPreviewTab');
+            const resultTab = document.getElementById('cleaningResultTab');
+            const tabPreview = document.getElementById('cleaningTabPreview');
+            const tabResult = document.getElementById('cleaningTabResult');
+
+            if (tab === 'preview') {
+                previewTab.classList.remove('hidden');
+                resultTab.classList.add('hidden');
+                tabPreview.classList.add('text-orange-600', 'border-b-2', 'border-orange-600');
+                tabPreview.classList.remove('text-slate-500');
+                tabResult.classList.remove('text-orange-600', 'border-b-2', 'border-orange-600');
+                tabResult.classList.add('text-slate-500');
+            } else {
+                previewTab.classList.add('hidden');
+                resultTab.classList.remove('hidden');
+                tabResult.classList.add('text-orange-600', 'border-b-2', 'border-orange-600');
+                tabResult.classList.remove('text-slate-500');
+                tabPreview.classList.remove('text-orange-600', 'border-b-2', 'border-orange-600');
+                tabPreview.classList.add('text-slate-500');
+            }
+        }
+
+        function resetCleaningFile() {
+            cleaningData = [];
+            cleaningHeaders = [];
+            cleanedData = [];
+            document.getElementById('cleaningFileInput').value = '';
+            document.getElementById('cleaningUploadSection').classList.remove('hidden');
+            document.getElementById('cleaningFileInfo').classList.add('hidden');
+            document.getElementById('cleaningBtn').disabled = true;
+            document.getElementById('cleaningColumnSection').classList.add('hidden');
+            document.getElementById('cleaningEmptyPreview').classList.remove('hidden');
+            document.getElementById('cleaningPreviewTable').classList.add('hidden');
+            document.getElementById('cleaningDownloadBtn').disabled = true;
+            document.getElementById('cleaningStatsBar').classList.add('hidden');
+        }
+
+        async function startCleaning() {
+            const config = getApiConfig();
+            if (!config.key) {
+                alert('请先配置 API 密钥');
+                openSettings(true);
+                return;
+            }
+
+            // 获取选中的任务
+            const tasks = [];
+            if (document.getElementById('cleaning-task-name')?.checked) tasks.push('name');
+            if (document.getElementById('cleaning-task-phone')?.checked) tasks.push('phone');
+            if (document.getElementById('cleaning-task-address')?.checked) tasks.push('address');
+            if (document.getElementById('cleaning-task-date')?.checked) tasks.push('date');
+            if (document.getElementById('cleaning-task-email')?.checked) tasks.push('email');
+            if (document.getElementById('cleaning-task-custom')?.checked) tasks.push('custom');
+
+            if (tasks.length === 0) {
+                alert('请至少选择一个清洗任务');
+                return;
+            }
+
+            // 获取选中的列
+            const selectedColumns = [];
+            document.querySelectorAll('.cleaning-column-checkbox:checked').forEach(cb => {
+                selectedColumns.push(parseInt(cb.dataset.index));
+            });
+
+            if (selectedColumns.length === 0) {
+                alert('请至少选择一列进行清洗');
+                return;
+            }
+
+            showCleaningTab('result');
+            document.getElementById('cleaningEmptyResult').classList.add('hidden');
+            document.getElementById('cleaningLoadingResult').classList.remove('hidden');
+            document.getElementById('cleaningResultTable').classList.add('hidden');
+            document.getElementById('cleaningBtn').disabled = true;
+
+            try {
+                const model = config.models.work; // 使用设置中的工作模型
+                const customRule = document.getElementById('cleaningCustomRule')?.value?.trim() || '';
+
+                const taskDescriptions = {
+                    name: '规范化姓名格式（去除多余空格，统一大小写）',
+                    phone: '标准化手机号格式（去除空格和特殊字符，验证有效性）',
+                    address: '标准化地址格式（补全省市区信息）',
+                    date: '统一日期格式为 YYYY-MM-DD',
+                    email: '验证邮箱格式有效性',
+                    custom: customRule
+                };
+
+                const selectedTaskDescriptions = tasks.map(t => taskDescriptions[t]).join('; ');
+
+                // 分批处理
+                const batchSize = 10;
+                cleanedData = JSON.parse(JSON.stringify(cleaningData));
+                cleaningStats = { total: cleaningData.length, cleaned: 0, changed: 0, errors: 0 };
+
+                for (let i = 0; i < cleaningData.length; i += batchSize) {
+                    const batch = cleaningData.slice(i, Math.min(i + batchSize, cleaningData.length));
+                    document.getElementById('cleaningProgressText').textContent = `处理第 ${i+1}-${Math.min(i+batchSize, cleaningData.length)} 行，共 ${cleaningData.length} 行`;
+
+                    const batchData = batch.map((row, idx) => {
+                        const obj = {};
+                        selectedColumns.forEach(colIdx => {
+                            obj[cleaningHeaders[colIdx]] = row[colIdx];
+                        });
+                        return { rowIndex: i + idx, data: obj };
+                    });
+
+                    const systemPrompt = `你是一个数据清洗专家。请根据以下规则清洗用户提供的数据：
+${selectedTaskDescriptions}
+
+要求：
+1. 返回 JSON 数组格式，每个元素包含 rowIndex 和清洗后的 data 对象
+2. 如果某个字段无法清洗或数据有问题，在该字段值前加 "[ERROR]" 前缀
+3. 如果数据有变更，在字段值前加 "[CHANGED]" 前缀
+4. 保持数据类型一致
+5. 不要添加任何解释，只返回 JSON`;
+
+                    const response = await fetch(config.url, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${config.key}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            model: model,
+                            messages: [
+                                { role: 'system', content: systemPrompt },
+                                { role: 'user', content: JSON.stringify(batchData) }
+                            ],
+                            temperature: 0.1,
+                            max_tokens: 2048
+                        })
+                    });
+
+                    if (!response.ok) throw new Error(`API 错误: ${response.status}`);
+
+                    const result = await response.json();
+                    let content = result.choices[0].message.content.trim();
+                    content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+
+                    try {
+                        const cleanedBatch = JSON.parse(content);
+                        cleanedBatch.forEach(item => {
+                            const rowIdx = item.rowIndex;
+                            selectedColumns.forEach(colIdx => {
+                                const headerName = cleaningHeaders[colIdx];
+                                let value = item.data[headerName];
+                                if (value !== undefined) {
+                                    if (String(value).startsWith('[ERROR]')) {
+                                        cleaningStats.errors++;
+                                        cleanedData[rowIdx][colIdx] = value;
+                                    } else if (String(value).startsWith('[CHANGED]')) {
+                                        cleaningStats.changed++;
+                                        cleanedData[rowIdx][colIdx] = value.replace('[CHANGED]', '');
+                                    } else {
+                                        cleanedData[rowIdx][colIdx] = value;
+                                    }
+                                }
+                            });
+                            cleaningStats.cleaned++;
+                        });
+                    } catch (e) {
+                        console.error('解析清洗结果失败:', e);
+                    }
+
+                    await new Promise(r => setTimeout(r, 200));
+                }
+
+                showCleaningResult();
+                updateCleaningStats();
+                document.getElementById('cleaningDownloadBtn').disabled = false;
+
+            } catch (error) {
+                alert('清洗失败: ' + error.message);
+                document.getElementById('cleaningLoadingResult').classList.add('hidden');
+                document.getElementById('cleaningEmptyResult').classList.remove('hidden');
+            } finally {
+                document.getElementById('cleaningBtn').disabled = false;
+            }
+        }
+
+        function showCleaningResult() {
+            const headerRow = document.getElementById('cleaningResultHeader');
+            const body = document.getElementById('cleaningResultBody');
+
+            headerRow.innerHTML = cleaningHeaders.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">${h || '-'}</th>`).join('');
+
+            body.innerHTML = cleanedData.slice(0, 100).map(row => `
+                <tr class="hover:bg-slate-50">
+                    ${cleaningHeaders.map((_, i) => {
+                        const val = row[i] ?? '';
+                        const isError = String(val).startsWith('[ERROR]');
+                        const cellClass = isError ? 'bg-red-50 text-red-700' : 'text-slate-700';
+                        const displayVal = String(val).replace('[ERROR]', '').replace('[CHANGED]', '');
+                        return `<td class="px-4 py-2 max-w-[200px] truncate ${cellClass}">${displayVal}</td>`;
+                    }).join('')}
+                </tr>
+            `).join('');
+
+            document.getElementById('cleaningLoadingResult').classList.add('hidden');
+            document.getElementById('cleaningResultTable').classList.remove('hidden');
+            document.getElementById('cleaningStatsBar').classList.remove('hidden');
+        }
+
+        function updateCleaningStats() {
+            document.getElementById('cleaningTotalRows').textContent = cleaningStats.total;
+            document.getElementById('cleaningCleanedRows').textContent = cleaningStats.cleaned;
+            document.getElementById('cleaningChangedRows').textContent = cleaningStats.changed;
+            document.getElementById('cleaningErrorRows').textContent = cleaningStats.errors;
+        }
+
+        function downloadCleaningResult() {
+            if (cleanedData.length === 0) return;
+
+            const exportData = cleanedData.map(row =>
+                row.map(cell => String(cell ?? '').replace('[ERROR]', '').replace('[CHANGED]', ''))
+            );
+
+            const ws = XLSX.utils.aoa_to_sheet([cleaningHeaders, ...exportData]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "清洗结果");
+            XLSX.writeFile(wb, `数据清洗结果_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        // ==================== 通用工具函数 ====================
+
+        function renderMarkdown(text) {
+            if (typeof marked !== 'undefined') {
+                return marked.parse(text);
+            }
+            return text.replace(/\n/g, '<br>');
+        }
+
+        async function callStreamingAPI(model, systemPrompt, userPrompt, onChunk) {
+            const config = getApiConfig();
+
+            const response = await fetch(config.url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${config.key}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 4096,
+                    stream: true
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => '');
+                const errorMsg = response.status === 401
+                    ? `API认证失败(401): 请检查API Key是否正确。当前平台: ${config.platform}, 模型: ${model}`
+                    : `API Error: ${response.status} - ${errorText.slice(0, 100)}`;
+                throw new Error(errorMsg);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let fullContent = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') continue;
+                        try {
+                            const json = JSON.parse(data);
+                            const content = json.choices[0]?.delta?.content || '';
+                            if (content) {
+                                onChunk(content);
+                            }
+                        } catch (e) {
+                            // Ignore parsing errors
+                        }
+                    }
+                }
+            }
+
+            return fullContent;
+        }
+
+        // ========= 不使用流式输出的后备方法 ===========
+        async function callNonStreamingAPI(model, systemPrompt, userPrompt) {
+            const config = getApiConfig();
+
+            const response = await fetch(config.url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${config.key}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 4096
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status}`);
+            }
+
+            const result = await response.json();
+            return result.choices[0].message.content;
+        }
+
+        // ========= 初始化模块 ==========
+        window.addEventListener('DOMContentLoaded', function() {
+            initSummaryModule();
+            initFormulaModule();
+            initCleaningModule();
+        });
+
+    </script>
+</body>
+</html>
