@@ -129,7 +129,9 @@ import ProgressOverlay from '../components/common/ProgressOverlay.vue'
 import { readFile, exportToXlsx, DEMO_DATA } from '../services/excel'
 import { callAI } from '../services/ai'
 import { TRANSLATE_SCENARIOS, LANGUAGE_DIRECTIONS, getTranslatePrompt } from '../services/prompts'
+import { useToast } from '../services/toast'
 
+const toast = useToast()
 const dataShare = useDataShareStore()
 
 const headers = ref([])
@@ -196,7 +198,7 @@ async function handleFile(file) {
     // 同步至全局，全局会自动启发式计算核心列 (传递 true 开启首次推荐)
     dataShare.setSharedData(headers.value, rows.value, file.name, true)
   } catch (err) {
-    alert(err.message)
+    toast.error(err.message)
   }
 }
 

@@ -119,7 +119,9 @@ import { Languages, Type, Brain, FileBarChart, FunctionSquare, Eraser, ArrowRigh
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
 import { readFile } from '../services/excel'
+import { useToast } from '../services/toast'
 
+const toast = useToast()
 const dataShare = useDataShareStore()
 const isUploading = ref(false)
 
@@ -130,7 +132,7 @@ async function handleGlobalFile(file) {
     // 传递 true 开启首次推荐
     dataShare.setSharedData(data.headers.map(String), data.rows, file.name, true)
   } catch (err) {
-    alert('文件解析失败: ' + err.message)
+    toast.error('文件解析失败: ' + err.message)
   } finally {
     isUploading.value = false
   }
@@ -158,7 +160,7 @@ function loadGlobalDemo() {
   ]
   // 传递 true 开启首次推荐
   dataShare.setSharedData(demoHeaders, demoRows, '社媒评论脏数据全局示例.csv', true)
-  alert('成功加载全局演示示例数据！现在您可以点击下方的“数据清洗”或其他卡片直接开始处理。')
+  toast.success('成功加载全局演示示例数据！现在您可以点击下方的”数据清洗”或其他卡片直接开始处理。')
 }
 
 function clearGlobalExcel() {

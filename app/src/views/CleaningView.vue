@@ -406,7 +406,9 @@ import { useDataShareStore } from '../stores/dataShare'
 import { useSettingsStore } from '../stores/settings'
 import { callAI } from '../services/ai'
 import { getSmartFilterPrompt } from '../services/prompts'
+import { useToast } from '../services/toast'
 
+const toast = useToast()
 const router = useRouter()
 const dataShare = useDataShareStore()
 const showShareMenu = ref(false)
@@ -494,8 +496,8 @@ async function generateSmartFilter() {
   const input = smartFilterInput.value.trim()
   if (!input || isGeneratingFilter.value) return
   const s = useSettingsStore()
-  if (!s.isConfigured) { s.showSettings = true; alert('请先配置 API 密钥'); return }
-  if (!rows.value.length) { alert('请先上传数据'); return }
+  if (!s.isConfigured) { s.showSettings = true; toast.warn('请先配置 API 密钥'); return }
+  if (!rows.value.length) { toast.warn('请先上传数据'); return }
 
   isGeneratingFilter.value = true
   try {
@@ -543,7 +545,7 @@ async function generateSmartFilter() {
     smartFilterInput.value = ''
     runPipeline()
   } catch (err) {
-    alert('AI 生成筛选规则失败: ' + err.message)
+    toast.error('AI 生成筛选规则失败: ' + err.message)
   } finally {
     isGeneratingFilter.value = false
   }
@@ -674,7 +676,7 @@ async function handleFile(file) {
     dataShare.setSharedData(headers.value, rows.value, file.name, true)
     
     runPipeline()
-  } catch (err) { alert(err.message) }
+  } catch (err) { toast.error(err.message) }
 }
 
 // 启发式选择需要清洗的列
@@ -888,7 +890,7 @@ function applyToGlobal() {
   // 更新到全局 Store 共享
   dataShare.setSharedData(cleanHeaders, cleanRows, dataShare.sourceName || '已清洗数据.xlsx')
   
-  alert('清洗后的健康数据已成功应用至全局 Excel！现在您可以直接切换到批量翻译或评论分析进行下一步处理。')
+  toast.success('清洗后的健康数据已成功应用至全局 Excel！现在您可以直接切换到批量翻译或评论分析进行下一步处理。')
 }
 
 // 导出当前配置 JSON (兼容导出全局整包配置)
@@ -924,13 +926,13 @@ function handleImportConfig(e) {
       }
       
       if (success) {
-        alert('导入规则配置成功！已应用并重新运行数据清洗。')
+        toast.success('导入规则配置成功！已应用并重新运行数据清洗。')
         runPipeline()
       } else {
-        alert('导入失败：非法的规则配置文件格式')
+        toast.error('导入失败：非法的规则配置文件格式')
       }
     } catch (err) {
-      alert('导入配置解析失败: ' + err.message)
+      toast.error('导入配置解析失败: ' + err.message)
     }
     e.target.value = ''
   }

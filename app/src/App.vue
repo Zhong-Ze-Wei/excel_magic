@@ -12,6 +12,7 @@
       </div>
     </main>
     <SettingsModal />
+    <ToastContainer />
   </div>
 </template>
 
@@ -19,6 +20,7 @@
 import Sidebar from './components/layout/Sidebar.vue'
 import Header from './components/layout/Header.vue'
 import SettingsModal from './components/settings/SettingsModal.vue'
+import ToastContainer from './components/common/ToastContainer.vue'
 </script>
 
 <style>
