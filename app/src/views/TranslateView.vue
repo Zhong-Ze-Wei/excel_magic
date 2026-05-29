@@ -127,7 +127,7 @@ import FileUploader from '../components/common/FileUploader.vue'
 import DataTable from '../components/common/DataTable.vue'
 import ProgressOverlay from '../components/common/ProgressOverlay.vue'
 import { readFile, exportToXlsx, DEMO_DATA } from '../services/excel'
-import { callAI } from '../services/ai'
+import { callAI, callAIBatch } from '../services/ai'
 import { TRANSLATE_SCENARIOS, LANGUAGE_DIRECTIONS, getTranslatePrompt } from '../services/prompts'
 import { useToast } from '../services/toast'
 
@@ -232,20 +232,29 @@ async function startTranslate() {
 
   const systemPrompt = getTranslatePrompt(scenario.value, direction.value)
 
+  // 构建任务列表，空行直接设为空字符串
+  const tasks = []
   for (let i = 0; i < rows.value.length; i++) {
     const text = rows.value[i][sourceCol.value]
-    if (!text) { rows.value[i][resultCol.value] = ''; processed.value++; continue }
-    try {
-      const result = await callAI(String(text), systemPrompt)
-      rows.value[i][resultCol.value] = result
-      
-      // 翻译过程中将数据写回全局以维持最新活跃状态
-      dataShare.setSharedData(headers.value, rows.value, dataShare.sourceName || '翻译中数据.xlsx')
-    } catch (e) {
-      rows.value[i][resultCol.value] = `[Error] ${e.message}`
+    if (!text) {
+      rows.value[i][resultCol.value] = ''
+      processed.value++
+    } else {
+      tasks.push({ content: String(text), systemPrompt, index: i })
     }
-    processed.value++
   }
+
+  // 并发调用 AI，每完成一行实时回写
+  await callAIBatch(
+    tasks.map(t => ({ content: t.content, systemPrompt: t.systemPrompt })),
+    (batchIdx, result, error) => {
+      const rowIdx = tasks[batchIdx].index
+      rows.value[rowIdx][resultCol.value] = error ? `[Error] ${error.message}` : result
+      processed.value++
+      dataShare.setSharedData(headers.value, rows.value, dataShare.sourceName || '翻译中数据.xlsx')
+    },
+    3
+  )
 
   isTranslating.value = false
   translated.value = true

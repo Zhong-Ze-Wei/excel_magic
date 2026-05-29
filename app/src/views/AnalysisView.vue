@@ -328,7 +328,7 @@ import { UploadCloud, SlidersHorizontal, Plus, X, Brain, BarChart2, Download, Sp
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
 import { readFile, exportToXlsx, DEMO_DATA } from '../services/excel'
-import { callAI } from '../services/ai'
+import { callAI, callAIBatch } from '../services/ai'
 import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt } from '../services/prompts'
 import { useSettingsStore } from '../stores/settings'
 import { useToast } from '../services/toast'
@@ -738,40 +738,47 @@ async function startLabeling() {
     ? plan.compiledPrompt
     : compileLabelingPrompt(plan)
 
+  // 构建任务列表
+  const tasks = []
   for (let i = start - 1; i < end; i++) {
-    currentProcessingRowIdx.value = i
-
-    // 构造行输入
     const rowInput = {}
     inputCols.forEach(ci => {
       rowInput[headers.value[ci]] = rows.value[i][ci] ?? ''
     })
-
-    // 检查是否有有效输入
     const hasContent = Object.values(rowInput).some(v => String(v).trim().length > 0)
     if (!hasContent) {
       const emptyValues = {}
       plan.outputColumns.forEach(c => { emptyValues[c.key] = null })
       analysisMap.value[i] = { status: 'done', values: emptyValues, errorMessage: '' }
       processed.value++
-      continue
+    } else {
+      tasks.push({ content: JSON.stringify(rowInput), systemPrompt, index: i })
     }
-
-    analysisMap.value[i].status = 'processing'
-    try {
-      const result = await callAI(JSON.stringify(rowInput), systemPrompt, config.workModel)
-      const parsed = parseRobustJSON(result)
-      const normalized = normalizeRowResult(parsed, plan.outputColumns)
-      if (normalized) {
-        analysisMap.value[i] = { status: 'done', values: normalized, errorMessage: '' }
-      } else {
-        throw new Error('AI 返回 JSON 格式不规范')
-      }
-    } catch (e) {
-      analysisMap.value[i] = { status: 'error', values: {}, errorMessage: e.message }
-    }
-    processed.value++
   }
+
+  // 标记待处理行
+  tasks.forEach(t => { analysisMap.value[t.index].status = 'processing' })
+
+  // 并发调用 AI
+  await callAIBatch(
+    tasks.map(t => ({ content: t.content, systemPrompt: t.systemPrompt })),
+    (batchIdx, result, error) => {
+      const rowIdx = tasks[batchIdx].index
+      if (error) {
+        analysisMap.value[rowIdx] = { status: 'error', values: {}, errorMessage: error.message }
+      } else {
+        const parsed = parseRobustJSON(result)
+        const normalized = normalizeRowResult(parsed, plan.outputColumns)
+        if (normalized) {
+          analysisMap.value[rowIdx] = { status: 'done', values: normalized, errorMessage: '' }
+        } else {
+          analysisMap.value[rowIdx] = { status: 'error', values: {}, errorMessage: 'AI 返回 JSON 格式不规范' }
+        }
+      }
+      processed.value++
+    },
+    3
+  )
 
   isAnalyzing.value = false
   currentProcessingRowIdx.value = -1
