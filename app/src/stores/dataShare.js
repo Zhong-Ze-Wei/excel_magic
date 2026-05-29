@@ -6,6 +6,7 @@ export const useDataShareStore = defineStore('dataShare', () => {
   const rows = ref([])
   const sourceName = ref('') // 例如: '清洗后数据.xlsx'
   const coreColumn = ref(0) // 全局共享的核心处理列索引
+  const labelingResults = ref(null) // { outputColumns: [...], analysisMap: { [rowIdx]: { values: {...} } } }
 
   const hasData = computed(() => rows.value.length > 0)
 
@@ -69,16 +70,27 @@ export const useDataShareStore = defineStore('dataShare', () => {
     return data
   }
 
+  // 存入 AI 打标结果
+  function setLabelingResults(outputColumns, map) {
+    labelingResults.value = { outputColumns, analysisMap: { ...map } }
+  }
+
+  function clearLabelingResults() {
+    labelingResults.value = null
+  }
+
   // 清理
   function clearSharedData() {
     headers.value = []
     rows.value = []
     sourceName.value = ''
     coreColumn.value = 0
+    labelingResults.value = null
   }
 
   return {
-    headers, rows, sourceName, coreColumn, hasData,
-    setSharedData, setCoreColumn, getAndClearSharedData, clearSharedData
+    headers, rows, sourceName, coreColumn, hasData, labelingResults,
+    setSharedData, setCoreColumn, getAndClearSharedData, clearSharedData,
+    setLabelingResults, clearLabelingResults
   }
 })
