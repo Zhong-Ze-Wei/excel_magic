@@ -307,6 +307,11 @@
                 💾 应用清洗结果到全局
               </button>
 
+              <button @click="resetAllOverrides"
+                class="px-2.5 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:border-amber-300 hover:text-amber-600 transition-all flex items-center gap-1 shadow-sm">
+                <RotateCcw class="w-3.5 h-3.5" /> 重置所有覆写
+              </button>
+
               <button @click="exportCleanedOnly"
                 class="px-2.5 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:bg-orange-700 transition-all flex items-center gap-1 shadow-sm">
                 <Download class="w-3.5 h-3.5" /> 导出保留数据
@@ -397,7 +402,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Eraser, Settings2, Download, ChevronDown, Check, X, RefreshCw, Sparkles, Plus, Pencil } from 'lucide-vue-next'
+import { Eraser, Settings2, Download, ChevronDown, Check, X, RefreshCw, Sparkles, Plus, Pencil, RotateCcw } from 'lucide-vue-next'
 import FileUploader from '../components/common/FileUploader.vue'
 import CustomFilterForm from '../components/cleaning/CustomFilterForm.vue'
 import { readFile, exportToXlsx } from '../services/excel'
@@ -761,6 +766,12 @@ function overwriteDecision(index, targetDecision) {
       fullStats.value[nextDecision]++
     }
   }
+}
+
+// 重置所有用户覆写，恢复为 Pipeline 原始判定
+function resetAllOverrides() {
+  runPipeline()
+  toast.success('已重置所有覆写，恢复为 AI 原始判定')
 }
 
 // UI 样式控制辅助
