@@ -130,9 +130,11 @@ import { readFile, exportToXlsx, DEMO_DATA } from '../services/excel'
 import { callAI, callAIBatch } from '../services/ai'
 import { TRANSLATE_SCENARIOS, LANGUAGE_DIRECTIONS, getTranslatePrompt } from '../services/prompts'
 import { useToast } from '../services/toast'
+import { createTranslationCache } from '../services/translationCache'
 
 const toast = useToast()
 const dataShare = useDataShareStore()
+const translationCache = createTranslationCache()
 
 const headers = ref([])
 const rows = ref([])
@@ -232,7 +234,7 @@ async function startTranslate() {
 
   const systemPrompt = getTranslatePrompt(scenario.value, direction.value)
 
-  // 构建任务列表，空行直接设为空字符串
+  // 构建任务列表，检查缓存
   const tasks = []
   for (let i = 0; i < rows.value.length; i++) {
     const text = rows.value[i][sourceCol.value]
@@ -240,16 +242,28 @@ async function startTranslate() {
       rows.value[i][resultCol.value] = ''
       processed.value++
     } else {
-      tasks.push({ content: String(text), systemPrompt, index: i })
+      const key = String(text)
+      const cached = translationCache.get(key)
+      if (cached) {
+        rows.value[i][resultCol.value] = cached
+        processed.value++
+      } else {
+        tasks.push({ content: key, systemPrompt, index: i })
+      }
     }
   }
 
-  // 并发调用 AI，每完成一行实时回写
+  // 并发调用 AI，每完成一行实时回写并缓存
   await callAIBatch(
     tasks.map(t => ({ content: t.content, systemPrompt: t.systemPrompt })),
     (batchIdx, result, error) => {
       const rowIdx = tasks[batchIdx].index
-      rows.value[rowIdx][resultCol.value] = error ? `[Error] ${error.message}` : result
+      if (error) {
+        rows.value[rowIdx][resultCol.value] = `[Error] ${error.message}`
+      } else {
+        rows.value[rowIdx][resultCol.value] = result
+        translationCache.set(tasks[batchIdx].content, result)
+      }
       processed.value++
       dataShare.setSharedData(headers.value, rows.value, dataShare.sourceName || '翻译中数据.xlsx')
     },
