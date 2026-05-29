@@ -307,7 +307,9 @@ import { ref, reactive, watch } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import { testConnection } from '../../services/ai'
 import { X, CheckCircle2, Gift, Copy, Eye, EyeOff, Settings2, Eraser, Key, Download, Upload, RotateCcw } from 'lucide-vue-next'
+import { useToast } from '../../services/toast'
 
+const toast = useToast()
 const settings = useSettingsStore()
 
 const activeTab = ref('api')
@@ -373,7 +375,7 @@ function handleSave() {
     settings.saveModelSelection(p, 'work', localWorkModels[p])
   }
   settings.showSettings = false
-  alert('系统设置已成功保存！')
+  toast.success('系统设置已成功保存！')
 }
 
 // 词库分词同步
@@ -416,7 +418,7 @@ function handleImportGlobalConfig(e) {
       }
       
       if (success) {
-        alert('系统全局配置导入成功！已应用生效。')
+        toast.success('系统全局配置导入成功！已应用生效。')
         // 同步刷新本地 ref
         localPlatform.value = settings.currentPlatform
         localKeys.siliconflow = localStorage.getItem('siliconflow_api_key') || ''
@@ -426,10 +428,10 @@ function handleImportGlobalConfig(e) {
         localWorkModels.siliconflow = settings.selectedWorkModel.siliconflow
         localWorkModels.aiping = settings.selectedWorkModel.aiping
       } else {
-        alert('导入失败：非法的备份配置文件结构')
+        toast.error('导入失败：非法的备份配置文件结构')
       }
     } catch (err) {
-      alert('导入解析失败: ' + err.message)
+      toast.error('导入解析失败: ' + err.message)
     }
     e.target.value = ''
   }
@@ -440,7 +442,7 @@ function handleImportGlobalConfig(e) {
 function handleResetAll() {
   if (confirm('警告：确定要清除所有已配置的 API Key 授权凭证、模型指向选择，并将清洗规则全部恢复为默认出厂设置吗？')) {
     settings.resetAllConfig()
-    alert('系统所有设置均已恢复至出厂状态。')
+    toast.success('系统所有设置均已恢复至出厂状态。')
     // 同步本地 ref
     localPlatform.value = settings.currentPlatform
     localKeys.siliconflow = ''

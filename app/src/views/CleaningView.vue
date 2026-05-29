@@ -307,6 +307,11 @@
                 💾 应用清洗结果到全局
               </button>
 
+              <button @click="resetAllOverrides"
+                class="px-2.5 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:border-amber-300 hover:text-amber-600 transition-all flex items-center gap-1 shadow-sm">
+                <RotateCcw class="w-3.5 h-3.5" /> 重置所有覆写
+              </button>
+
               <button @click="exportCleanedOnly"
                 class="px-2.5 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:bg-orange-700 transition-all flex items-center gap-1 shadow-sm">
                 <Download class="w-3.5 h-3.5" /> 导出保留数据
@@ -397,7 +402,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Eraser, Settings2, Download, ChevronDown, Check, X, RefreshCw, Sparkles, Plus, Pencil } from 'lucide-vue-next'
+import { Eraser, Settings2, Download, ChevronDown, Check, X, RefreshCw, Sparkles, Plus, Pencil, RotateCcw } from 'lucide-vue-next'
 import FileUploader from '../components/common/FileUploader.vue'
 import CustomFilterForm from '../components/cleaning/CustomFilterForm.vue'
 import { readFile, exportToXlsx } from '../services/excel'
@@ -406,7 +411,9 @@ import { useDataShareStore } from '../stores/dataShare'
 import { useSettingsStore } from '../stores/settings'
 import { callAI } from '../services/ai'
 import { getSmartFilterPrompt } from '../services/prompts'
+import { useToast } from '../services/toast'
 
+const toast = useToast()
 const router = useRouter()
 const dataShare = useDataShareStore()
 const showShareMenu = ref(false)
@@ -494,8 +501,8 @@ async function generateSmartFilter() {
   const input = smartFilterInput.value.trim()
   if (!input || isGeneratingFilter.value) return
   const s = useSettingsStore()
-  if (!s.isConfigured) { s.showSettings = true; alert('请先配置 API 密钥'); return }
-  if (!rows.value.length) { alert('请先上传数据'); return }
+  if (!s.isConfigured) { s.showSettings = true; toast.warn('请先配置 API 密钥'); return }
+  if (!rows.value.length) { toast.warn('请先上传数据'); return }
 
   isGeneratingFilter.value = true
   try {
@@ -543,7 +550,7 @@ async function generateSmartFilter() {
     smartFilterInput.value = ''
     runPipeline()
   } catch (err) {
-    alert('AI 生成筛选规则失败: ' + err.message)
+    toast.error('AI 生成筛选规则失败: ' + err.message)
   } finally {
     isGeneratingFilter.value = false
   }
@@ -674,7 +681,7 @@ async function handleFile(file) {
     dataShare.setSharedData(headers.value, rows.value, file.name, true)
     
     runPipeline()
-  } catch (err) { alert(err.message) }
+  } catch (err) { toast.error(err.message) }
 }
 
 // 启发式选择需要清洗的列
@@ -759,6 +766,12 @@ function overwriteDecision(index, targetDecision) {
       fullStats.value[nextDecision]++
     }
   }
+}
+
+// 重置所有用户覆写，恢复为 Pipeline 原始判定
+function resetAllOverrides() {
+  runPipeline()
+  toast.success('已重置所有覆写，恢复为 AI 原始判定')
 }
 
 // UI 样式控制辅助
@@ -888,7 +901,7 @@ function applyToGlobal() {
   // 更新到全局 Store 共享
   dataShare.setSharedData(cleanHeaders, cleanRows, dataShare.sourceName || '已清洗数据.xlsx')
   
-  alert('清洗后的健康数据已成功应用至全局 Excel！现在您可以直接切换到批量翻译或评论分析进行下一步处理。')
+  toast.success('清洗后的健康数据已成功应用至全局 Excel！现在您可以直接切换到批量翻译或评论分析进行下一步处理。')
 }
 
 // 导出当前配置 JSON (兼容导出全局整包配置)
@@ -924,13 +937,13 @@ function handleImportConfig(e) {
       }
       
       if (success) {
-        alert('导入规则配置成功！已应用并重新运行数据清洗。')
+        toast.success('导入规则配置成功！已应用并重新运行数据清洗。')
         runPipeline()
       } else {
-        alert('导入失败：非法的规则配置文件格式')
+        toast.error('导入失败：非法的规则配置文件格式')
       }
     } catch (err) {
-      alert('导入配置解析失败: ' + err.message)
+      toast.error('导入配置解析失败: ' + err.message)
     }
     e.target.value = ''
   }

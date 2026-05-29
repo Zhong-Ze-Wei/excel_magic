@@ -127,10 +127,14 @@ import FileUploader from '../components/common/FileUploader.vue'
 import DataTable from '../components/common/DataTable.vue'
 import ProgressOverlay from '../components/common/ProgressOverlay.vue'
 import { readFile, exportToXlsx, DEMO_DATA } from '../services/excel'
-import { callAI } from '../services/ai'
+import { callAI, callAIBatch } from '../services/ai'
 import { TRANSLATE_SCENARIOS, LANGUAGE_DIRECTIONS, getTranslatePrompt } from '../services/prompts'
+import { useToast } from '../services/toast'
+import { createTranslationCache } from '../services/translationCache'
 
+const toast = useToast()
 const dataShare = useDataShareStore()
+const translationCache = createTranslationCache()
 
 const headers = ref([])
 const rows = ref([])
@@ -196,7 +200,7 @@ async function handleFile(file) {
     // 同步至全局，全局会自动启发式计算核心列 (传递 true 开启首次推荐)
     dataShare.setSharedData(headers.value, rows.value, file.name, true)
   } catch (err) {
-    alert(err.message)
+    toast.error(err.message)
   }
 }
 
@@ -230,20 +234,41 @@ async function startTranslate() {
 
   const systemPrompt = getTranslatePrompt(scenario.value, direction.value)
 
+  // 构建任务列表，检查缓存
+  const tasks = []
   for (let i = 0; i < rows.value.length; i++) {
     const text = rows.value[i][sourceCol.value]
-    if (!text) { rows.value[i][resultCol.value] = ''; processed.value++; continue }
-    try {
-      const result = await callAI(String(text), systemPrompt)
-      rows.value[i][resultCol.value] = result
-      
-      // 翻译过程中将数据写回全局以维持最新活跃状态
-      dataShare.setSharedData(headers.value, rows.value, dataShare.sourceName || '翻译中数据.xlsx')
-    } catch (e) {
-      rows.value[i][resultCol.value] = `[Error] ${e.message}`
+    if (!text) {
+      rows.value[i][resultCol.value] = ''
+      processed.value++
+    } else {
+      const key = String(text)
+      const cached = translationCache.get(key)
+      if (cached) {
+        rows.value[i][resultCol.value] = cached
+        processed.value++
+      } else {
+        tasks.push({ content: key, systemPrompt, index: i })
+      }
     }
-    processed.value++
   }
+
+  // 并发调用 AI，每完成一行实时回写并缓存
+  await callAIBatch(
+    tasks.map(t => ({ content: t.content, systemPrompt: t.systemPrompt })),
+    (batchIdx, result, error) => {
+      const rowIdx = tasks[batchIdx].index
+      if (error) {
+        rows.value[rowIdx][resultCol.value] = `[Error] ${error.message}`
+      } else {
+        rows.value[rowIdx][resultCol.value] = result
+        translationCache.set(tasks[batchIdx].content, result)
+      }
+      processed.value++
+      dataShare.setSharedData(headers.value, rows.value, dataShare.sourceName || '翻译中数据.xlsx')
+    },
+    3
+  )
 
   isTranslating.value = false
   translated.value = true
