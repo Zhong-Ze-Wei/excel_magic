@@ -4,6 +4,65 @@
 import { useSettingsStore } from '../stores/settings'
 
 /**
+ * 创建信号量，用于限制并发数
+ */
+export function createSemaphore(max) {
+  let current = 0
+  const queue = []
+
+  function acquire() {
+    return new Promise(resolve => {
+      if (current < max) {
+        current++
+        resolve()
+      } else {
+        queue.push(resolve)
+      }
+    })
+  }
+
+  function release() {
+    if (queue.length > 0) {
+      const next = queue.shift()
+      next()
+    } else {
+      current--
+    }
+  }
+
+  return { acquire, release }
+}
+
+/**
+ * 批量调用 AI，支持并发控制
+ * @param {Array} tasks - [{content, systemPrompt}] 数组
+ * @param {Function} onProgress - (index, result) 进度回调
+ * @param {number} concurrency - 最大并发数，默认 3
+ * @param {string} modelOverride - 模型覆盖
+ * @returns {Promise<Array>} 每个任务的结果
+ */
+export async function callAIBatch(tasks, onProgress, concurrency = 3, modelOverride) {
+  const sem = createSemaphore(concurrency)
+  const results = new Array(tasks.length)
+
+  await Promise.all(tasks.map(async (task, i) => {
+    await sem.acquire()
+    try {
+      const result = await callAI(task.content, task.systemPrompt, modelOverride)
+      results[i] = { ok: true, data: result }
+      if (onProgress) onProgress(i, result)
+    } catch (e) {
+      results[i] = { ok: false, error: e.message }
+      if (onProgress) onProgress(i, null, e)
+    } finally {
+      sem.release()
+    }
+  }))
+
+  return results
+}
+
+/**
  * 调用 AI 模型（非流式）
  */
 export async function callAI(content, systemPrompt, modelOverride) {
