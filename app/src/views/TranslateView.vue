@@ -110,7 +110,8 @@
               </button>
             </template>
             <template #overlay>
-              <ProgressOverlay :visible="isTranslating" :current="processed" :total="rows.length" text="AI 批量翻译中..." />
+              <ProgressOverlay :visible="isTranslating" :current="processed" :total="rows.length"
+                :text="`AI 批量翻译中 (并发${actualConcurrency})...`" />
             </template>
           </DataTable>
         </div>
@@ -131,9 +132,11 @@ import { callAI, callAIBatch } from '../services/ai'
 import { TRANSLATE_SCENARIOS, LANGUAGE_DIRECTIONS, getTranslatePrompt } from '../services/prompts'
 import { useToast } from '../services/toast'
 import { createTranslationCache } from '../services/translationCache'
+import { useSettingsStore } from '../stores/settings'
 
 const toast = useToast()
 const dataShare = useDataShareStore()
+const settings = useSettingsStore()
 const translationCache = createTranslationCache()
 
 const headers = ref([])
@@ -144,6 +147,7 @@ const direction = ref('auto_to_zh')
 const isTranslating = ref(false)
 const processed = ref(0)
 const translated = ref(false)
+const actualConcurrency = ref(0)
 const resultCol = ref(-1)
 
 const hasData = computed(() => rows.value.length > 0)
@@ -254,9 +258,10 @@ async function startTranslate() {
   }
 
   // 并发调用 AI，每完成一行实时回写并缓存
-  await callAIBatch(
+  actualConcurrency.value = settings.concurrency
+  const { finalConcurrency } = await callAIBatch(
     tasks.map(t => ({ content: t.content, systemPrompt: t.systemPrompt })),
-    (batchIdx, result, error) => {
+    (batchIdx, result, error, meta) => {
       const rowIdx = tasks[batchIdx].index
       if (error) {
         rows.value[rowIdx][resultCol.value] = `[Error] ${error.message}`
@@ -265,10 +270,15 @@ async function startTranslate() {
         translationCache.set(tasks[batchIdx].content, result)
       }
       processed.value++
+      actualConcurrency.value = meta.concurrency
       dataShare.setSharedData(headers.value, rows.value, dataShare.sourceName || '翻译中数据.xlsx')
     },
-    3
+    settings.concurrency
   )
+
+  if (finalConcurrency < settings.concurrency) {
+    toast.warn(`API 限流，已自动降级并发数: ${settings.concurrency} → ${finalConcurrency}`)
+  }
 
   isTranslating.value = false
   translated.value = true

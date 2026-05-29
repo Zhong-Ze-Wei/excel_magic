@@ -201,7 +201,7 @@
               <span class="text-xs font-bold text-slate-700">预览与打标结果</span>
               <span class="text-[10px] text-slate-400">(前 20 行)</span>
               <span v-if="isAnalyzing" class="text-xs text-violet-600 font-bold ml-3 animate-pulse">
-                {{ processed }}/{{ totalToProcess }} ({{ percentFinished }}%)
+                {{ processed }}/{{ totalToProcess }} ({{ percentFinished }}%) 并发{{ actualConcurrency }}
               </span>
             </div>
             <button v-if="Object.keys(analysisMap).length > 0" @click="exportResults"
@@ -333,12 +333,15 @@ import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabel
 import { useSettingsStore } from '../stores/settings'
 import { useToast } from '../services/toast'
 import { parseRobustJSON } from '../services/jsonParser'
+import { useSettingsStore } from '../stores/settings'
 
 const toast = useToast()
+const settings = useSettingsStore()
 const dataShare = useDataShareStore()
 
 const headers = ref([])
 const rows = ref([])
+const actualConcurrency = ref(0)
 
 // 分析范围
 const rangeStart = ref(1)
@@ -732,9 +735,10 @@ async function startLabeling() {
   tasks.forEach(t => { analysisMap.value[t.index].status = 'processing' })
 
   // 并发调用 AI
-  await callAIBatch(
+  actualConcurrency.value = settings.concurrency
+  const { finalConcurrency } = await callAIBatch(
     tasks.map(t => ({ content: t.content, systemPrompt: t.systemPrompt })),
-    (batchIdx, result, error) => {
+    (batchIdx, result, error, meta) => {
       const rowIdx = tasks[batchIdx].index
       if (error) {
         analysisMap.value[rowIdx] = { status: 'error', values: {}, errorMessage: error.message }
@@ -748,9 +752,14 @@ async function startLabeling() {
         }
       }
       processed.value++
+      actualConcurrency.value = meta.concurrency
     },
-    3
+    settings.concurrency
   )
+
+  if (finalConcurrency < settings.concurrency) {
+    toast.warn(`API 限流，已自动降级并发数: ${settings.concurrency} → ${finalConcurrency}`)
+  }
 
   isAnalyzing.value = false
   currentProcessingRowIdx.value = -1

@@ -121,6 +121,19 @@
                 </div>
               </div>
             </div>
+
+            <!-- Concurrency Setting -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-2">
+              <label class="block text-xs font-bold text-slate-700">AI 并发调用数</label>
+              <div class="flex items-center gap-3">
+                <input type="range" v-model.number="settings.concurrency" min="1" max="20"
+                  class="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
+                <span class="text-sm font-bold text-slate-800 w-8 text-center font-mono">{{ settings.concurrency }}</span>
+              </div>
+              <p class="text-[10px] text-slate-400">
+                同时发起的 AI 请求数。部分 API 有并发限制，遇到 429 限流会自动降级。
+              </p>
+            </div>
           </div>
 
           <!-- Tab 2: Cleaning Rules Configurations -->

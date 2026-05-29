@@ -34,32 +34,46 @@ export function createSemaphore(max) {
 }
 
 /**
- * 批量调用 AI，支持并发控制
+ * 批量调用 AI，支持并发控制和 429 自动降级
  * @param {Array} tasks - [{content, systemPrompt}] 数组
- * @param {Function} onProgress - (index, result) 进度回调
+ * @param {Function} onProgress - (index, result, error, meta) 进度回调
  * @param {number} concurrency - 最大并发数，默认 3
  * @param {string} modelOverride - 模型覆盖
- * @returns {Promise<Array>} 每个任务的结果
+ * @returns {Promise<{results: Array, finalConcurrency: number}>}
  */
 export async function callAIBatch(tasks, onProgress, concurrency = 3, modelOverride) {
-  const sem = createSemaphore(concurrency)
+  let currentConcurrency = concurrency
+  let sem = createSemaphore(currentConcurrency)
   const results = new Array(tasks.length)
+  let consecutiveErrors = 0
 
-  await Promise.all(tasks.map(async (task, i) => {
+  async function runTask(task, i) {
     await sem.acquire()
     try {
       const result = await callAI(task.content, task.systemPrompt, modelOverride)
       results[i] = { ok: true, data: result }
-      if (onProgress) onProgress(i, result)
+      consecutiveErrors = 0
+      if (onProgress) onProgress(i, result, null, { concurrency: currentConcurrency })
     } catch (e) {
       results[i] = { ok: false, error: e.message }
-      if (onProgress) onProgress(i, null, e)
+      // 429 或网络错误：自动降级并发数
+      if (e.message.includes('429') || e.message.includes('rate') || e.message.includes('limit') || e.message.includes('Too Many')) {
+        consecutiveErrors++
+        if (currentConcurrency > 1 && consecutiveErrors >= 2) {
+          currentConcurrency = Math.max(1, Math.ceil(currentConcurrency / 2))
+          sem = createSemaphore(currentConcurrency)
+          consecutiveErrors = 0
+        }
+      }
+      if (onProgress) onProgress(i, null, e, { concurrency: currentConcurrency })
     } finally {
       sem.release()
     }
-  }))
+  }
 
-  return results
+  await Promise.all(tasks.map((task, i) => runTask(task, i)))
+
+  return { results, finalConcurrency: currentConcurrency }
 }
 
 /**

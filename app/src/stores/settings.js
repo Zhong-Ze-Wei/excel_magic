@@ -46,6 +46,10 @@ export const useSettingsStore = defineStore('settings', () => {
     aiping: localStorage.getItem('aiping_api_key') || ''
   })
 
+  // AI 并发调用数（持久化）
+  const concurrency = ref(parseInt(localStorage.getItem('magic_excel_concurrency')) || 3)
+  watch(concurrency, (v) => localStorage.setItem('magic_excel_concurrency', String(v)))
+
   // 当前平台的完整配置
   const platformConfig = computed(() => API_PLATFORMS[currentPlatform.value])
   // 当前的 API Key
@@ -182,7 +186,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     currentPlatform, platformConfig, apiKey, isConfigured,
     translateModel, workModel, useSystemPrompt, showSettings,
-    selectedTranslateModel, selectedWorkModel, rulesConfig,
+    selectedTranslateModel, selectedWorkModel, rulesConfig, concurrency,
     API_PLATFORMS, getApiConfig, setPlatform, saveApiKey, saveModelSelection,
     exportGlobalConfig, importGlobalConfig, resetAllConfig
   }
