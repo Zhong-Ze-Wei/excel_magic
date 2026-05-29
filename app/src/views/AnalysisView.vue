@@ -332,6 +332,7 @@ import { callAI, callAIBatch } from '../services/ai'
 import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt } from '../services/prompts'
 import { useSettingsStore } from '../stores/settings'
 import { useToast } from '../services/toast'
+import { parseRobustJSON } from '../services/jsonParser'
 
 const toast = useToast()
 const dataShare = useDataShareStore()
@@ -500,35 +501,6 @@ function formatCellValue(val, type) {
   if (type === 'multi_enum' && Array.isArray(val)) return val.join(', ')
   if (type === 'boolean') return val === true ? 'Yes' : val === false ? 'No' : '-'
   return String(val)
-}
-
-// ── JSON 容错解析 ──
-function parseRobustJSON(text) {
-  if (!text) return null
-  let cleaned = text.trim()
-  cleaned = cleaned.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '').trim()
-
-  const startBrace = cleaned.indexOf('{')
-  const startBracket = cleaned.indexOf('[')
-  let startIdx = -1, endIdx = -1
-
-  if (startBrace !== -1 && (startBracket === -1 || startBrace < startBracket)) {
-    startIdx = startBrace
-    endIdx = cleaned.lastIndexOf('}')
-  } else if (startBracket !== -1) {
-    startIdx = startBracket
-    endIdx = cleaned.lastIndexOf(']')
-  }
-
-  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-    cleaned = cleaned.substring(startIdx, endIdx + 1)
-  }
-
-  try {
-    return JSON.parse(cleaned)
-  } catch {
-    return null
-  }
 }
 
 // ── 方案校验与规范化 ──
