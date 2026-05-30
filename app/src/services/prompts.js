@@ -148,17 +148,6 @@ ${taxonomyStr}
 }
 
 /**
- * 获取公式生成 prompt
- */
-export function getFormulaPrompt() {
-  return `你是一个Excel公式专家。根据用户需求生成Excel公式。
-要求：
-1. 返回JSON格式：{"formula": "=公式", "explanation": "使用说明"}
-2. 公式要准确可用
-3. 只返回JSON，不要其他内容`
-}
-
-/**
  * AI 智能筛选提示词 — 分析全表结构，识别目标列，生成精确匹配规则
  */
 export function getSmartFilterPrompt(userInput, headers, sourceColIdx, allColumnSamples, existingRulesMeta) {

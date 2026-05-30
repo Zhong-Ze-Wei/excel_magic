@@ -28,10 +28,8 @@ const settings = useSettingsStore()
 const titles = {
   '/': '功能主页',
   '/translate': '批量翻译',
-  '/text': '文本翻译',
   '/analysis': '数据分析',
   '/summary': '数据摘要',
-  '/formula': '公式生成',
   '/cleaning': '数据清洗'
 }
 

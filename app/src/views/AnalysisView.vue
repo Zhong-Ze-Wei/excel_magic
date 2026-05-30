@@ -333,7 +333,6 @@ import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabel
 import { useSettingsStore } from '../stores/settings'
 import { useToast } from '../services/toast'
 import { parseRobustJSON } from '../services/jsonParser'
-import { useSettingsStore } from '../stores/settings'
 
 const toast = useToast()
 const settings = useSettingsStore()
