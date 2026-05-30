@@ -9,12 +9,12 @@ export const useSettingsStore = defineStore('settings', () => {
   const currentPlatform = ref(localStorage.getItem('api_platform') || 'aiping')
   // 各平台选中的翻译模型 ID
   const selectedTranslateModel = ref({
-    siliconflow: localStorage.getItem('siliconflow_translate_model') || 'deepseek-ai/DeepSeek-V3',
+    siliconflow: localStorage.getItem('siliconflow_translate_model') || 'deepseek-ai/DeepSeek-V4-Flash',
     aiping: (localStorage.getItem('aiping_translate_model') === 'GLM-4.7' || !localStorage.getItem('aiping_translate_model')) ? 'DeepSeek-V4-Flash' : localStorage.getItem('aiping_translate_model')
   })
   // 各平台选中的分析模型 ID
   const selectedWorkModel = ref({
-    siliconflow: localStorage.getItem('siliconflow_work_model') || 'deepseek-ai/DeepSeek-V3',
+    siliconflow: localStorage.getItem('siliconflow_work_model') || 'deepseek-ai/DeepSeek-V4-Flash',
     aiping: (localStorage.getItem('aiping_work_model') === 'GLM-4.7' || !localStorage.getItem('aiping_work_model')) ? 'DeepSeek-V4-Flash' : localStorage.getItem('aiping_work_model')
   })
   // 设置弹窗是否打开
@@ -166,14 +166,14 @@ export const useSettingsStore = defineStore('settings', () => {
     localStorage.removeItem('aiping_api_key')
     
     selectedTranslateModel.value = {
-      siliconflow: 'deepseek-ai/DeepSeek-V3',
+      siliconflow: 'deepseek-ai/DeepSeek-V4-Flash',
       aiping: 'DeepSeek-V4-Flash'
     }
     localStorage.removeItem('siliconflow_translate_model')
     localStorage.removeItem('aiping_translate_model')
-    
+
     selectedWorkModel.value = {
-      siliconflow: 'deepseek-ai/DeepSeek-V3',
+      siliconflow: 'deepseek-ai/DeepSeek-V4-Flash',
       aiping: 'DeepSeek-V4-Flash'
     }
     localStorage.removeItem('siliconflow_work_model')
