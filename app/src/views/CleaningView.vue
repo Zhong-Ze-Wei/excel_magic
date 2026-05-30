@@ -661,6 +661,7 @@ import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
 import { callAI } from '../services/ai'
 import { getSmartFilterPrompt } from '../services/prompts'
+import { parseRobustJSON } from '../services/jsonParser'
 import { useToast } from '../services/toast'
 
 const toast = useToast()
@@ -773,11 +774,7 @@ async function generateSmartFilter() {
     const prompt = getSmartFilterPrompt(input, headers.value, sourceCol.value, allColumnSamples, rulesMeta)
     const raw = await callAI(prompt, '你是一个数据清洗专家。', s.getApiConfig().workModel)
 
-    let cleaned = raw.trim().replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '').trim()
-    const startIdx = cleaned.indexOf('{')
-    const endIdx = cleaned.lastIndexOf('}')
-    if (startIdx !== -1 && endIdx > startIdx) cleaned = cleaned.substring(startIdx, endIdx + 1)
-    const parsed = JSON.parse(cleaned)
+    const parsed = parseRobustJSON(raw)
 
     // 应用内置规则配置
     if (parsed.builtinConfig) {
