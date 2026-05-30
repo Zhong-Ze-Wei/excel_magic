@@ -43,23 +43,19 @@
       </div>
     </div>
 
-    <!-- 功能卡片 — 单列 -->
-    <div class="space-y-3">
+    <!-- 功能卡片 — 2×2 网格 -->
+    <div class="grid grid-cols-2 gap-3">
       <div v-for="card in cards" :key="card.route" @click="$router.push(card.route)"
-        class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm active:bg-slate-50 relative overflow-hidden">
+        class="bg-white rounded-xl p-3 border border-slate-200 shadow-sm active:bg-slate-50 relative overflow-hidden">
         <span v-if="dataShare.hasData && card.supportGlobal"
-          class="absolute top-2 right-2 bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">
+          class="absolute top-1.5 right-1.5 bg-emerald-600 text-white text-[7px] font-bold px-1 py-0.5 rounded-full">
           就绪
         </span>
-        <div class="flex items-start gap-3">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" :class="card.iconBg">
-            <component :is="card.icon" class="w-5 h-5" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-bold text-slate-800">{{ card.title }}</h3>
-            <p class="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{{ card.desc }}</p>
-          </div>
+        <div class="w-9 h-9 rounded-lg flex items-center justify-center mb-2" :class="card.iconBg">
+          <component :is="card.icon" class="w-4.5 h-4.5" />
         </div>
+        <h3 class="text-xs font-bold text-slate-800">{{ card.title }}</h3>
+        <p class="text-[10px] text-slate-500 mt-0.5 line-clamp-2">{{ card.desc }}</p>
       </div>
     </div>
   </div>
