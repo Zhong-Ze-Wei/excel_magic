@@ -56,8 +56,8 @@
               <p class="text-[9px] text-slate-400 mt-1">选择要纳入统计分析的列，默认全选</p>
             </div>
 
-            <!-- 交叉分析维度 -->
-            <div v-if="selectedCols.length >= 2">
+            <!-- 交叉分析维度（暂隐藏，AI 可自动发现交叉关系） -->
+            <div v-if="false && selectedCols.length >= 2">
               <label class="block text-xs font-bold text-slate-600 mb-1.5">交叉分析维度 (最多 2 个)</label>
               <div class="max-h-28 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1 custom-scrollbar">
                 <label v-for="i in selectedCols" :key="'dim-'+i" class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer hover:bg-slate-100 px-1 py-0.5 rounded">
