@@ -155,6 +155,8 @@
           <div class="text-lg font-black text-amber-800 font-mono">{{ stats.suspect }}</div>
         </div>
       </div>
+      <!-- 清洗分布饼图 -->
+      <StatsPieChart :data="chartData" :height="180" />
       <!-- 操作按钮 -->
       <div class="space-y-2">
         <button @click="exportCleanedOnly"
@@ -518,6 +520,12 @@
           </div>
         </div>
 
+        <!-- 清洗分布饼图 -->
+        <div v-if="hasData" class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 animate-fade-in">
+          <h3 class="text-xs font-bold text-slate-700 mb-3">数据清洗分布</h3>
+          <StatsPieChart :data="chartData" :height="220" />
+        </div>
+
         <!-- Live Audit Table Card -->
         <div v-if="hasData" class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[520px] overflow-hidden animate-fade-in">
           <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
@@ -654,6 +662,7 @@ import FileUploader from '../components/common/FileUploader.vue'
 import CustomFilterForm from '../components/cleaning/CustomFilterForm.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
+import StatsPieChart from '../components/common/StatsPieChart.vue'
 import { exportToXlsx } from '../services/excel'
 import { runCleaningPipeline } from '../services/cleaningRules'
 import { useDataShareStore } from '../stores/dataShare'
@@ -845,6 +854,12 @@ const enabledRulesCount = computed(() => {
 
 // 流式打标决策汇总指标指向 fullStats 响应式缓存
 const stats = computed(() => fullStats.value)
+
+const chartData = computed(() => [
+  { name: '保留', value: stats.value.keep, color: '#10b981' },
+  { name: '过滤', value: stats.value.delete, color: '#f43f5e' },
+  { name: '待确认', value: stats.value.suspect, color: '#f59e0b' }
+])
 
 // 规则源信息列表
 const rulesMeta = [
