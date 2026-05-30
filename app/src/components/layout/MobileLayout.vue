@@ -3,7 +3,7 @@
     <MobileHeader />
     <div class="flex-1 overflow-y-auto scroll-smooth">
       <router-view v-slot="{ Component }">
-        <transition name="fade" mode="out-in">
+        <transition name="fade">
           <component :is="Component" />
         </transition>
       </router-view>
