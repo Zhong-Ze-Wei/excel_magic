@@ -934,7 +934,7 @@ async function handleFile(file) {
     rows.value = data.rows
     
     // 直接同步到全局，全局会自动判断核心处理列 (传递 true 启用首次推荐)
-    dataShare.setSharedData(headers.value, rows.value, file.name, true)
+    dataShare.setSharedData(headers.value, rows.value, file.name, true, { sheetNames: data.sheetNames, currentSheet: data.currentSheet, file })
     
     runPipeline()
   } catch (err) { toast.error(err.message) }

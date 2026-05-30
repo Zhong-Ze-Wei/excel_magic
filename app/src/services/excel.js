@@ -57,7 +57,24 @@ function detectCSVEncoding(bytes) {
 }
 
 /**
- * 读取上传的文件，返回 { headers: string[], rows: any[][] }
+ * 解析 workbook 中指定 Sheet 的数据
+ */
+function parseSheet(workbook, sheetName) {
+  const sheet = workbook.Sheets[sheetName]
+  const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 })
+  if (jsonData.length === 0) return { headers: [], rows: [] }
+
+  const headers = jsonData[0]
+  const rows = jsonData.slice(1).map(row => {
+    const padded = Array.isArray(row) ? [...row] : []
+    while (padded.length < headers.length) padded.push('')
+    return padded
+  })
+  return { headers, rows }
+}
+
+/**
+ * 读取上传的文件，返回 { headers, rows, sheetNames, currentSheet }
  */
 export function readFile(file) {
   return new Promise((resolve, reject) => {
@@ -77,22 +94,47 @@ export function readFile(file) {
           opts.codepage = encoding === 'gbk' ? 936 : 65001
         }
         const workbook = XLSX.read(data, opts)
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
+        const sheetNames = workbook.SheetNames
+        const currentSheet = sheetNames[0]
+        const { headers, rows } = parseSheet(workbook, currentSheet)
 
-        if (jsonData.length === 0) return reject(new Error('文件为空'))
+        if (headers.length === 0 && rows.length === 0) return reject(new Error('文件为空'))
 
-        const headers = jsonData[0]
-        // 补齐每行长度与表头列数一致，防止尾部空单元格被 SheetJS 截断导致后续新增列错位
-        const rows = jsonData.slice(1).map(row => {
-          const padded = Array.isArray(row) ? [...row] : []
-          while (padded.length < headers.length) padded.push('')
-          return padded
-        })
-
-        resolve({ headers, rows })
+        resolve({ headers, rows, sheetNames, currentSheet })
       } catch (err) {
         reject(new Error('文件解析失败: ' + err.message))
+      }
+    }
+    reader.onerror = () => reject(new Error('文件读取失败'))
+    reader.readAsArrayBuffer(file)
+  })
+}
+
+/**
+ * 读取指定文件的指定 Sheet
+ */
+export function readSheet(file, sheetName) {
+  return new Promise((resolve, reject) => {
+    if (!file) return reject(new Error('没有文件'))
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result)
+        const isCSV = /\.csv$/i.test(file.name)
+        const opts = { type: 'array' }
+        if (isCSV) {
+          const encoding = detectCSVEncoding(data)
+          opts.codepage = encoding === 'gbk' ? 936 : 65001
+        }
+        const workbook = XLSX.read(data, opts)
+        if (!workbook.SheetNames.includes(sheetName)) {
+          return reject(new Error(`Sheet "${sheetName}" 不存在`))
+        }
+        const { headers, rows } = parseSheet(workbook, sheetName)
+        resolve({ headers, rows, sheetNames: workbook.SheetNames, currentSheet: sheetName })
+      } catch (err) {
+        reject(new Error('Sheet 解析失败: ' + err.message))
       }
     }
     reader.onerror = () => reject(new Error('文件读取失败'))
