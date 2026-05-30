@@ -319,7 +319,7 @@ async function handleFile(file) {
     resultCol.value = -1
     
     // 同步至全局，全局会自动启发式计算核心列 (传递 true 开启首次推荐)
-    dataShare.setSharedData(headers.value, rows.value, file.name, true)
+    dataShare.setSharedData(headers.value, rows.value, file.name, true, { sheetNames: data.sheetNames, currentSheet: data.currentSheet, file })
   } catch (err) {
     toast.error(err.message)
   }

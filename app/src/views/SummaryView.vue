@@ -386,7 +386,7 @@ async function handleFile(file) {
     selectedCols.value = headers.value.map((_, i) => i)
     crossDimCols.value = []
     summaryText.value = ''
-    dataShare.setSharedData(headers.value, rows.value, file.name)
+    dataShare.setSharedData(headers.value, rows.value, file.name, false, { sheetNames: data.sheetNames, currentSheet: data.currentSheet, file })
   } catch (err) { toast.error(err.message) }
 }
 

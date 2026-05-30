@@ -41,6 +41,14 @@
           <option v-for="(h, idx) in dataShare.headers" :key="idx" :value="idx">{{ h }}</option>
         </select>
       </div>
+      <!-- Sheet 选择器（多 Sheet 时显示）-->
+      <div v-if="dataShare.hasMultipleSheets" class="flex items-center gap-2 flex-wrap">
+        <span class="text-[10px] text-emerald-800 font-bold">Sheet:</span>
+        <select :value="dataShare.currentSheet" @change="e => dataShare.setSheet(e.target.value)"
+          class="flex-1 min-w-0 px-2 py-1 bg-white border border-emerald-200 text-emerald-800 rounded-lg text-xs font-bold">
+          <option v-for="name in dataShare.sheetNames" :key="name" :value="name">{{ name }}</option>
+        </select>
+      </div>
     </div>
 
     <!-- 功能卡片 — 2×2 网格 -->
@@ -131,6 +139,15 @@
             </select>
             <span class="text-[10px] text-slate-400 font-normal">* 此列为数据清洗、批量翻译、数据分析的默认目标处理列，各模块共享此配置。</span>
           </div>
+
+          <!-- Sheet 选择器（多 Sheet 时显示）-->
+          <div v-if="dataShare.hasMultipleSheets" class="flex items-center gap-2 pt-1 flex-wrap">
+            <span class="text-xs font-bold text-emerald-800 shrink-0">📊 工作表:</span>
+            <select :value="dataShare.currentSheet" @change="e => dataShare.setSheet(e.target.value)"
+              class="px-2.5 py-1 bg-white border border-emerald-200 text-emerald-800 rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 max-w-[200px] cursor-pointer">
+              <option v-for="name in dataShare.sheetNames" :key="name" :value="name">{{ name }}</option>
+            </select>
+          </div>
         </div>
         
         <button @click="clearGlobalExcel" 
@@ -195,7 +212,7 @@ async function handleGlobalFile(file) {
     isUploading.value = true
     const data = await readFile(file)
     // 传递 true 开启首次推荐
-    dataShare.setSharedData(data.headers.map(String), data.rows, file.name, true)
+    dataShare.setSharedData(data.headers.map(String), data.rows, file.name, true, { sheetNames: data.sheetNames, currentSheet: data.currentSheet, file })
   } catch (err) {
     toast.error('文件解析失败: ' + err.message)
   } finally {
