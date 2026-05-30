@@ -107,6 +107,7 @@
           <div class="text-lg font-black text-emerald-800 font-mono">{{ stats.done }}</div>
         </div>
       </div>
+      <StatsPieChart :data="chartData" :height="160" />
       <button v-if="Object.keys(analysisMap).length > 0" @click="exportResults"
         class="w-full mt-2 py-2 bg-white border border-violet-200 text-violet-600 rounded-lg text-xs font-bold active:bg-violet-50">
         导出结果
@@ -376,6 +377,12 @@
           </div>
         </div>
 
+        <!-- 分析分布饼图 -->
+        <div v-if="hasData" class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 animate-fade-in">
+          <h3 class="text-xs font-bold text-slate-700 mb-3">分析进度分布</h3>
+          <StatsPieChart :data="chartData" :height="220" />
+        </div>
+
         <!-- 数据表格 -->
         <div v-if="hasData" class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[520px] overflow-hidden relative animate-fade-in">
           <div v-if="isAnalyzing" class="w-full h-1 bg-slate-100 overflow-hidden relative">
@@ -516,6 +523,7 @@ import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
+import StatsPieChart from '../components/common/StatsPieChart.vue'
 import { exportToXlsx, DEMO_DATA } from '../services/excel'
 import { callAI, callAIBatch } from '../services/ai'
 import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt } from '../services/prompts'
@@ -606,6 +614,15 @@ const stats = computed(() => {
     else if (res?.status === 'error') error++
   }
   return { done, error }
+})
+
+const chartData = computed(() => {
+  const pending = rows.value.length - stats.value.done - stats.value.error
+  return [
+    { name: '已分析', value: stats.value.done, color: '#10b981' },
+    { name: '错误', value: stats.value.error, color: '#f43f5e' },
+    { name: '待处理', value: Math.max(0, pending), color: '#94a3b8' }
+  ]
 })
 
 
