@@ -1,5 +1,71 @@
 <template>
-  <div class="animate-fade-in max-w-6xl mx-auto space-y-8 pb-10">
+  <!-- ===== 移动端模板 ===== -->
+  <div v-if="isMobile" class="px-4 py-4 space-y-4 pb-20 animate-fade-in">
+    <!-- 标题 -->
+    <div class="text-center space-y-1">
+      <h1 class="text-xl font-black text-slate-800 tracking-tight flex items-center justify-center gap-2">
+        <FileSpreadsheet class="w-6 h-6 text-emerald-600" /> 智能数据分析
+      </h1>
+      <p class="text-[11px] text-slate-500 leading-relaxed">
+        上传 Excel 后数据在各模块间实时联动，无需重复上传。
+      </p>
+    </div>
+
+    <!-- 上传/数据状态 -->
+    <div v-if="!dataShare.hasData" class="space-y-3">
+      <FileUploader label="点击上传 Excel/CSV" :icon="UploadCloud" iconBg="bg-emerald-50" iconColor="text-emerald-600" @file="handleGlobalFile" />
+      <button @click="loadGlobalDemo"
+        class="w-full py-2.5 bg-white border border-emerald-200 text-emerald-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2 active:bg-emerald-50">
+        <RefreshCw class="w-3.5 h-3.5" /> 加载演示数据
+      </button>
+    </div>
+    <div v-else class="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 space-y-2">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="text-xs font-bold text-emerald-800">全局工作表已就绪</span>
+        </div>
+        <button @click="clearGlobalExcel"
+          class="px-2.5 py-1 text-xs text-slate-500 active:text-rose-600 active:bg-rose-50 rounded-lg">
+          <X class="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div class="text-xs text-slate-600">
+        <span class="font-bold">{{ dataShare.sourceName }}</span>
+        <span class="ml-2 text-slate-400">{{ dataShare.rows.length }}行 × {{ dataShare.headers.length }}列</span>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-[10px] text-emerald-800 font-bold">核心列:</span>
+        <select :value="dataShare.coreColumn" @change="e => dataShare.setCoreColumn(e.target.value)"
+          class="flex-1 min-w-0 px-2 py-1 bg-white border border-emerald-200 text-emerald-800 rounded-lg text-xs font-bold">
+          <option v-for="(h, idx) in dataShare.headers" :key="idx" :value="idx">{{ h }}</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 功能卡片 — 单列 -->
+    <div class="space-y-3">
+      <div v-for="card in cards" :key="card.route" @click="$router.push(card.route)"
+        class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm active:bg-slate-50 relative overflow-hidden">
+        <span v-if="dataShare.hasData && card.supportGlobal"
+          class="absolute top-2 right-2 bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">
+          就绪
+        </span>
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" :class="card.iconBg">
+            <component :is="card.icon" class="w-5 h-5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-sm font-bold text-slate-800">{{ card.title }}</h3>
+            <p class="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{{ card.desc }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 桌面端模板（原样保留）===== -->
+  <div v-else class="animate-fade-in max-w-6xl mx-auto space-y-8 pb-10">
     <div class="text-center space-y-2">
       <h1 class="text-3xl font-black text-slate-800 tracking-tight flex items-center justify-center gap-2">
         <FileSpreadsheet class="w-8 h-8 text-emerald-600" /> 智能数据分析主入口
@@ -117,9 +183,12 @@
 import { ref } from 'vue'
 import { Languages, Brain, FileBarChart, Eraser, ArrowRight, UploadCloud, Database, X, FileSpreadsheet, RefreshCw } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
+import { useDevice } from '../composables/useDevice'
 import FileUploader from '../components/common/FileUploader.vue'
 import { readFile } from '../services/excel'
 import { useToast } from '../services/toast'
+
+const { isMobile } = useDevice()
 
 const toast = useToast()
 const dataShare = useDataShareStore()
