@@ -680,8 +680,9 @@ onMounted(() => {
 })
 
 // store 数据变化时自动同步（解决 keep-alive 下 onMounted 只触发一次的问题）
-watch(() => dataShare.hasData, (has) => {
-  if (has && rows.value.length === 0) {
+// 监听 rows.length 变化，覆盖"先访问功能页再上传数据"和"共享/应用清洗结果"等场景
+watch(() => dataShare.rows.length, (newLen) => {
+  if (newLen > 0) {
     importGlobalExcel()
   }
 })
@@ -1158,7 +1159,10 @@ function applyToGlobal() {
     
   // 更新到全局 Store 共享
   dataShare.setSharedData(cleanHeaders, cleanRows, dataShare.sourceName || '已清洗数据.xlsx')
-  
+
+  // 重新从 store 同步到本地，使当前页面也显示清洗后的数据
+  importGlobalExcel()
+
   toast.success('清洗后的健康数据已成功应用至全局 Excel！现在您可以直接切换到批量翻译或评论分析进行下一步处理。')
 }
 
