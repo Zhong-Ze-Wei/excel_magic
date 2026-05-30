@@ -226,7 +226,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { Languages, Globe, SlidersHorizontal, Play, Download, Check } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
@@ -234,13 +234,15 @@ import DataTable from '../components/common/DataTable.vue'
 import ProgressOverlay from '../components/common/ProgressOverlay.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
-import { readFile, exportToXlsx, DEMO_DATA } from '../services/excel'
+import { exportToXlsx, DEMO_DATA } from '../services/excel'
 import { callAI, callAIBatch } from '../services/ai'
 import { TRANSLATE_SCENARIOS, LANGUAGE_DIRECTIONS, getTranslatePrompt } from '../services/prompts'
 import { useToast } from '../services/toast'
 import { createTranslationCache } from '../services/translationCache'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
+import { useGlobalDataSync } from '../composables/useGlobalDataSync'
+import { useFileUpload } from '../composables/useFileUpload'
 
 const toast = useToast()
 const dataShare = useDataShareStore()
@@ -248,8 +250,14 @@ const settings = useSettingsStore()
 const { isMobile } = useDevice()
 const translationCache = createTranslationCache()
 
-const headers = ref([])
-const rows = ref([])
+const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
+  onInit: () => { translated.value = false; resultCol.value = -1 }
+})
+
+const { handleFile } = useFileUpload({
+  onFileLoaded: () => { translated.value = false; resultCol.value = -1 }
+})
+
 const sourceCol = computed(() => dataShare.coreColumn)
 const scenario = ref('ecommerce_spec')
 const direction = ref('auto_to_zh')
@@ -258,8 +266,6 @@ const processed = ref(0)
 const translated = ref(false)
 const actualConcurrency = ref(0)
 const resultCol = ref(-1)
-
-const hasData = computed(() => rows.value.length > 0)
 
 const displayHeaders = computed(() => {
   if (resultCol.value >= 0 && headers.value[resultCol.value]) {
@@ -279,51 +285,6 @@ const directionLabel = computed(() => {
   const d = LANGUAGE_DIRECTIONS.find(x => x.value === direction.value)
   return d ? d.label : direction.value
 })
-
-onMounted(() => {
-  if (dataShare.hasData && rows.value.length === 0) {
-    importGlobalExcel()
-  }
-})
-
-// store 数据变化时自动同步（解决 keep-alive 下 onMounted 只触发一次的问题）
-// 监听 rows.length 变化，覆盖"先访问功能页再上传数据"和"共享清洗结果"等场景
-watch(() => dataShare.rows.length, (newLen) => {
-  if (newLen > 0) {
-    importGlobalExcel()
-  }
-})
-
-function importGlobalExcel() {
-  headers.value = [...dataShare.headers]
-  rows.value = dataShare.rows.map(r => [...r])
-  translated.value = false
-  resultCol.value = -1
-}
-
-function disconnectGlobalExcel() {
-  dataShare.clearSharedData()
-  reset()
-}
-
-function detectBestColumn() {
-  // 已废弃，完全由全局 store 自动启发式推荐
-}
-
-async function handleFile(file) {
-  try {
-    const data = await readFile(file)
-    headers.value = data.headers.map(String)
-    rows.value = data.rows
-    translated.value = false
-    resultCol.value = -1
-    
-    // 同步至全局，全局会自动启发式计算核心列 (传递 true 开启首次推荐)
-    dataShare.setSharedData(headers.value, rows.value, file.name, true, { sheetNames: data.sheetNames, currentSheet: data.currentSheet, file })
-  } catch (err) {
-    toast.error(err.message)
-  }
-}
 
 function loadDemo() {
   const demo = DEMO_DATA.specs

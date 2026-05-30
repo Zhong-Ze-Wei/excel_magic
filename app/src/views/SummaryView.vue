@@ -272,18 +272,20 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { marked } from 'marked'
 import { FileBarChart, SlidersHorizontal, Sparkles, Loader2, Lightbulb, Wand2 } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
-import { readFile, DEMO_DATA } from '../services/excel'
+import { DEMO_DATA } from '../services/excel'
 import { callStreamingAI, callAI } from '../services/ai'
 import { getDataSummaryPrompt, getAnalysisThemePrompt } from '../services/prompts'
 import { parseRobustJSON } from '../services/jsonParser'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
+import { useGlobalDataSync } from '../composables/useGlobalDataSync'
+import { useFileUpload } from '../composables/useFileUpload'
 import { computeAllProfiles, computeColumnProfile, computeCrossTabs, formatProfilesForAI, stratifiedSample, formatSampleRows, detectColumnType } from '../services/dataProfiler'
 import { useToast } from '../services/toast'
 
@@ -292,8 +294,22 @@ const dataShare = useDataShareStore()
 const settings = useSettingsStore()
 const { isMobile } = useDevice()
 
-const headers = ref([])
-const rows = ref([])
+const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
+  onInit: (h) => {
+    selectedCols.value = h.map((_, i) => i)
+    crossDimCols.value = []
+    summaryText.value = ''
+  }
+})
+
+const { handleFile } = useFileUpload({
+  onFileLoaded: (data) => {
+    selectedCols.value = data.headers.map((_, i) => i)
+    crossDimCols.value = []
+    summaryText.value = ''
+  }
+})
+
 const isSummarizing = ref(false)
 const summaryText = ref('')
 const selectedCols = ref([])
@@ -301,8 +317,6 @@ const crossDimCols = ref([])
 const analysisTheme = ref('')
 const isRecommending = ref(false)
 const recommendedAngles = ref([])
-
-const hasData = computed(() => rows.value.length > 0)
 const renderedSummary = computed(() => {
   if (!summaryText.value) return ''
   try { return marked(summaryText.value) } catch { return summaryText.value.replace(/\n/g, '<br>') }
@@ -347,48 +361,9 @@ function typeChipClass(type) {
 }
 
 // 全选/取消联动
-watch(hasData, (v) => {
-  if (v) selectedCols.value = headers.value.map((_, i) => i)
-})
-
 watch(() => headers.value.length, () => {
   if (headers.value.length > 0) selectedCols.value = headers.value.map((_, i) => i)
 })
-
-onMounted(() => {
-  if (dataShare.hasData && rows.value.length === 0) importGlobalExcel()
-})
-
-// store 数据变化时自动同步（解决 keep-alive 下 onMounted 只触发一次的问题）
-// 监听 rows.length 变化，覆盖"先访问功能页再上传数据"和"共享清洗结果"等场景
-watch(() => dataShare.rows.length, (newLen) => {
-  if (newLen > 0) importGlobalExcel()
-})
-
-function importGlobalExcel() {
-  headers.value = [...dataShare.headers]
-  rows.value = dataShare.rows.map(r => [...r])
-  selectedCols.value = headers.value.map((_, i) => i)
-  crossDimCols.value = []
-  summaryText.value = ''
-}
-
-function disconnectGlobalExcel() {
-  dataShare.clearSharedData()
-  reset()
-}
-
-async function handleFile(file) {
-  try {
-    const data = await readFile(file)
-    headers.value = data.headers.map(String)
-    rows.value = data.rows
-    selectedCols.value = headers.value.map((_, i) => i)
-    crossDimCols.value = []
-    summaryText.value = ''
-    dataShare.setSharedData(headers.value, rows.value, file.name, false, { sheetNames: data.sheetNames, currentSheet: data.currentSheet, file })
-  } catch (err) { toast.error(err.message) }
-}
 
 function reset() {
   headers.value = []

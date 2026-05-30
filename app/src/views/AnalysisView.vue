@@ -510,17 +510,19 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { UploadCloud, SlidersHorizontal, Plus, X, Brain, BarChart2, Download, Sparkles, ChevronDown, Sliders, Trash2, Check, Pencil } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
-import { readFile, exportToXlsx, DEMO_DATA } from '../services/excel'
+import { exportToXlsx, DEMO_DATA } from '../services/excel'
 import { callAI, callAIBatch } from '../services/ai'
 import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt } from '../services/prompts'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
+import { useGlobalDataSync } from '../composables/useGlobalDataSync'
+import { useFileUpload } from '../composables/useFileUpload'
 import { useToast } from '../services/toast'
 import { parseRobustJSON } from '../services/jsonParser'
 
@@ -529,8 +531,27 @@ const settings = useSettingsStore()
 const dataShare = useDataShareStore()
 const { isMobile } = useDevice()
 
-const headers = ref([])
-const rows = ref([])
+const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
+  onInit: (h, r) => {
+    rangeStart.value = 1
+    rangeEnd.value = r.length
+    selectedInputColumns.value = dataShare.coreColumn != null ? [Number(dataShare.coreColumn)] : []
+    analysisMap.value = {}
+  }
+})
+
+const { handleFile } = useFileUpload({
+  onFileLoaded: (data) => {
+    rangeStart.value = 1
+    rangeEnd.value = data.rows.length
+    selectedInputColumns.value = []
+    analysisMap.value = {}
+    if (dataShare.coreColumn != null) {
+      selectedInputColumns.value = [Number(dataShare.coreColumn)]
+    }
+  }
+})
+
 const actualConcurrency = ref(0)
 
 // 分析范围
@@ -571,7 +592,6 @@ const editingHierStr = ref('')
 // 分析结果映射表 { [rowIdx]: { status, values: {key: val}, errorMessage } }
 const analysisMap = ref({})
 
-const hasData = computed(() => rows.value.length > 0)
 const displayRows = computed(() => rows.value.slice(0, 20))
 const percentFinished = computed(() => {
   if (totalToProcess.value <= 0) return 0
@@ -588,33 +608,6 @@ const stats = computed(() => {
   return { done, error }
 })
 
-onMounted(() => {
-  if (dataShare.hasData && rows.value.length === 0) {
-    importGlobalExcel()
-  }
-})
-
-// store 数据变化时自动同步（解决 keep-alive 下 onMounted 只触发一次的问题）
-// 监听 rows.length 变化，覆盖"先访问功能页再上传数据"和"共享清洗结果"等场景
-watch(() => dataShare.rows.length, (newLen) => {
-  if (newLen > 0) {
-    importGlobalExcel()
-  }
-})
-
-function importGlobalExcel() {
-  headers.value = [...dataShare.headers]
-  rows.value = dataShare.rows.map(r => [...r])
-  rangeStart.value = 1
-  rangeEnd.value = rows.value.length
-  selectedInputColumns.value = dataShare.coreColumn != null ? [Number(dataShare.coreColumn)] : []
-  analysisMap.value = {}
-}
-
-function disconnectGlobalExcel() {
-  dataShare.clearSharedData()
-  reset()
-}
 
 // 当 outputColumns 变化且 promptDirty 为 false 时自动重编译 prompt
 watch(
@@ -775,22 +768,6 @@ function normalizeRowResult(parsed, outputColumns) {
 }
 
 // ── 文件加载 ──
-async function handleFile(file) {
-  try {
-    const data = await readFile(file)
-    headers.value = data.headers.map(String)
-    rows.value = data.rows
-    rangeStart.value = 1
-    rangeEnd.value = data.rows.length
-    selectedInputColumns.value = []
-    analysisMap.value = {}
-    dataShare.setSharedData(headers.value, rows.value, file.name, true, { sheetNames: data.sheetNames, currentSheet: data.currentSheet, file })
-    if (dataShare.coreColumn != null) {
-      selectedInputColumns.value = [Number(dataShare.coreColumn)]
-    }
-  } catch (err) { toast.error(err.message) }
-}
-
 function loadDemo() {
   const demo = DEMO_DATA.comments
   dataShare.setSharedData(demo.headers, demo.rows, '用户评论示例.csv', true)
