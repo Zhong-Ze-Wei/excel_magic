@@ -1,5 +1,192 @@
 <template>
-  <div class="animate-fade-in max-w-7xl mx-auto space-y-6">
+  <!-- ===== 移动端模板 ===== -->
+  <div v-if="isMobile" class="px-3 py-3 space-y-3 pb-20 animate-fade-in">
+    <div class="bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 rounded-xl border border-violet-200/50 p-3">
+      <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+        <Brain class="w-5 h-5 text-violet-600" /> AI 打标
+      </h2>
+      <p class="text-[10px] text-slate-500 mt-0.5">自然语言描述需求 → AI 生成方案 → 批量打标。</p>
+    </div>
+
+    <div v-if="hasData && dataShare.hasData"
+      class="bg-emerald-500/10 rounded-lg border border-emerald-500/20 px-3 py-2 flex justify-between items-center text-[10px]">
+      <div class="flex items-center gap-1.5 text-emerald-800 min-w-0">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+        <span class="truncate">已关联 <strong>{{ dataShare.sourceName }}</strong></span>
+      </div>
+      <button @click="disconnectGlobalExcel" class="text-rose-500 font-bold shrink-0 ml-2">断开</button>
+    </div>
+
+    <!-- 文件上传 -->
+    <MobileCollapsible title="数据文件" :default-open="!hasData">
+      <FileUploader v-if="!hasData" label="上传数据文件" :icon="UploadCloud" iconBg="bg-violet-50" iconColor="text-violet-600" @file="handleFile" />
+      <div v-else class="text-xs text-slate-600">
+        <span class="font-bold">{{ rows.length }} 行 × {{ headers.length }} 列</span>
+      </div>
+      <button v-if="!hasData" @click="loadDemo"
+        class="w-full mt-2 py-2 bg-white border border-violet-200 text-violet-600 rounded-lg text-xs font-bold active:bg-violet-50">
+        加载示例数据
+      </button>
+    </MobileCollapsible>
+
+    <!-- 分析配置 -->
+    <MobileCollapsible v-if="hasData" title="分析配置" :default-open="true">
+      <div class="space-y-3">
+        <!-- 参考列 -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">AI 参考列</label>
+          <div class="max-h-24 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1">
+            <label v-for="(h, i) in headers" :key="i" class="flex items-center gap-1.5 text-[10px] text-slate-700">
+              <input type="checkbox" :value="i" v-model="selectedInputColumns" class="rounded text-violet-600" />
+              {{ h }}
+            </label>
+          </div>
+        </div>
+        <!-- 范围 -->
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <div class="text-[9px] text-slate-400 mb-0.5">开始行</div>
+            <input type="number" v-model.number="rangeStart" min="1" :max="rows.length"
+              class="w-full p-1.5 border border-slate-200 rounded-lg text-[10px] font-mono" />
+          </div>
+          <div>
+            <div class="text-[9px] text-slate-400 mb-0.5">结束行</div>
+            <input type="number" v-model.number="rangeEnd" min="1" :max="rows.length"
+              class="w-full p-1.5 border border-slate-200 rounded-lg text-[10px] font-mono" />
+          </div>
+        </div>
+        <!-- 目标 -->
+        <textarea v-model="userGoal" rows="2"
+          class="w-full p-2 border border-slate-200 rounded-lg text-[10px] resize-none"
+          placeholder="描述分析需求"></textarea>
+        <button @click="generateLabelingPlanWithAI" :disabled="isGeneratingPlan"
+          class="w-full py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-lg text-[10px] font-bold disabled:opacity-50">
+          {{ isGeneratingPlan ? '生成中...' : 'AI 生成方案' }}
+        </button>
+      </div>
+    </MobileCollapsible>
+
+    <!-- 输出列方案 -->
+    <MobileCollapsible v-if="hasData && labelingPlan.outputColumns.length > 0"
+      title="输出列方案" :default-open="true">
+      <div class="flex justify-between items-center mb-2">
+        <span class="text-[10px] text-slate-500">{{ labelingPlan.outputColumns.length }} 列</span>
+        <button @click="addOutputColumn" class="text-[10px] text-violet-600 font-bold"><Plus class="w-3 h-3 inline" /> 添加</button>
+      </div>
+      <div class="space-y-1.5">
+        <div v-for="(col, idx) in labelingPlan.outputColumns" :key="col.key"
+          class="bg-slate-50 p-2 rounded-lg border border-slate-200">
+          <div class="flex justify-between items-center">
+            <div class="min-w-0">
+              <span class="text-[10px] font-bold text-slate-700">{{ col.name }}</span>
+              <span class="ml-1 text-[8px] px-1 py-0.5 rounded bg-violet-100 text-violet-700 font-bold">{{ col.type }}</span>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button @click="editOutputColumn(idx)" class="text-slate-400 active:text-violet-600"><Pencil class="w-3 h-3" /></button>
+              <button @click="removeOutputColumn(idx)" class="text-slate-400 active:text-rose-500"><X class="w-3 h-3" /></button>
+            </div>
+          </div>
+          <p class="text-[9px] text-slate-400 truncate">{{ col.description }}</p>
+        </div>
+      </div>
+      <button @click="startLabeling" :disabled="isAnalyzing"
+        class="w-full mt-3 py-2.5 bg-violet-600 text-white rounded-lg text-xs font-bold active:bg-violet-700 disabled:opacity-50">
+        {{ isAnalyzing ? '打标中...' : '开始 AI 打标' }}
+      </button>
+    </MobileCollapsible>
+
+    <!-- 统计 -->
+    <MobileCollapsible v-if="hasData" title="统计" :default-open="true">
+      <div class="grid grid-cols-2 gap-2">
+        <div class="bg-white rounded-lg border border-slate-200 p-2.5">
+          <div class="text-[9px] font-bold text-slate-400 uppercase">总量</div>
+          <div class="text-lg font-black text-slate-800 font-mono">{{ rows.length }}</div>
+        </div>
+        <div class="bg-emerald-50 rounded-lg border border-emerald-200 p-2.5">
+          <div class="text-[9px] font-bold text-emerald-600 uppercase">已分析</div>
+          <div class="text-lg font-black text-emerald-800 font-mono">{{ stats.done }}</div>
+        </div>
+      </div>
+      <button v-if="Object.keys(analysisMap).length > 0" @click="exportResults"
+        class="w-full mt-2 py-2 bg-white border border-violet-200 text-violet-600 rounded-lg text-xs font-bold active:bg-violet-50">
+        导出结果
+      </button>
+    </MobileCollapsible>
+
+    <!-- 打标结果表格 -->
+    <MobileCollapsible v-if="hasData" title="打标结果" :default-open="true">
+      <MobileTableWrapper title="预览" :row-count="displayRows.length" height-class="h-[40vh]">
+        <table class="w-full text-left border-collapse text-[10px]">
+          <thead class="bg-slate-50 sticky top-0 z-10 text-[8px] font-bold text-slate-500 uppercase border-b border-slate-200">
+            <tr>
+              <th class="px-2 py-2 sticky left-0 bg-slate-50 z-20">原文</th>
+              <th v-for="col in labelingPlan.outputColumns" :key="col.key" class="px-2 py-2 whitespace-nowrap">{{ col.name }}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 text-slate-600">
+            <tr v-for="(row, ri) in displayRows" :key="ri"
+              :class="{ 'opacity-40': isAnalyzing && (ri < (rangeStart-1) || ri > (rangeEnd-1)) }">
+              <td class="px-2 py-1.5 truncate max-w-[100px] sticky left-0 z-10 bg-white">{{ row[dataShare.coreColumn] || '' }}</td>
+              <td v-for="col in labelingPlan.outputColumns" :key="col.key" class="px-2 py-1.5 truncate max-w-[100px]">
+                <template v-if="analysisMap[ri]?.status === 'processing'">
+                  <span class="w-1.5 h-1.5 rounded-full bg-violet-600 animate-ping inline-block"></span>
+                </template>
+                <template v-else-if="analysisMap[ri]?.status === 'done'">
+                  <span class="text-[9px] bg-slate-100 px-1 py-0.5 rounded">{{ formatCellValue(analysisMap[ri]?.values?.[col.key], col.type) }}</span>
+                </template>
+                <template v-else-if="analysisMap[ri]?.status === 'error'">
+                  <span class="text-red-500 text-[9px]">Err</span>
+                </template>
+                <template v-else><span class="text-slate-300">-</span></template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </MobileTableWrapper>
+    </MobileCollapsible>
+
+    <!-- 高级设置（默认收起）-->
+    <MobileCollapsible v-if="hasData" title="高级 Prompt" :default-open="false">
+      <textarea v-model="labelingPlan.compiledPrompt" @input="onPromptManualEdit" rows="4"
+        class="w-full p-2 border border-slate-200 rounded text-[10px] font-mono resize-none"></textarea>
+      <div class="flex gap-2 mt-2">
+        <button @click="resetPromptToAuto" class="flex-1 text-[10px] py-1.5 bg-violet-50 text-violet-600 rounded-lg font-bold active:bg-violet-100">恢复自动</button>
+        <button @click="syncPlanFromPrompt" :disabled="isSyncingPlan" class="flex-1 text-[10px] py-1.5 bg-slate-50 text-slate-600 rounded-lg font-bold disabled:opacity-50">同步列配置</button>
+      </div>
+    </MobileCollapsible>
+
+    <!-- 编辑列弹窗 -->
+    <div v-if="editingColumn != null" class="fixed inset-0 bg-black/40 z-50 flex items-end justify-center" @click.self="editingColumn = null">
+      <div class="bg-white rounded-t-2xl shadow-2xl w-full max-w-md animate-fade-in max-h-[85vh] overflow-y-auto">
+        <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h3 class="font-bold text-sm text-slate-800">{{ editingColumnIdx >= 0 ? '编辑' : '添加' }}输出列</h3>
+          <button @click="editingColumn = null" class="text-slate-400 active:text-slate-600"><X class="w-4 h-4" /></button>
+        </div>
+        <div class="p-4 space-y-3">
+          <div><label class="block text-[10px] font-bold text-slate-500 mb-1">列名</label><input v-model="editingColumn.name" type="text" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" /></div>
+          <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Key</label><input v-model="editingColumn.key" type="text" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono" /></div>
+          <div><label class="block text-[10px] font-bold text-slate-500 mb-1">类型</label>
+            <select v-model="editingColumn.type" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+              <option value="enum">单选标签</option><option value="multi_enum">多选标签</option>
+              <option value="boolean">是否判断</option><option value="text">自由文本</option><option value="number">数值评分</option>
+            </select>
+          </div>
+          <div><label class="block text-[10px] font-bold text-slate-500 mb-1">说明</label><input v-model="editingColumn.description" type="text" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" /></div>
+          <div v-if="editingColumn.type === 'enum' || editingColumn.type === 'multi_enum'">
+            <label class="block text-[10px] font-bold text-slate-500 mb-1">选项 (逗号分隔)</label>
+            <textarea v-model="editingOptionsStr" rows="2" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs resize-none"></textarea>
+          </div>
+        </div>
+        <div class="px-4 py-3 border-t border-slate-100 flex justify-end gap-2 sticky bottom-0 bg-white">
+          <button @click="editingColumn = null" class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600">取消</button>
+          <button @click="saveEditingColumn" class="px-4 py-2 bg-violet-600 text-white rounded-lg text-xs font-bold">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 桌面端模板（原样保留）===== -->
+  <div v-else class="animate-fade-in max-w-7xl mx-auto space-y-6">
     <!-- Header -->
     <div class="bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 rounded-2xl border border-violet-200/50 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
@@ -327,16 +514,20 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { UploadCloud, SlidersHorizontal, Plus, X, Brain, BarChart2, Download, Sparkles, ChevronDown, Sliders, Trash2, Check, Pencil } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
+import MobileCollapsible from '../components/common/MobileCollapsible.vue'
+import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
 import { readFile, exportToXlsx, DEMO_DATA } from '../services/excel'
 import { callAI, callAIBatch } from '../services/ai'
 import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt } from '../services/prompts'
 import { useSettingsStore } from '../stores/settings'
+import { useDevice } from '../composables/useDevice'
 import { useToast } from '../services/toast'
 import { parseRobustJSON } from '../services/jsonParser'
 
 const toast = useToast()
 const settings = useSettingsStore()
 const dataShare = useDataShareStore()
+const { isMobile } = useDevice()
 
 const headers = ref([])
 const rows = ref([])

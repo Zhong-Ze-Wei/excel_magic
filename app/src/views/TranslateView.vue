@@ -1,5 +1,110 @@
 <template>
-  <div class="animate-fade-in max-w-7xl mx-auto space-y-6">
+  <!-- ===== 移动端模板 ===== -->
+  <div v-if="isMobile" class="px-3 py-3 space-y-3 pb-20 animate-fade-in">
+    <div class="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-xl border border-blue-200/50 p-3">
+      <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+        <Languages class="w-5 h-5 text-blue-600" /> 批量翻译
+      </h2>
+      <p class="text-[10px] text-slate-500 mt-0.5">多场景批量翻译，支持电商参数、多语种评论。</p>
+    </div>
+
+    <div v-if="hasData && dataShare.hasData"
+      class="bg-emerald-500/10 rounded-lg border border-emerald-500/20 px-3 py-2 flex justify-between items-center text-[10px]">
+      <div class="flex items-center gap-1.5 text-emerald-800 min-w-0">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+        <span class="truncate">已关联 <strong>{{ dataShare.sourceName }}</strong></span>
+      </div>
+      <button @click="disconnectGlobalExcel" class="text-rose-500 font-bold shrink-0 ml-2">断开</button>
+    </div>
+
+    <!-- 文件上传 -->
+    <MobileCollapsible title="数据文件" :default-open="!hasData">
+      <FileUploader v-if="!hasData" label="上传翻译文件" :icon="Languages" iconBg="bg-blue-50" iconColor="text-blue-600" @file="handleFile" />
+      <div v-else class="text-xs text-slate-600">
+        <span class="font-bold">{{ rows.length }} 行 × {{ headers.length }} 列</span>
+      </div>
+      <button v-if="!hasData" @click="loadDemo"
+        class="w-full mt-2 py-2 bg-white border border-blue-200 text-blue-600 rounded-lg text-xs font-bold active:bg-blue-50">
+        加载演示数据
+      </button>
+    </MobileCollapsible>
+
+    <!-- 翻译配置 -->
+    <MobileCollapsible v-if="hasData" title="翻译配置" :default-open="true">
+      <div class="space-y-3">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">源列</label>
+          <select :value="dataShare.coreColumn" @change="e => dataShare.setCoreColumn(e.target.value)"
+            class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+            <option v-for="(h, i) in headers" :key="i" :value="i">{{ h }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">翻译场景</label>
+          <select v-model="scenario" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+            <option v-for="s in TRANSLATE_SCENARIOS" :key="s.value" :value="s.value">{{ s.label }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">语言方向</label>
+          <select v-model="direction" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+            <option v-for="d in LANGUAGE_DIRECTIONS" :key="d.value" :value="d.value">{{ d.label }}</option>
+          </select>
+        </div>
+        <button @click="startTranslate" :disabled="isTranslating"
+          class="w-full py-2.5 bg-blue-600 text-white rounded-lg text-xs font-bold active:bg-blue-700 disabled:opacity-50">
+          {{ isTranslating ? '翻译中...' : '开始批量翻译' }}
+        </button>
+      </div>
+    </MobileCollapsible>
+
+    <!-- 统计 -->
+    <MobileCollapsible v-if="hasData" title="统计" :default-open="true">
+      <div class="grid grid-cols-2 gap-2">
+        <div class="bg-white rounded-lg border border-slate-200 p-2.5">
+          <div class="text-[9px] font-bold text-slate-400 uppercase">总量</div>
+          <div class="text-lg font-black text-slate-800 font-mono">{{ rows.length }}</div>
+        </div>
+        <div class="bg-blue-50 rounded-lg border border-blue-200 p-2.5">
+          <div class="text-[9px] font-bold text-blue-600 uppercase">已处理</div>
+          <div class="text-lg font-black text-blue-800 font-mono">{{ processed }}</div>
+        </div>
+      </div>
+      <button v-if="translated" @click="exportResult"
+        class="w-full mt-2 py-2 bg-white border border-blue-200 text-blue-600 rounded-lg text-xs font-bold active:bg-blue-50">
+        导出结果
+      </button>
+    </MobileCollapsible>
+
+    <!-- 翻译结果表格 -->
+    <MobileCollapsible v-if="hasData" title="翻译结果" :default-open="true">
+      <MobileTableWrapper title="翻译预览" :row-count="rows.length" height-class="h-[40vh]">
+        <div v-if="isTranslating" class="absolute inset-0 bg-white/80 flex flex-col items-center justify-center z-20">
+          <div class="w-48 h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div class="h-full bg-blue-600 transition-all duration-300" :style="{ width: (rows.length ? Math.round(processed/rows.length*100) : 0) + '%' }"></div>
+          </div>
+          <span class="text-xs font-bold text-blue-600 mt-2">翻译中 {{ processed }}/{{ rows.length }}</span>
+        </div>
+        <table class="w-full text-left border-collapse text-[10px]">
+          <thead class="bg-slate-50 sticky top-0 z-10 text-[8px] font-bold text-slate-500 uppercase border-b border-slate-200">
+            <tr>
+              <th class="px-2 py-2 sticky left-0 bg-slate-50 z-20">原文</th>
+              <th class="px-2 py-2">翻译结果</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 text-slate-600">
+            <tr v-for="(row, i) in displayRows" :key="i" class="hover:bg-slate-50/50">
+              <td class="px-2 py-1.5 truncate max-w-[120px] sticky left-0 z-10 bg-white">{{ row[sourceCol] || '' }}</td>
+              <td class="px-2 py-1.5 truncate max-w-[180px]">{{ resultCol >= 0 ? (row[resultCol] || '—') : '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </MobileTableWrapper>
+    </MobileCollapsible>
+  </div>
+
+  <!-- ===== 桌面端模板（原样保留）===== -->
+  <div v-else class="animate-fade-in max-w-7xl mx-auto space-y-6">
     <!-- Header Summary Card -->
     <div class="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-2xl border border-blue-200/50 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
@@ -127,16 +232,20 @@ import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
 import DataTable from '../components/common/DataTable.vue'
 import ProgressOverlay from '../components/common/ProgressOverlay.vue'
+import MobileCollapsible from '../components/common/MobileCollapsible.vue'
+import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
 import { readFile, exportToXlsx, DEMO_DATA } from '../services/excel'
 import { callAI, callAIBatch } from '../services/ai'
 import { TRANSLATE_SCENARIOS, LANGUAGE_DIRECTIONS, getTranslatePrompt } from '../services/prompts'
 import { useToast } from '../services/toast'
 import { createTranslationCache } from '../services/translationCache'
 import { useSettingsStore } from '../stores/settings'
+import { useDevice } from '../composables/useDevice'
 
 const toast = useToast()
 const dataShare = useDataShareStore()
 const settings = useSettingsStore()
+const { isMobile } = useDevice()
 const translationCache = createTranslationCache()
 
 const headers = ref([])

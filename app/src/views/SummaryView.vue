@@ -1,5 +1,104 @@
 <template>
-  <div class="animate-fade-in max-w-7xl mx-auto space-y-6">
+  <!-- ===== 移动端模板 ===== -->
+  <div v-if="isMobile" class="px-3 py-3 space-y-3 pb-20 animate-fade-in">
+    <div class="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-xl border border-emerald-200/50 p-3">
+      <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+        <FileBarChart class="w-5 h-5 text-emerald-600" /> 数据摘要
+      </h2>
+      <p class="text-[10px] text-slate-500 mt-0.5">AI 分析列级统计画像，生成数据洞察报告。</p>
+    </div>
+
+    <div v-if="hasData && dataShare.hasData"
+      class="bg-emerald-500/10 rounded-lg border border-emerald-500/20 px-3 py-2 flex justify-between items-center text-[10px]">
+      <div class="flex items-center gap-1.5 text-emerald-800 min-w-0">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+        <span class="truncate">已关联 <strong>{{ dataShare.sourceName }}</strong></span>
+      </div>
+      <button @click="disconnectGlobalExcel" class="text-rose-500 font-bold shrink-0 ml-2">断开</button>
+    </div>
+
+    <!-- 文件上传 -->
+    <MobileCollapsible title="数据文件" :default-open="!hasData">
+      <FileUploader v-if="!hasData" label="上传数据文件" :icon="FileBarChart" iconBg="bg-emerald-50" iconColor="text-emerald-600" @file="handleFile" />
+      <div v-else class="text-xs text-slate-600">
+        <span class="font-bold">{{ rows.length }} 行 × {{ headers.length }} 列</span>
+        <span class="text-slate-400 ml-2">非空率 {{ averageFillRate }}%</span>
+      </div>
+      <button v-if="!hasData" @click="loadDemo"
+        class="w-full mt-2 py-2 bg-white border border-emerald-200 text-emerald-600 rounded-lg text-xs font-bold active:bg-emerald-50">
+        加载示例数据
+      </button>
+    </MobileCollapsible>
+
+    <!-- 分析配置 -->
+    <MobileCollapsible v-if="hasData" title="分析配置" :default-open="true">
+      <div class="space-y-3">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">分析主题</label>
+          <input v-model="analysisTheme" type="text" placeholder="如：客户满意度..."
+            class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+          <button @click="recommendColumns" :disabled="isRecommending || !analysisTheme.trim()"
+            class="w-full mt-1.5 py-1.5 bg-violet-50 border border-violet-200 text-violet-700 rounded-lg text-[10px] font-bold disabled:opacity-40">
+            {{ isRecommending ? '推荐中...' : 'AI 推荐分析列' }}
+          </button>
+          <div v-if="recommendedAngles.length > 0" class="mt-1.5 bg-emerald-50 border border-emerald-200 rounded-lg p-2">
+            <p v-for="(a, i) in recommendedAngles" :key="i" class="text-[9px] text-emerald-600">· {{ a }}</p>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">分析列</label>
+          <div class="max-h-28 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1">
+            <label v-for="(h, i) in headers" :key="i" class="flex items-center gap-1.5 text-[10px] text-slate-700">
+              <input type="checkbox" :value="i" v-model="selectedCols" class="rounded text-emerald-600" />
+              {{ h }}
+            </label>
+          </div>
+        </div>
+        <div v-if="dataShare.labelingResults" class="bg-violet-50 p-2 rounded-lg border border-violet-200 text-[10px] text-violet-700">
+          AI 打标结果已就绪 ({{ dataShare.labelingResults.outputColumns.length }} 列)
+        </div>
+        <button @click="generateSummary" :disabled="isSummarizing || selectedCols.length === 0"
+          class="w-full py-2.5 bg-emerald-600 text-white rounded-lg text-xs font-bold active:bg-emerald-700 disabled:opacity-50">
+          {{ isSummarizing ? '分析中...' : '开始生成摘要' }}
+        </button>
+      </div>
+    </MobileCollapsible>
+
+    <!-- 列类型分布 -->
+    <MobileCollapsible v-if="hasData && columnTypeDistribution.length > 0" title="列类型分布" :default-open="false">
+      <div class="flex flex-wrap gap-1.5">
+        <span v-for="ct in columnTypeDistribution" :key="ct.type"
+          class="inline-flex items-center px-2 py-1 rounded-lg text-[9px] font-bold"
+          :class="typeChipClass(ct.type)">
+          {{ ct.typeLabel }} {{ ct.count }}
+        </span>
+      </div>
+    </MobileCollapsible>
+
+    <!-- 摘要报告 -->
+    <MobileCollapsible v-if="hasData" title="分析报告" :default-open="true">
+      <div class="relative">
+        <div v-if="!summaryText && !isSummarizing" class="text-center py-8 text-slate-300">
+          <FileBarChart class="w-10 h-10 mx-auto mb-2 opacity-50" />
+          <p class="text-xs">选择列后点击"开始生成"</p>
+        </div>
+        <div v-if="isSummarizing && !summaryText" class="text-center py-8">
+          <Loader2 class="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-2" />
+          <p class="text-xs text-emerald-600 font-bold animate-pulse">AI 分析中...</p>
+        </div>
+        <div v-if="summaryText" class="prose prose-sm prose-slate max-w-none text-xs">
+          <div v-html="renderedSummary"></div>
+        </div>
+      </div>
+      <button v-if="summaryText" @click="summaryText = ''"
+        class="w-full mt-2 py-2 bg-white border border-slate-200 text-slate-500 rounded-lg text-[10px] font-bold active:bg-slate-50">
+        清除报告
+      </button>
+    </MobileCollapsible>
+  </div>
+
+  <!-- ===== 桌面端模板（原样保留）===== -->
+  <div v-else class="animate-fade-in max-w-7xl mx-auto space-y-6">
     <!-- Header -->
     <div class="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-2xl border border-emerald-200/50 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
@@ -176,17 +275,20 @@ import { marked } from 'marked'
 import { FileBarChart, SlidersHorizontal, Sparkles, Loader2, Lightbulb, Wand2 } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
+import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import { readFile, DEMO_DATA } from '../services/excel'
 import { callStreamingAI, callAI } from '../services/ai'
 import { getDataSummaryPrompt, getAnalysisThemePrompt } from '../services/prompts'
 import { parseRobustJSON } from '../services/jsonParser'
 import { useSettingsStore } from '../stores/settings'
+import { useDevice } from '../composables/useDevice'
 import { computeAllProfiles, computeCrossTabs, formatProfilesForAI, stratifiedSample, formatSampleRows, detectColumnType } from '../services/dataProfiler'
 import { useToast } from '../services/toast'
 
 const toast = useToast()
 const dataShare = useDataShareStore()
 const settings = useSettingsStore()
+const { isMobile } = useDevice()
 
 const headers = ref([])
 const rows = ref([])

@@ -1,6 +1,7 @@
 <template>
   <Teleport to="body">
-    <div class="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+    <div class="fixed top-2 z-[100] flex flex-col gap-2"
+      :class="isMobile ? 'left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm' : 'right-4 max-w-sm'">
       <TransitionGroup name="toast">
         <div v-for="t in toasts" :key="t.id"
           class="flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium border backdrop-blur-sm cursor-pointer"
@@ -17,8 +18,10 @@
 <script setup>
 import { X } from 'lucide-vue-next'
 import { useToast } from '../../services/toast'
+import { useDevice } from '../../composables/useDevice'
 
 const { toasts, dismiss } = useToast()
+const { isMobile } = useDevice()
 
 function toastClass(type) {
   const map = {

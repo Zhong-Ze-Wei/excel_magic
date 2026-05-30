@@ -48,3 +48,20 @@
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
 }
+
+/* 移动端触摸优化 */
+@media (max-width: 768px) {
+  body {
+    -webkit-overflow-scrolling: touch;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  * {
+    touch-action: manipulation;
+  }
+
+  .card-hover:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}

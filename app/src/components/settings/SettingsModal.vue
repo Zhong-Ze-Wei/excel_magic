@@ -1,7 +1,9 @@
 <template>
   <Teleport to="body">
-    <div v-if="settings.showSettings" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center backdrop-blur-sm" @click.self="settings.showSettings = false">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl h-[620px] max-h-[90vh] overflow-hidden animate-fade-in flex flex-col">
+    <div v-if="settings.showSettings" class="fixed inset-0 bg-slate-900/60 z-50 backdrop-blur-sm"
+      :class="isMobile ? 'items-stretch' : 'flex items-center justify-center'" @click.self="settings.showSettings = false">
+      <div class="bg-white rounded-2xl shadow-2xl w-full overflow-hidden animate-fade-in flex flex-col"
+        :class="isMobile ? 'h-full rounded-none' : 'max-w-2xl h-[620px] max-h-[90vh]'">
         <!-- Header -->
         <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <div>
@@ -34,7 +36,7 @@
           <!-- Tab 1: API Configuration -->
           <div v-show="activeTab === 'api'" class="space-y-5 animate-fade-in">
             <!-- Platform Selection -->
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid gap-4" :class="isMobile ? 'grid-cols-1' : 'grid-cols-2'">
               <div v-for="(config, key) in settings.API_PLATFORMS" :key="key"
                 @click="localPlatform = key"
                 class="cursor-pointer border-2 rounded-xl p-4 flex flex-col items-center text-center transition-all relative"
@@ -98,7 +100,7 @@
               </div>
 
               <!-- Model Selection -->
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid gap-4" :class="isMobile ? 'grid-cols-1' : 'grid-cols-2'">
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1.5">翻译专用模型</label>
                   <input v-model="localTranslateModels[key]" :list="`translate-list-${key}`"
@@ -257,7 +259,7 @@
               <!-- 基础快捷规则 -->
               <div class="border border-slate-200 rounded-xl p-4 bg-white space-y-2.5">
                 <span class="text-xs font-bold text-slate-800 block">基础过滤开关</span>
-                <div class="grid grid-cols-2 gap-3.5">
+                <div class="grid gap-3.5" :class="isMobile ? 'grid-cols-1' : 'grid-cols-2'">
                   <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-600">
                     <input type="checkbox" v-model="settings.rulesConfig.empty.enable" class="rounded text-blue-600 focus:ring-blue-500" />
                     空文本过滤
@@ -321,8 +323,10 @@ import { useSettingsStore } from '../../stores/settings'
 import { testConnection } from '../../services/ai'
 import { X, CheckCircle2, Gift, Copy, Eye, EyeOff, Settings2, Eraser, Key, Download, Upload, RotateCcw } from 'lucide-vue-next'
 import { useToast } from '../../services/toast'
+import { useDevice } from '../../composables/useDevice'
 
 const toast = useToast()
+const { isMobile } = useDevice()
 const settings = useSettingsStore()
 
 const activeTab = ref('api')
