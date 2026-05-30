@@ -74,7 +74,7 @@ export function readFile(file) {
         const opts = { type: 'array' }
         if (isCSV) {
           const encoding = detectCSVEncoding(data)
-          if (encoding === 'gbk') opts.codepage = 936
+          opts.codepage = encoding === 'gbk' ? 936 : 65001
         }
         const workbook = XLSX.read(data, opts)
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
