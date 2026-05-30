@@ -359,6 +359,11 @@ onMounted(() => {
   if (dataShare.hasData && rows.value.length === 0) importGlobalExcel()
 })
 
+// store 数据变化时自动同步（解决 keep-alive 下 onMounted 只触发一次的问题）
+watch(() => dataShare.hasData, (has) => {
+  if (has && rows.value.length === 0) importGlobalExcel()
+})
+
 function importGlobalExcel() {
   headers.value = [...dataShare.headers]
   rows.value = dataShare.rows.map(r => [...r])
