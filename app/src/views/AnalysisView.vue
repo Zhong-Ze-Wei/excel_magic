@@ -595,8 +595,9 @@ onMounted(() => {
 })
 
 // store 数据变化时自动同步（解决 keep-alive 下 onMounted 只触发一次的问题）
-watch(() => dataShare.hasData, (has) => {
-  if (has && rows.value.length === 0) {
+// 监听 rows.length 变化，覆盖"先访问功能页再上传数据"和"共享清洗结果"等场景
+watch(() => dataShare.rows.length, (newLen) => {
+  if (newLen > 0) {
     importGlobalExcel()
   }
 })
