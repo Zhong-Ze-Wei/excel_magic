@@ -6,7 +6,9 @@
       <div class="flex-1 overflow-y-auto p-6 scroll-smooth">
         <router-view v-slot="{ Component }">
           <transition name="fade">
-            <component :is="Component" />
+            <keep-alive>
+              <component :is="Component" />
+            </keep-alive>
           </transition>
         </router-view>
       </div>
