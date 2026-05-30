@@ -36,17 +36,6 @@
         class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
         <FileBarChart class="w-4 h-4" /> 数据摘要
       </button>
-
-      <div class="pt-4 pb-2 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">AI 助手</div>
-
-      <button @click="$router.push('/text')" :class="navClass('text')"
-        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
-        <Type class="w-4 h-4" /> 文本翻译
-      </button>
-      <button @click="$router.push('/formula')" :class="navClass('formula')"
-        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
-        <FunctionSquare class="w-4 h-4" /> 公式生成
-      </button>
     </nav>
 
     <!-- Settings Button -->
@@ -64,14 +53,14 @@
 <script setup>
 import { useRoute } from 'vue-router'
 import { useSettingsStore } from '../../stores/settings'
-import { Wand2, LayoutGrid, Languages, Brain, FileBarChart, Eraser, Type, FunctionSquare, Settings } from 'lucide-vue-next'
+import { Wand2, LayoutGrid, Languages, Brain, FileBarChart, Eraser, Settings } from 'lucide-vue-next'
 
 const route = useRoute()
 const settings = useSettingsStore()
 
 const routeMap = {
-  home: '/', translate: '/translate', text: '/text',
-  analysis: '/analysis', summary: '/summary', formula: '/formula', cleaning: '/cleaning'
+  home: '/', translate: '/translate',
+  analysis: '/analysis', summary: '/summary', cleaning: '/cleaning'
 }
 
 function navClass(name) {

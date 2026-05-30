@@ -43,6 +43,22 @@
           </div>
 
           <div class="space-y-4">
+            <!-- 分析主题 -->
+            <div>
+              <label class="block text-xs font-bold text-slate-600 mb-1.5">分析主题 (可选)</label>
+              <input v-model="analysisTheme" type="text" placeholder="如：客户满意度、产品质量、销售趋势..."
+                class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-emerald-500" />
+              <button @click="recommendColumns" :disabled="isRecommending || !analysisTheme.trim()"
+                class="mt-2 w-full py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 text-violet-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                <Wand2 class="w-3 h-3" :class="{ 'animate-spin': isRecommending }" />
+                {{ isRecommending ? 'AI 推荐中...' : 'AI 推荐分析列' }}
+              </button>
+              <div v-if="recommendedAngles.length > 0" class="mt-2 bg-emerald-50 border border-emerald-200 rounded-lg p-2 space-y-1">
+                <p class="text-[10px] font-bold text-emerald-700">AI 推荐分析角度：</p>
+                <p v-for="(a, i) in recommendedAngles" :key="i" class="text-[10px] text-emerald-600">· {{ a }}</p>
+              </div>
+            </div>
+
             <!-- 分析列选择 -->
             <div>
               <label class="block text-xs font-bold text-slate-600 mb-1.5">分析列 (多选)</label>
@@ -56,8 +72,8 @@
               <p class="text-[9px] text-slate-400 mt-1">选择要纳入统计分析的列，默认全选</p>
             </div>
 
-            <!-- 交叉分析维度 -->
-            <div v-if="selectedCols.length >= 2">
+            <!-- 交叉分析维度（暂隐藏，AI 可自动发现交叉关系） -->
+            <div v-if="false && selectedCols.length >= 2">
               <label class="block text-xs font-bold text-slate-600 mb-1.5">交叉分析维度 (最多 2 个)</label>
               <div class="max-h-28 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1 custom-scrollbar">
                 <label v-for="i in selectedCols" :key="'dim-'+i" class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer hover:bg-slate-100 px-1 py-0.5 rounded">
@@ -157,17 +173,20 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { marked } from 'marked'
-import { FileBarChart, SlidersHorizontal, Sparkles, Loader2 } from 'lucide-vue-next'
+import { FileBarChart, SlidersHorizontal, Sparkles, Loader2, Lightbulb, Wand2 } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
 import { readFile, DEMO_DATA } from '../services/excel'
-import { callStreamingAI } from '../services/ai'
-import { getDataSummaryPrompt } from '../services/prompts'
+import { callStreamingAI, callAI } from '../services/ai'
+import { getDataSummaryPrompt, getAnalysisThemePrompt } from '../services/prompts'
+import { parseRobustJSON } from '../services/jsonParser'
+import { useSettingsStore } from '../stores/settings'
 import { computeAllProfiles, computeCrossTabs, formatProfilesForAI, stratifiedSample, formatSampleRows, detectColumnType } from '../services/dataProfiler'
 import { useToast } from '../services/toast'
 
 const toast = useToast()
 const dataShare = useDataShareStore()
+const settings = useSettingsStore()
 
 const headers = ref([])
 const rows = ref([])
@@ -175,6 +194,9 @@ const isSummarizing = ref(false)
 const summaryText = ref('')
 const selectedCols = ref([])
 const crossDimCols = ref([])
+const analysisTheme = ref('')
+const isRecommending = ref(false)
+const recommendedAngles = ref([])
 
 const hasData = computed(() => rows.value.length > 0)
 const renderedSummary = computed(() => {
@@ -264,6 +286,52 @@ function reset() {
   summaryText.value = ''
   selectedCols.value = []
   crossDimCols.value = []
+  analysisTheme.value = ''
+  recommendedAngles.value = []
+}
+
+async function recommendColumns() {
+  if (!analysisTheme.value.trim() || isRecommending.value) return
+  if (!settings.isConfigured) { settings.showSettings = true; toast.warn('请先配置 API 密钥'); return }
+  isRecommending.value = true
+  recommendedAngles.value = []
+
+  try {
+    const allColIndexes = headers.value.map((_, i) => i)
+    const profiles = computeAllProfiles(headers.value, rows.value, allColIndexes)
+    const profilesText = formatProfilesForAI(profiles)
+
+    let labelingInfo = ''
+    if (dataShare.labelingResults?.outputColumns?.length) {
+      labelingInfo = dataShare.labelingResults.outputColumns.map(c =>
+        `- ${c.name} (key: ${c.key}, type: ${c.type})`
+      ).join('\n')
+    }
+
+    const prompt = getAnalysisThemePrompt(analysisTheme.value.trim(), profilesText, labelingInfo)
+    const res = await callAI(prompt, '你是一个数据分析策略专家。', settings.getApiConfig().workModel)
+    const parsed = parseRobustJSON(res)
+
+    if (parsed.focusColumns?.length) {
+      const validIndexes = parsed.focusColumns
+        .map(c => c.columnIndex)
+        .filter(i => i >= 0 && i < headers.value.length)
+      if (validIndexes.length > 0) {
+        selectedCols.value = [...new Set(validIndexes)]
+      }
+    }
+    if (parsed.analysisAngles?.length) {
+      recommendedAngles.value = parsed.analysisAngles
+    }
+    if (parsed.theme) {
+      analysisTheme.value = parsed.theme
+    }
+    toast.success(`AI 推荐了 ${selectedCols.value.length} 个分析列`)
+  } catch (e) {
+    toast.error('AI 推荐失败: ' + e.message)
+  } finally {
+    isRecommending.value = false
+  }
 }
 
 async function generateSummary() {
@@ -306,7 +374,11 @@ async function generateSummary() {
     const sampleText = formatSampleRows(sample)
 
     // 6. 调用 AI
-    const { systemPrompt, userPrompt } = getDataSummaryPrompt(profilesText, datasetMeta, crossTabsText, sampleText)
+    const { systemPrompt, userPrompt } = getDataSummaryPrompt(
+      profilesText, datasetMeta, crossTabsText, sampleText,
+      analysisTheme.value.trim() || null,
+      recommendedAngles.value.length > 0 ? recommendedAngles.value : null
+    )
     await callStreamingAI(systemPrompt, userPrompt, (chunk) => { summaryText.value += chunk })
   } catch (e) {
     summaryText.value += `\n\n[错误] ${e.message}`

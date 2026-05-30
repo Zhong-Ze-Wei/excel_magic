@@ -115,7 +115,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { Languages, Type, Brain, FileBarChart, FunctionSquare, Eraser, ArrowRight, UploadCloud, Database, X, FileSpreadsheet, RefreshCw } from 'lucide-vue-next'
+import { Languages, Brain, FileBarChart, Eraser, ArrowRight, UploadCloud, Database, X, FileSpreadsheet, RefreshCw } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
 import { readFile } from '../services/excel'
@@ -171,8 +171,6 @@ const cards = [
   { route: '/cleaning', title: '数据清洗', desc: '智能识别并修复数据中的格式错误、缺失值和异常项。', icon: Eraser, bgAccent: 'bg-orange-50', iconBg: 'bg-orange-100 text-orange-600', iconBgHover: 'bg-orange-600', linkColor: 'text-orange-600', supportGlobal: true },
   { route: '/translate', title: '批量翻译', desc: '上传 Excel/CSV 文件，批量翻译产品参数、评论或标题。', icon: Languages, bgAccent: 'bg-blue-50', iconBg: 'bg-blue-100 text-blue-600', iconBgHover: 'bg-blue-600', linkColor: 'text-blue-600', supportGlobal: true },
   { route: '/analysis', title: '数据分析', desc: '智能分析用户评论与表格数据，自动提取情感倾向、观点和分类标签。', icon: Brain, bgAccent: 'bg-violet-50', iconBg: 'bg-violet-100 text-violet-600', iconBgHover: 'bg-violet-600', linkColor: 'text-violet-600', supportGlobal: true },
-  { route: '/summary', title: '数据摘要', desc: '上传数据表，一键生成包含统计特征和业务洞察的分析报告。', icon: FileBarChart, bgAccent: 'bg-emerald-50', iconBg: 'bg-emerald-100 text-emerald-600', iconBgHover: 'bg-emerald-600', linkColor: 'text-emerald-600', supportGlobal: true },
-  { route: '/text', title: '文本翻译', desc: '快速翻译一段文本，支持多种场景和语言方向。', icon: Type, bgAccent: 'bg-indigo-50', iconBg: 'bg-indigo-100 text-indigo-600', iconBgHover: 'bg-indigo-600', linkColor: 'text-indigo-600', supportGlobal: false },
-  { route: '/formula', title: '公式生成', desc: '描述您的需求，AI 自动为您生成复杂的 Excel/WPS 公式。', icon: FunctionSquare, bgAccent: 'bg-pink-50', iconBg: 'bg-pink-100 text-pink-600', iconBgHover: 'bg-pink-600', linkColor: 'text-pink-600', supportGlobal: false }
+  { route: '/summary', title: '数据摘要', desc: '上传数据表，一键生成包含统计特征和业务洞察的分析报告。', icon: FileBarChart, bgAccent: 'bg-emerald-50', iconBg: 'bg-emerald-100 text-emerald-600', iconBgHover: 'bg-emerald-600', linkColor: 'text-emerald-600', supportGlobal: true }
 ]
 </script>
