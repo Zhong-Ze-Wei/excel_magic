@@ -647,18 +647,20 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Eraser, Settings2, Download, ChevronDown, Check, X, RefreshCw, Sparkles, Plus, Pencil, RotateCcw } from 'lucide-vue-next'
 import FileUploader from '../components/common/FileUploader.vue'
 import CustomFilterForm from '../components/cleaning/CustomFilterForm.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
-import { readFile, exportToXlsx } from '../services/excel'
+import { exportToXlsx } from '../services/excel'
 import { runCleaningPipeline } from '../services/cleaningRules'
 import { useDataShareStore } from '../stores/dataShare'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
+import { useGlobalDataSync } from '../composables/useGlobalDataSync'
+import { useFileUpload } from '../composables/useFileUpload'
 import { callAI } from '../services/ai'
 import { getSmartFilterPrompt } from '../services/prompts'
 import { parseRobustJSON } from '../services/jsonParser'
@@ -670,39 +672,20 @@ const dataShare = useDataShareStore()
 const { isMobile } = useDevice()
 const showShareMenu = ref(false)
 
-const headers = ref([])
-const rows = ref([])
+const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
+  onInit: () => { runPipeline() }
+})
+
+const { handleFile } = useFileUpload({
+  onFileLoaded: () => { runPipeline() }
+})
+
 const sourceCol = computed(() => dataShare.coreColumn)
-
-onMounted(() => {
-  if (dataShare.hasData && rows.value.length === 0) {
-    importGlobalExcel()
-  }
-})
-
-// store 数据变化时自动同步（解决 keep-alive 下 onMounted 只触发一次的问题）
-// 监听 rows.length 变化，覆盖"先访问功能页再上传数据"和"共享/应用清洗结果"等场景
-watch(() => dataShare.rows.length, (newLen) => {
-  if (newLen > 0) {
-    importGlobalExcel()
-  }
-})
-
-function importGlobalExcel() {
-  headers.value = [...dataShare.headers]
-  rows.value = dataShare.rows.map(r => [...r])
-  runPipeline()
-}
 
 // 监听全局核心列变动，重新运行清洗 Pipeline
 watch(() => dataShare.coreColumn, () => {
   runPipeline()
 })
-
-function disconnectGlobalExcel() {
-  dataShare.clearSharedData()
-  reset()
-}
 
 const configFileRef = ref(null)
 
@@ -729,7 +712,6 @@ const cleanedRows = ref([])
 // 缓存在非响应式下全表运行统计的数值
 const fullStats = ref({ keep: 0, delete: 0, suspect: 0 })
 
-const hasData = computed(() => rows.value.length > 0)
 const totalCount = computed(() => rows.value.length)
 const displayCleanedRows = computed(() => cleanedRows.value) // cleanedRows 内部已经做过 slice(0, 100)
 
@@ -927,19 +909,6 @@ function calculateFullStats() {
 }
 
 // 文件加载处理
-async function handleFile(file) {
-  try {
-    const data = await readFile(file)
-    headers.value = data.headers.map(String)
-    rows.value = data.rows
-    
-    // 直接同步到全局，全局会自动判断核心处理列 (传递 true 启用首次推荐)
-    dataShare.setSharedData(headers.value, rows.value, file.name, true, { sheetNames: data.sheetNames, currentSheet: data.currentSheet, file })
-    
-    runPipeline()
-  } catch (err) { toast.error(err.message) }
-}
-
 // 启发式选择需要清洗的列
 function heuristicDetectCleanColumn(headersList, rowsList) {
   if (!rowsList || rowsList.length === 0) return 0
