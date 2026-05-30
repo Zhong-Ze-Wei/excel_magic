@@ -87,6 +87,13 @@ app/src/
 
 每个平台分别配置翻译模型和分析模型。API Key 存 localStorage，支持配置导入/导出/重置。
 
+## 分支与提交规范
+
+- 所有修改必须在分支上进行（`feat/`、`fix/`、`refactor/`），不在 master 上直接改代码
+- 每个 commit 原子化——一个 commit 只做一件事
+- commit 前必须通过 `npm run build` + `npm test`
+- 本地审核通过后 fast-forward merge 到 master，再 `git push origin master`
+
 ## 架构决策记录
 
 详见 `docs/adr/` 目录。重大设计决策不写在代码注释里，而是以 ADR 形式记录。修改涉及这些领域时务必先阅读对应 ADR。

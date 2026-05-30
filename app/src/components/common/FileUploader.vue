@@ -26,7 +26,7 @@ import { UploadCloud } from 'lucide-vue-next'
 
 const props = defineProps({
   label: { type: String, default: '点击或拖拽文件' },
-  icon: { type: Object, default: () => UploadCloud },
+  icon: { type: [Object, Function], default: () => UploadCloud },
   iconBg: { type: String, default: 'bg-blue-50' },
   iconColor: { type: String, default: 'text-blue-600' }
 })

@@ -47,7 +47,7 @@ export const useSettingsStore = defineStore('settings', () => {
   })
 
   // AI 并发调用数（持久化）
-  const concurrency = ref(parseInt(localStorage.getItem('magic_excel_concurrency')) || 20)
+  const concurrency = ref(parseInt(localStorage.getItem('magic_excel_concurrency')) || 3)
   watch(concurrency, (v) => localStorage.setItem('magic_excel_concurrency', String(v)))
 
   // 当前平台的完整配置

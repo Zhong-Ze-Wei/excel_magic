@@ -47,7 +47,7 @@
         </div>
         <div>
           <label class="block text-[10px] font-bold text-slate-600 mb-1">分析列</label>
-          <div class="max-h-28 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1">
+          <div class="max-h-20 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1">
             <label v-for="(h, i) in headers" :key="i" class="flex items-center gap-1.5 text-[10px] text-slate-700">
               <input type="checkbox" :value="i" v-model="selectedCols" class="rounded text-emerald-600" />
               {{ h }}
@@ -57,12 +57,14 @@
         <div v-if="dataShare.labelingResults" class="bg-violet-50 p-2 rounded-lg border border-violet-200 text-[10px] text-violet-700">
           AI 打标结果已就绪 ({{ dataShare.labelingResults.outputColumns.length }} 列)
         </div>
-        <button @click="generateSummary" :disabled="isSummarizing || selectedCols.length === 0"
-          class="w-full py-2.5 bg-emerald-600 text-white rounded-lg text-xs font-bold active:bg-emerald-700 disabled:opacity-50">
-          {{ isSummarizing ? '分析中...' : '开始生成摘要' }}
-        </button>
       </div>
     </MobileCollapsible>
+
+    <!-- 固定操作按钮 -->
+    <button v-if="hasData" @click="generateSummary" :disabled="isSummarizing || selectedCols.length === 0"
+      class="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold active:bg-emerald-700 disabled:opacity-50 shadow-lg shadow-emerald-200">
+      {{ isSummarizing ? '分析中...' : '开始生成摘要' }}
+    </button>
 
     <!-- 列类型分布 -->
     <MobileCollapsible v-if="hasData && columnTypeDistribution.length > 0" title="列类型分布" :default-open="false">
@@ -282,7 +284,7 @@ import { getDataSummaryPrompt, getAnalysisThemePrompt } from '../services/prompt
 import { parseRobustJSON } from '../services/jsonParser'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
-import { computeAllProfiles, computeCrossTabs, formatProfilesForAI, stratifiedSample, formatSampleRows, detectColumnType } from '../services/dataProfiler'
+import { computeAllProfiles, computeColumnProfile, computeCrossTabs, formatProfilesForAI, stratifiedSample, formatSampleRows, detectColumnType } from '../services/dataProfiler'
 import { useToast } from '../services/toast'
 
 const toast = useToast()
@@ -355,6 +357,12 @@ watch(() => headers.value.length, () => {
 
 onMounted(() => {
   if (dataShare.hasData && rows.value.length === 0) importGlobalExcel()
+})
+
+// store 数据变化时自动同步（解决 keep-alive 下 onMounted 只触发一次的问题）
+// 监听 rows.length 变化，覆盖"先访问功能页再上传数据"和"共享清洗结果"等场景
+watch(() => dataShare.rows.length, (newLen) => {
+  if (newLen > 0) importGlobalExcel()
 })
 
 function importGlobalExcel() {
