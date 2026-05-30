@@ -784,7 +784,7 @@ async function handleFile(file) {
     rangeEnd.value = data.rows.length
     selectedInputColumns.value = []
     analysisMap.value = {}
-    dataShare.setSharedData(headers.value, rows.value, file.name, true)
+    dataShare.setSharedData(headers.value, rows.value, file.name, true, { sheetNames: data.sheetNames, currentSheet: data.currentSheet, file })
     if (dataShare.coreColumn != null) {
       selectedInputColumns.value = [Number(dataShare.coreColumn)]
     }

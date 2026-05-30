@@ -8,7 +8,13 @@ export const useDataShareStore = defineStore('dataShare', () => {
   const coreColumn = ref(0) // 全局共享的核心处理列索引
   const labelingResults = ref(null) // { outputColumns: [...], analysisMap: { [rowIdx]: { values: {...} } } }
 
+  // 多 Sheet 支持
+  const sheetNames = ref([])
+  const currentSheet = ref('')
+  const file = ref(null) // 原始 File 对象，用于切换 Sheet 时重新读取
+
   const hasData = computed(() => rows.value.length > 0)
+  const hasMultipleSheets = computed(() => sheetNames.value.length > 1)
 
   // 启发式选择核心列的方法（基于字数长度）
   function heuristicDetectCoreColumn(headersList, rowsList) {
@@ -38,10 +44,13 @@ export const useDataShareStore = defineStore('dataShare', () => {
   }
 
   // 存入共享数据
-  function setSharedData(newHeaders, newRows, name = '已清洗的数据', autoDetect = false) {
+  function setSharedData(newHeaders, newRows, name = '已清洗的数据', autoDetect = false, options = {}) {
     headers.value = [...newHeaders]
     rows.value = newRows.map(r => [...r])
     sourceName.value = name
+    if (options.sheetNames) sheetNames.value = options.sheetNames
+    if (options.currentSheet) currentSheet.value = options.currentSheet
+    if (options.file) file.value = options.file
     if (autoDetect) {
       // 自动判断并推荐最佳核心处理列
       coreColumn.value = heuristicDetectCoreColumn(newHeaders, newRows)
@@ -79,6 +88,17 @@ export const useDataShareStore = defineStore('dataShare', () => {
     labelingResults.value = null
   }
 
+  // 切换 Sheet
+  async function setSheet(sheetName) {
+    if (!file.value || sheetName === currentSheet.value) return
+    const { readSheet } = await import('../services/excel')
+    const data = await readSheet(file.value, sheetName)
+    headers.value = data.headers
+    rows.value = data.rows
+    currentSheet.value = sheetName
+    coreColumn.value = heuristicDetectCoreColumn(data.headers, data.rows)
+  }
+
   // 清理
   function clearSharedData() {
     headers.value = []
@@ -86,11 +106,15 @@ export const useDataShareStore = defineStore('dataShare', () => {
     sourceName.value = ''
     coreColumn.value = 0
     labelingResults.value = null
+    sheetNames.value = []
+    currentSheet.value = ''
+    file.value = null
   }
 
   return {
     headers, rows, sourceName, coreColumn, hasData, labelingResults,
+    sheetNames, currentSheet, hasMultipleSheets, file,
     setSharedData, setCoreColumn, getAndClearSharedData, clearSharedData,
-    setLabelingResults, clearLabelingResults
+    setLabelingResults, clearLabelingResults, setSheet
   }
 })
