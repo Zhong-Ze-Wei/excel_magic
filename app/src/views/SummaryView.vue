@@ -282,7 +282,7 @@ import { getDataSummaryPrompt, getAnalysisThemePrompt } from '../services/prompt
 import { parseRobustJSON } from '../services/jsonParser'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
-import { computeAllProfiles, computeCrossTabs, formatProfilesForAI, stratifiedSample, formatSampleRows, detectColumnType } from '../services/dataProfiler'
+import { computeAllProfiles, computeColumnProfile, computeCrossTabs, formatProfilesForAI, stratifiedSample, formatSampleRows, detectColumnType } from '../services/dataProfiler'
 import { useToast } from '../services/toast'
 
 const toast = useToast()
