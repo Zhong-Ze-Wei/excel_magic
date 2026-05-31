@@ -19,10 +19,12 @@ npm test           # Vitest
 - AI 打标采用 **labelingPlan** 模型：自然语言需求 → AI 生成 outputColumns 方案 → 编译 system prompt → 逐行打标（详见 docs/adr/0003）
 - 数据摘要用**列画像**替代原始行采样：预计算全表统计后发给 AI，不发原始行（详见 docs/adr/0004）
 - AI 返回 JSON 统一走 `parseRobustJSON` 容错解析（剥离 markdown 代码块、提取最外层括号）
-- 并发控制用 `createSemaphore` 信号量，`callAIBatch` 支持指定并发数（默认 3），遇 429 自动降级
+- 并发控制用 `createSemaphore` 信号量，`callAIBatch` 支持指定并发数（默认 20，上限 100），遇 429 自动降级
 - 全局通知用 `useToast()`，不用 `alert()`
 - 桌面端和移动端 UI 完全分离：`v-if="isDesktop"` / `v-else` 双模板，移动端用 MobileCollapsible 折叠面板 + MobileTableWrapper 表格包装
-- 数据总线 `stores/dataShare.js` 是全局数据枢纽，各页面通过 watch 监听 `rows.length` 变化自动同步
+- 数据总线 `stores/dataShare.js` 是全局数据枢纽，各页面通过 `useGlobalDataSync` composable 自动同步
+- 公共逻辑已提取为 composables：`useGlobalDataSync`（数据同步）、`useFileUpload`（文件上传）、`useExport`（导出）、`useShare`（共享/应用）
+- 大型组件已拆分：`CleaningRulesPanel`（清洗规则面板）、`OutputColumnsList`（打标输出列管理）、`StatsPieChart`（ECharts 饼图）
 
 ## 分支与提交规范
 
