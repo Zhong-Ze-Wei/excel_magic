@@ -88,12 +88,16 @@ export function readFile(file) {
       try {
         const data = new Uint8Array(e.target.result)
         const isCSV = /\.csv$/i.test(file.name)
-        const opts = { type: 'array' }
+
+        let workbook
         if (isCSV) {
           const encoding = detectCSVEncoding(data)
-          opts.codepage = encoding === 'gbk' ? 936 : 65001
+          const text = new TextDecoder(encoding === 'gbk' ? 'gbk' : 'utf-8').decode(data)
+          workbook = XLSX.read(text, { type: 'string' })
+        } else {
+          workbook = XLSX.read(data, { type: 'array' })
         }
-        const workbook = XLSX.read(data, opts)
+
         const sheetNames = workbook.SheetNames
         const currentSheet = sheetNames[0]
         const { headers, rows } = parseSheet(workbook, currentSheet)
@@ -122,12 +126,15 @@ export function readSheet(file, sheetName) {
       try {
         const data = new Uint8Array(e.target.result)
         const isCSV = /\.csv$/i.test(file.name)
-        const opts = { type: 'array' }
+
+        let workbook
         if (isCSV) {
           const encoding = detectCSVEncoding(data)
-          opts.codepage = encoding === 'gbk' ? 936 : 65001
+          const text = new TextDecoder(encoding === 'gbk' ? 'gbk' : 'utf-8').decode(data)
+          workbook = XLSX.read(text, { type: 'string' })
+        } else {
+          workbook = XLSX.read(data, { type: 'array' })
         }
-        const workbook = XLSX.read(data, opts)
         if (!workbook.SheetNames.includes(sheetName)) {
           return reject(new Error(`Sheet "${sheetName}" 不存在`))
         }
