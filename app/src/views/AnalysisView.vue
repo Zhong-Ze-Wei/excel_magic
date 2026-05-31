@@ -524,7 +524,8 @@ import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
 import StatsPieChart from '../components/common/StatsPieChart.vue'
-import { exportToXlsx, DEMO_DATA } from '../services/excel'
+import { DEMO_DATA } from '../services/excel'
+import { useExport } from '../composables/useExport'
 import { callAI, callAIBatch } from '../services/ai'
 import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt } from '../services/prompts'
 import { useSettingsStore } from '../stores/settings'
@@ -547,6 +548,8 @@ const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
     analysisMap.value = {}
   }
 })
+
+const { exportData } = useExport({ rows, headers })
 
 const { handleFile } = useFileUpload({
   onFileLoaded: (data) => {
@@ -968,8 +971,7 @@ async function startLabeling() {
 // ── 导出 ──
 function exportResults() {
   const plan = labelingPlan.value
-  const expHeaders = [...headers.value, ...plan.outputColumns.map(c => `${c.name} (AI)`)]
-  const expRows = rows.value.map((row, ri) => {
+  exportData(() => rows.value.map((row, ri) => {
     const res = analysisMap.value[ri]
     const padded = [...row]
     while (padded.length < headers.value.length) padded.push('')
@@ -980,7 +982,6 @@ function exportResults() {
       else padded.push(String(val))
     })
     return padded
-  })
-  exportToXlsx(expHeaders, expRows, 'AI打标结果.xlsx')
+  }), 'AI打标结果.xlsx', () => [...headers.value, ...plan.outputColumns.map(c => `${c.name} (AI)`)])
 }
 </script>

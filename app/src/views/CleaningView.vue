@@ -656,14 +656,14 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useExport } from '../composables/useExport'
+import { useShare } from '../composables/useShare'
 import { Eraser, Settings2, Download, ChevronDown, Check, X, RefreshCw, Sparkles, Plus, Pencil, RotateCcw } from 'lucide-vue-next'
 import FileUploader from '../components/common/FileUploader.vue'
 import CustomFilterForm from '../components/cleaning/CustomFilterForm.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
 import StatsPieChart from '../components/common/StatsPieChart.vue'
-import { exportToXlsx } from '../services/excel'
 import { runCleaningPipeline } from '../services/cleaningRules'
 import { useDataShareStore } from '../stores/dataShare'
 import { useSettingsStore } from '../stores/settings'
@@ -676,14 +676,16 @@ import { parseRobustJSON } from '../services/jsonParser'
 import { useToast } from '../services/toast'
 
 const toast = useToast()
-const router = useRouter()
 const dataShare = useDataShareStore()
 const { isMobile } = useDevice()
 const showShareMenu = ref(false)
 
-const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
+const { headers, rows, hasData, importGlobalExcel, disconnectGlobalExcel } = useGlobalDataSync({
   onInit: () => { runPipeline() }
 })
+
+const { exportData } = useExport({ rows, headers })
+const { shareTo, applyToGlobal: applyGlobal } = useShare({ rows, headers, importGlobalExcel })
 
 const { handleFile } = useFileUpload({
   onFileLoaded: () => { runPipeline() }
@@ -1039,112 +1041,47 @@ function ruleClass(decision) {
   return 'text-slate-400 bg-slate-100 px-1 py-0.5 rounded'
 }
 
-// 导出清洗后健康数据 (仅保留行)
+// 运行全量清洗 Pipeline 并应用用户覆写
+function getCleanedFullResult() {
+  const fullResult = runCleaningPipeline(rows.value, headers.value, sourceCol.value, settings.rulesConfig)
+  cleanedRows.value.forEach((previewRow, idx) => {
+    if (previewRow.hitRule === 'user_override' || previewRow.hitRule === 'user_reset') {
+      fullResult[idx].decision = previewRow.decision
+      fullResult[idx].hitRule = previewRow.hitRule
+      fullResult[idx].reason = previewRow.reason
+    }
+  })
+  return fullResult
+}
+
+function getCleanRows() {
+  return getCleanedFullResult()
+    .filter(r => r.decision === 'keep')
+    .map(r => r.originalRow)
+}
+
 function exportCleanedOnly() {
-  if (!rows.value.length) return
-  // 全量在内存中快速跑判定，不带 Vue 响应式代理开销
-  const fullResult = runCleaningPipeline(rows.value, headers.value, sourceCol.value, settings.rulesConfig)
-  
-  // 覆盖前 100 行中用户手动标记的覆写结果
-  cleanedRows.value.forEach((previewRow, idx) => {
-    if (previewRow.hitRule === 'user_override' || previewRow.hitRule === 'user_reset') {
-      fullResult[idx].decision = previewRow.decision
-      fullResult[idx].hitRule = previewRow.hitRule
-      fullResult[idx].reason = previewRow.reason
-    }
-  })
-  
-  const expHeaders = [...headers.value]
-  const expRows = fullResult
-    .filter(r => r.decision === 'keep')
-    .map(r => r.originalRow)
-  exportToXlsx(expHeaders, expRows, '干净清洗数据.xlsx')
+  exportData(() => getCleanRows(), '干净清洗数据.xlsx')
 }
 
-// 导出完整审计报表 (含标准化文本、状态、命中原因)
 function exportFullAudit() {
-  if (!rows.value.length) return
-  const fullResult = runCleaningPipeline(rows.value, headers.value, sourceCol.value, settings.rulesConfig)
-  
-  // 覆盖前 100 行中用户手动标记的覆写结果
-  cleanedRows.value.forEach((previewRow, idx) => {
-    if (previewRow.hitRule === 'user_override' || previewRow.hitRule === 'user_reset') {
-      fullResult[idx].decision = previewRow.decision
-      fullResult[idx].hitRule = previewRow.hitRule
-      fullResult[idx].reason = previewRow.reason
-    }
-  })
-  
-  const expHeaders = [...headers.value, '标准化文本', '清洗决策状态', '判定原因描述']
-  const expRows = fullResult.map(r => {
-    const label = statusLabel(r.decision)
-    const padded = [...r.originalRow]
-    while (padded.length < headers.value.length) padded.push('')
-    padded.push(r.normalizedText, label, `${r.hitRule} (${r.reason})`)
-    return padded
-  })
-  exportToXlsx(expHeaders, expRows, '数据清洗审计报表.xlsx')
+  exportData(() => {
+    return getCleanedFullResult().map(r => {
+      const padded = [...r.originalRow]
+      while (padded.length < headers.value.length) padded.push('')
+      padded.push(r.normalizedText, statusLabel(r.decision), `${r.hitRule} (${r.reason})`)
+      return padded
+    })
+  }, '数据清洗审计报表.xlsx', () => [...headers.value, '标准化文本', '清洗决策状态', '判定原因描述'])
 }
 
-// 共享清洗结果并跳转
 function shareDataTo(targetPath) {
-  if (!rows.value.length) return
-  
-  // 全量在内存中跑判定
-  const fullResult = runCleaningPipeline(rows.value, headers.value, sourceCol.value, settings.rulesConfig)
-  
-  // 覆盖前 100 行用户手动修改的覆写结果
-  cleanedRows.value.forEach((previewRow, idx) => {
-    if (previewRow.hitRule === 'user_override' || previewRow.hitRule === 'user_reset') {
-      fullResult[idx].decision = previewRow.decision
-      fullResult[idx].hitRule = previewRow.hitRule
-      fullResult[idx].reason = previewRow.reason
-    }
-  })
-  
-  // 提取保留的数据
-  const cleanHeaders = [...headers.value]
-  const cleanRows = fullResult
-    .filter(r => r.decision === 'keep')
-    .map(r => r.originalRow)
-    
-  // 存入 store 共享
-  dataShare.setSharedData(cleanHeaders, cleanRows, '清洗后数据')
-  
+  shareTo(() => ({ headers: [...headers.value], rows: getCleanRows() }), targetPath, '清洗后数据')
   showShareMenu.value = false
-  // 跳转到目标页面
-  router.push(targetPath)
 }
 
-// 应用清洗结果至全局 Excel Store
 function applyToGlobal() {
-  if (!rows.value.length) return
-  
-  // 全量在内存中跑判定
-  const fullResult = runCleaningPipeline(rows.value, headers.value, sourceCol.value, settings.rulesConfig)
-  
-  // 覆盖前 100 行中用户手动标记的覆写结果
-  cleanedRows.value.forEach((previewRow, idx) => {
-    if (previewRow.hitRule === 'user_override' || previewRow.hitRule === 'user_reset') {
-      fullResult[idx].decision = previewRow.decision
-      fullResult[idx].hitRule = previewRow.hitRule
-      fullResult[idx].reason = previewRow.reason
-    }
-  })
-  
-  // 提取保留的数据
-  const cleanHeaders = [...headers.value]
-  const cleanRows = fullResult
-    .filter(r => r.decision === 'keep')
-    .map(r => r.originalRow)
-    
-  // 更新到全局 Store 共享
-  dataShare.setSharedData(cleanHeaders, cleanRows, dataShare.sourceName || '已清洗数据.xlsx')
-
-  // 重新从 store 同步到本地，使当前页面也显示清洗后的数据
-  importGlobalExcel()
-
-  toast.success('清洗后的健康数据已成功应用至全局 Excel！现在您可以直接切换到批量翻译或评论分析进行下一步处理。')
+  applyGlobal(() => ({ headers: [...headers.value], rows: getCleanRows() }), dataShare.sourceName || '已清洗数据.xlsx')
 }
 
 // 导出当前配置 JSON (兼容导出全局整包配置)

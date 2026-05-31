@@ -234,7 +234,8 @@ import DataTable from '../components/common/DataTable.vue'
 import ProgressOverlay from '../components/common/ProgressOverlay.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
-import { exportToXlsx, DEMO_DATA } from '../services/excel'
+import { DEMO_DATA } from '../services/excel'
+import { useExport } from '../composables/useExport'
 import { callAI, callAIBatch } from '../services/ai'
 import { TRANSLATE_SCENARIOS, LANGUAGE_DIRECTIONS, getTranslatePrompt } from '../services/prompts'
 import { useToast } from '../services/toast'
@@ -253,6 +254,8 @@ const translationCache = createTranslationCache()
 const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
   onInit: () => { translated.value = false; resultCol.value = -1 }
 })
+
+const { exportData } = useExport({ rows, headers })
 
 const { handleFile } = useFileUpload({
   onFileLoaded: () => { translated.value = false; resultCol.value = -1 }
@@ -363,7 +366,6 @@ async function startTranslate() {
 }
 
 function exportResult() {
-  const exportRows = rows.value.map(r => [...r])
-  exportToXlsx(headers.value, exportRows, '翻译结果.xlsx')
+  exportData(() => rows.value.map(r => [...r]), '翻译结果.xlsx')
 }
 </script>
