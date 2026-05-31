@@ -4,56 +4,17 @@
 import * as XLSX from 'xlsx'
 
 /**
- * 检测 CSV 文件编码：UTF-8 (含 BOM) 或 GBK
- * - BOM 检测：\xEF\xBB\xxBF = UTF-8
- * - 启发式：扫描前 8KB，存在 UTF-8 多字节序列 → UTF-8，否则 → GBK
+ * 解码 CSV 文本：UTF-8 优先，GBK 兜底
+ * BOM → UTF-8；无 BOM 则尝试 UTF-8，出现替换字符 U+FFFD → GBK
  */
-function detectCSVEncoding(bytes) {
-  // BOM 检测
+function decodeCSVText(bytes) {
   if (bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
-    return 'utf-8'
+    return new TextDecoder('utf-8').decode(bytes)
   }
-
-  // 启发式检测：遍历前 8KB
-  const len = Math.min(bytes.length, 8192)
-  let utf8Score = 0
-  let i = 0
-  while (i < len) {
-    const b = bytes[i]
-    if (b <= 0x7F) {
-      // ASCII
-      i++
-    } else if (b >= 0xC2 && b <= 0xDF) {
-      // 2-byte UTF-8 sequence
-      if (i + 1 < len && bytes[i + 1] >= 0x80 && bytes[i + 1] <= 0xBF) {
-        utf8Score++
-        i += 2
-      } else {
-        return 'gbk'
-      }
-    } else if (b >= 0xE0 && b <= 0xEF) {
-      // 3-byte UTF-8 sequence (Chinese characters)
-      if (i + 2 < len && bytes[i + 1] >= 0x80 && bytes[i + 1] <= 0xBF && bytes[i + 2] >= 0x80 && bytes[i + 2] <= 0xBF) {
-        utf8Score += 2
-        i += 3
-      } else {
-        return 'gbk'
-      }
-    } else if (b >= 0xF0 && b <= 0xF4) {
-      // 4-byte UTF-8 sequence
-      if (i + 3 < len && bytes[i + 1] >= 0x80 && bytes[i + 1] <= 0xBF && bytes[i + 2] >= 0x80 && bytes[i + 2] <= 0xBF && bytes[i + 3] >= 0x80 && bytes[i + 3] <= 0xBF) {
-        utf8Score += 3
-        i += 4
-      } else {
-        return 'gbk'
-      }
-    } else {
-      // Invalid UTF-8 start byte → likely GBK
-      return 'gbk'
-    }
-  }
-
-  return utf8Score > 0 ? 'utf-8' : 'gbk'
+  const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
+  return text.includes('�')
+    ? new TextDecoder('gbk').decode(bytes)
+    : text
 }
 
 /**
@@ -89,14 +50,9 @@ export function readFile(file) {
         const data = new Uint8Array(e.target.result)
         const isCSV = /\.csv$/i.test(file.name)
 
-        let workbook
-        if (isCSV) {
-          const encoding = detectCSVEncoding(data)
-          const text = new TextDecoder(encoding === 'gbk' ? 'gbk' : 'utf-8').decode(data)
-          workbook = XLSX.read(text, { type: 'string' })
-        } else {
-          workbook = XLSX.read(data, { type: 'array' })
-        }
+        const workbook = isCSV
+          ? XLSX.read(decodeCSVText(data), { type: 'string' })
+          : XLSX.read(data, { type: 'array' })
 
         const sheetNames = workbook.SheetNames
         const currentSheet = sheetNames[0]
@@ -127,14 +83,10 @@ export function readSheet(file, sheetName) {
         const data = new Uint8Array(e.target.result)
         const isCSV = /\.csv$/i.test(file.name)
 
-        let workbook
-        if (isCSV) {
-          const encoding = detectCSVEncoding(data)
-          const text = new TextDecoder(encoding === 'gbk' ? 'gbk' : 'utf-8').decode(data)
-          workbook = XLSX.read(text, { type: 'string' })
-        } else {
-          workbook = XLSX.read(data, { type: 'array' })
-        }
+        const workbook = isCSV
+          ? XLSX.read(decodeCSVText(data), { type: 'string' })
+          : XLSX.read(data, { type: 'array' })
+
         if (!workbook.SheetNames.includes(sheetName)) {
           return reject(new Error(`Sheet "${sheetName}" 不存在`))
         }
