@@ -1,0 +1,65 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Skill(connect-chrome)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git add *)",
+      "Bash(git push *)",
+      "Bash(python *)",
+      "Bash(npx vite *)",
+      "Bash(npm install *)",
+      "Bash(npx vitest *)",
+      "Bash(git commit -m ' *)",
+      "Bash(rm app/src/stores/data.js)",
+      "Bash(grep -rn \"stores/data\\\\.js\" CLAUDE.md docs/)",
+      "Bash(grep -rn \"stores/data[^S]\" CLAUDE.md docs/)",
+      "Bash(git tag *)",
+      "Bash(git mv *)",
+      "Bash(git ls-tree *)",
+      "Bash(git commit *)",
+      "Bash(git checkout *)",
+      "Bash(git branch *)",
+      "Bash(npm test *)",
+      "Bash(git cherry-pick *)",
+      "Bash(ipconfig)",
+      "Bash(findstr /i \"IPv4\")",
+      "Bash(xxd \"1000.csv\")",
+      "Bash(git merge *)",
+      "Bash(node *)",
+      "Bash(ls stores/data.js)",
+      "Bash(ls services/translationCache.js)",
+      "Bash(grep -rl \"echarts\\\\|ECharts\" .)",
+      "Bash(grep -rl \"parseRobustJSON\" services/ views/)",
+      "Bash(git reset *)",
+      "Bash(git stash *)",
+      "Bash(xxd /e/ZZ\\\\'s_Code/AI/magic-excel/data/1000.csv)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/prevent-master-commit.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/adr-reminder.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
