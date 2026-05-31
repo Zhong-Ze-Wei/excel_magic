@@ -3,11 +3,9 @@
     <MobileHeader />
     <div class="flex-1 overflow-y-auto scroll-smooth">
       <router-view v-slot="{ Component }">
-        <transition name="fade">
-          <keep-alive>
-            <component :is="Component" />
-          </keep-alive>
-        </transition>
+        <keep-alive>
+          <component :is="Component" />
+        </keep-alive>
       </router-view>
     </div>
     <MobileTabBar />
