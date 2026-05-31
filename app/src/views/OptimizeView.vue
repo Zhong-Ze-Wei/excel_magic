@@ -44,6 +44,44 @@
       </div>
     </MobileCollapsible>
 
+    <!-- 移动端 AI 配置方案 -->
+    <MobileCollapsible v-if="aiRulesConfig" title="AI 配置方案" :default-open="true">
+      <!-- 比例条 -->
+      <div class="mb-2">
+        <div class="flex justify-between text-[9px] font-bold mb-1">
+          <span class="text-emerald-600">保留 {{ stats.keep }}</span>
+          <span class="text-rose-500">过滤 {{ stats.delete }}</span>
+        </div>
+        <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden flex">
+          <div class="h-full bg-emerald-400 rounded-l-full transition-all duration-500" :style="{ width: (keepRatio * 100) + '%' }"></div>
+          <div class="h-full bg-rose-300 rounded-r-full transition-all duration-500" :style="{ width: ((1 - keepRatio) * 100) + '%' }"></div>
+        </div>
+      </div>
+      <!-- 原子规则 -->
+      <div v-if="enabledAtomicRules.length" class="mb-2">
+        <div class="text-[9px] font-bold text-slate-400 mb-1">原子规则</div>
+        <div class="flex flex-wrap gap-1">
+          <span v-for="r in enabledAtomicRules" :key="r.key"
+            class="px-1.5 py-0.5 text-[9px] font-bold rounded-full border"
+            :class="ruleHitCounts[r.hitKey] ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
+            {{ r.title }}<span v-if="ruleHitCounts[r.hitKey]"> ×{{ ruleHitCounts[r.hitKey] }}</span>
+          </span>
+        </div>
+      </div>
+      <!-- 自定义筛选 -->
+      <div v-if="customFiltersList.length">
+        <div class="text-[9px] font-bold text-slate-400 mb-1">自定义筛选</div>
+        <div class="space-y-1">
+          <div v-for="cf in customFiltersList" :key="cf.id"
+            class="flex items-center gap-1 px-2 py-1 bg-violet-50 rounded border border-violet-200/60">
+            <span class="w-1 h-1 rounded-full bg-violet-400 shrink-0"></span>
+            <span class="text-[9px] font-bold text-violet-700">{{ cf.name }}</span>
+            <span class="text-[8px] text-violet-500 font-mono truncate">{{ formatFilterConfig(cf) }}</span>
+          </div>
+        </div>
+      </div>
+    </MobileCollapsible>
+
     <!-- 统计 + 操作 -->
     <MobileCollapsible v-if="hasData && cleanedRows.length" title="结果" :default-open="true">
       <div class="grid grid-cols-2 gap-2 mb-3">
@@ -162,6 +200,55 @@
             </select>
           </div>
         </div>
+
+        <!-- AI 配置方案可视化 -->
+        <div v-if="aiRulesConfig" class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3 animate-fade-in">
+          <div class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <SlidersHorizontal class="w-3.5 h-3.5 text-violet-500" /> AI 配置方案
+          </div>
+
+          <!-- Keep/Delete 比例条 -->
+          <div>
+            <div class="flex justify-between text-[10px] font-bold mb-1">
+              <span class="text-emerald-600">保留 {{ stats.keep }}</span>
+              <span class="text-slate-400">{{ totalCount }} 条</span>
+              <span class="text-rose-500">过滤 {{ stats.delete }}</span>
+            </div>
+            <div class="h-2 bg-slate-100 rounded-full overflow-hidden flex">
+              <div class="h-full bg-emerald-400 rounded-l-full transition-all duration-500" :style="{ width: (keepRatio * 100) + '%' }"></div>
+              <div class="h-full bg-rose-300 rounded-r-full transition-all duration-500" :style="{ width: ((1 - keepRatio) * 100) + '%' }"></div>
+            </div>
+          </div>
+
+          <!-- 原子规则标签 -->
+          <div v-if="enabledAtomicRules.length">
+            <div class="text-[10px] font-bold text-slate-400 mb-1.5">原子规则</div>
+            <div class="flex flex-wrap gap-1">
+              <span v-for="r in enabledAtomicRules" :key="r.key"
+                class="px-2 py-0.5 text-[10px] font-bold rounded-full border"
+                :class="ruleHitCounts[r.hitKey] ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
+                {{ r.title }}
+                <span v-if="ruleHitCounts[r.hitKey]" class="ml-0.5 opacity-70">×{{ ruleHitCounts[r.hitKey] }}</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- 自定义筛选 -->
+          <div v-if="customFiltersList.length">
+            <div class="text-[10px] font-bold text-slate-400 mb-1.5">自定义筛选</div>
+            <div class="space-y-1">
+              <div v-for="cf in customFiltersList" :key="cf.id"
+                class="flex items-center gap-1.5 px-2.5 py-1.5 bg-violet-50 rounded-lg border border-violet-200/60">
+                <span class="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0"></span>
+                <span class="text-[10px] font-bold text-violet-700">{{ cf.name }}</span>
+                <span class="text-[9px] text-violet-500 font-mono truncate">{{ formatFilterConfig(cf) }}</span>
+                <span v-if="ruleHitCounts['custom:' + cf.name]" class="ml-auto text-[9px] text-violet-400 font-bold shrink-0">
+                  ×{{ ruleHitCounts['custom:' + cf.name] }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Right Panel: Results -->
@@ -254,7 +341,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Sparkles, Download } from 'lucide-vue-next'
+import { Sparkles, Download, SlidersHorizontal } from 'lucide-vue-next'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
@@ -281,6 +368,19 @@ const intentInput = ref('')
 const isOptimizing = ref(false)
 const aiSummary = ref('')
 const activeFilter = ref('all')
+
+const RULES_META = [
+  { key: 'empty', title: '空文本', hitKey: 'empty_text' },
+  { key: 'tooShort', title: '过短', hitKey: 'text_too_short' },
+  { key: 'duplicate', title: '重复', hitKey: 'exact_duplicate' },
+  { key: 'pureEmoji', title: '纯表情', hitKey: 'pure_emoji' },
+  { key: 'pureSymbol', title: '纯符号', hitKey: 'pure_symbol' },
+  { key: 'linkOnly', title: '纯链接', hitKey: 'link_only' },
+  { key: 'topicOnly', title: '话题', hitKey: 'topic_only' },
+  { key: 'shortMeaningless', title: '无意义', hitKey: 'short_meaningless' },
+  { key: 'adLink', title: '广告', hitKey: 'ad_link' },
+  { key: 'garbledText', title: '乱码', hitKey: 'suspect_garbled' }
+]
 
 const { headers, rows, hasData, importGlobalExcel, disconnectGlobalExcel } = useGlobalDataSync({
   onInit: () => {}
@@ -315,6 +415,40 @@ const filteredRows = computed(() => {
   return cleanedRows.value.filter(r => r.displayDecision === activeFilter.value)
 })
 
+const keepRatio = computed(() => totalCount.value ? stats.value.keep / totalCount.value : 0)
+
+const enabledAtomicRules = computed(() => {
+  if (!aiRulesConfig.value) return []
+  return RULES_META.filter(r => aiRulesConfig.value[r.key]?.enable)
+})
+
+const customFiltersList = computed(() => aiRulesConfig.value?.customFilters || [])
+
+const ruleHitCounts = computed(() => {
+  const counts = {}
+  cleanedRows.value.forEach(r => {
+    if (r.displayDecision === 'delete' && r.hitRule) {
+      counts[r.hitRule] = (counts[r.hitRule] || 0) + 1
+    }
+  })
+  return counts
+})
+
+function formatFilterConfig(filter) {
+  const c = filter.config || {}
+  switch (filter.type) {
+    case 'columnEquals': return `${headers.value[c.column] ?? '列' + c.column} = "${c.value}"`
+    case 'columnGt': return `${headers.value[c.column] ?? '列' + c.column} > ${c.value}`
+    case 'columnLt': return `${headers.value[c.column] ?? '列' + c.column} < ${c.value}`
+    case 'textContains': return `含「${(c.keywords || []).join(',')}」`
+    case 'textNotContains': return `不含「${(c.keywords || []).join(',')}」`
+    case 'textEquals': return `= "${c.value}"`
+    case 'regexMatch': return `/${c.pattern}/`
+    case 'textLength': return `长度 ${({ lt: '<', gt: '>', eq: '=', lte: '≤', gte: '≥' })[c.operator] || c.operator} ${c.value}`
+    default: return JSON.stringify(c)
+  }
+}
+
 // 核心列变化时，如果已有 AI 配置，重新跑 pipeline
 watch(() => dataShare.coreColumn, () => {
   if (aiRulesConfig.value && rows.value.length) {
@@ -345,18 +479,7 @@ async function runAiOptimize() {
     for (let c = 0; c < headers.value.length; c++) {
       allColumnSamples[c] = rows.value.slice(0, 20).map(r => r[c] != null ? String(r[c]) : '')
     }
-    const rulesMeta = [
-      { key: 'empty', title: '空文本过滤', description: '空单元格删除' },
-      { key: 'tooShort', title: '字数过短', description: '过短无意义文本' },
-      { key: 'duplicate', title: '精确去重', description: '重复文本' },
-      { key: 'pureEmoji', title: '纯表情', description: '纯表情符号' },
-      { key: 'pureSymbol', title: '纯符号', description: '纯标点符号' },
-      { key: 'linkOnly', title: '纯链接', description: '纯网址' },
-      { key: 'topicOnly', title: '纯话题', description: '纯话题标签' },
-      { key: 'shortMeaningless', title: '无意义短词', description: '水贴词汇' },
-      { key: 'adLink', title: '引流广告', description: '含广告关键词' },
-      { key: 'garbledText', title: '疑似乱码', description: '非正常字符占比高' }
-    ]
+    const rulesMeta = RULES_META.map(r => ({ key: r.key, title: r.title, description: r.title }))
 
     const prompt = getSmartFilterPrompt(input, headers.value, sourceCol.value, allColumnSamples, rulesMeta)
     const raw = await callAI(prompt, '你是一个数据清洗专家。', settings.getApiConfig().workModel)
@@ -402,7 +525,7 @@ async function runAiOptimize() {
     // 生成摘要
     const enabledCount = Object.keys(config).filter(k => config[k]?.enable).length
     const customCount = config.customFilters?.length || 0
-    aiSummary.value = `已启用 ${enabledCount} 条原子规则` + (customCount ? `，添加 ${customCount} 条自定义筛选` : '') + `。核心列：${headers.value[sourceCol.value]}`
+    aiSummary.value = parsed.analysis || ''
 
     toast.success('AI 配置完成')
   } catch (err) {
