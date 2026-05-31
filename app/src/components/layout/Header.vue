@@ -30,7 +30,8 @@ const titles = {
   '/translate': '批量翻译',
   '/analysis': '数据分析',
   '/summary': '数据摘要',
-  '/cleaning': '数据清洗'
+  '/cleaning': '数据清洗',
+  '/optimize': '数据优化'
 }
 
 const title = computed(() => titles[route.path] || '智能分析助手')

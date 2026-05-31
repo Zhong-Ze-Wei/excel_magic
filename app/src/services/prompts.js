@@ -218,10 +218,12 @@ ${rulesDesc}
       "policy": "delete",
       "config": { "column": 3, "value": "负面" }
     }
-  ]
+  ],
+  "recommendedCoreColumn": 2
 }
 
-当 strategy 为 "builtin" 时仅填充 builtinConfig，为 "custom" 时仅填充 customFilters，为 "mixed" 时两者都填充。`
+当 strategy 为 "builtin" 时仅填充 builtinConfig，为 "custom" 时仅填充 customFilters，为 "mixed" 时两者都填充。
+recommendedCoreColumn 为可选字段：如果当前清洗目标列不适合用户的意图，推荐更合适的列索引（0-based）；如果不需更换则省略。`
 }
 
 // ─── AI 打标方案：三个核心 Prompt 函数 ───

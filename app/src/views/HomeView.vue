@@ -194,7 +194,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { Languages, Brain, FileBarChart, Eraser, ArrowRight, UploadCloud, Database, X, FileSpreadsheet, RefreshCw } from 'lucide-vue-next'
+import { Languages, Brain, FileBarChart, Eraser, ArrowRight, UploadCloud, Database, X, FileSpreadsheet, RefreshCw, Sparkles } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import { useDevice } from '../composables/useDevice'
 import FileUploader from '../components/common/FileUploader.vue'
@@ -250,6 +250,7 @@ function clearGlobalExcel() {
 }
 
 const cards = [
+  { route: '/optimize', title: '数据优化', desc: 'AI 一句话清洗，自动识别核心列，智能配置清洗规则。', icon: Sparkles, bgAccent: 'bg-amber-50', iconBg: 'bg-amber-100 text-amber-600', iconBgHover: 'bg-amber-600', linkColor: 'text-amber-600', supportGlobal: true },
   { route: '/cleaning', title: '数据清洗', desc: '智能识别并修复数据中的格式错误、缺失值和异常项。', icon: Eraser, bgAccent: 'bg-orange-50', iconBg: 'bg-orange-100 text-orange-600', iconBgHover: 'bg-orange-600', linkColor: 'text-orange-600', supportGlobal: true },
   { route: '/translate', title: '批量翻译', desc: '上传 Excel/CSV 文件，批量翻译产品参数、评论或标题。', icon: Languages, bgAccent: 'bg-blue-50', iconBg: 'bg-blue-100 text-blue-600', iconBgHover: 'bg-blue-600', linkColor: 'text-blue-600', supportGlobal: true },
   { route: '/analysis', title: '数据分析', desc: '智能分析用户评论与表格数据，自动提取情感倾向、观点和分类标签。', icon: Brain, bgAccent: 'bg-violet-50', iconBg: 'bg-violet-100 text-violet-600', iconBgHover: 'bg-violet-600', linkColor: 'text-violet-600', supportGlobal: true },
