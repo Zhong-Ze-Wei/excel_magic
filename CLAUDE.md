@@ -26,10 +26,12 @@ npm test           # Vitest
 
 ## 分支与提交规范
 
-- 所有修改必须在分支上进行（`feat/`、`fix/`、`refactor/`），不在 master 上直接改代码
+- **禁止在 master 上直接 commit**：所有修改必须先 `git checkout -b <type>/<name>` 建立分支，在分支上开发
+- 分支命名：`feat/xxx`（功能）、`fix/xxx`（修复）、`refactor/xxx`（重构）、`docs/xxx`（文档）
 - 每个 commit 原子化——一个 commit 只做一件事，可独立验证、可单独回滚
 - commit 前必须通过 `npm run build` + `npm test`
-- 本地审核通过后 fast-forward merge 到 master，再 `git push origin master`
+- 分支开发完成后，切回 master 执行 `git merge --no-ff <branch>` 合并（保留分支拓扑）
+- 合并后 `git push origin master` 同步远程，然后可删除本地分支
 
 ## 架构决策记录
 
