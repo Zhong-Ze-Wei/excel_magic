@@ -51,13 +51,46 @@
       </div>
     </div>
 
+    <!-- 移动端数据洞察 -->
+    <MobileCollapsible v-if="dataShare.hasData && profiles.length" title="数据洞察" :default-open="true">
+      <div v-if="isAnalyzing" class="flex items-center gap-2 text-[10px] text-violet-600 py-2">
+        <Loader2 class="w-3.5 h-3.5 animate-spin" /> AI 分析中...
+      </div>
+      <div v-else class="space-y-2.5">
+        <div class="flex flex-wrap gap-1">
+          <span v-for="t in typeSummary" :key="t.label"
+            class="px-1.5 py-0.5 text-[9px] font-bold rounded-full border" :class="t.color">
+            {{ t.label }} ×{{ t.count }}
+          </span>
+        </div>
+        <div class="text-[10px] text-slate-600">
+          <span class="font-bold text-emerald-700">核心列</span> {{ coreReason }}
+        </div>
+        <div v-if="recommendations.length" class="space-y-1">
+          <div v-for="rec in recommendations" :key="rec.route"
+            @click="$router.push(rec.route)"
+            class="flex items-center gap-1.5 px-2 py-1.5 bg-violet-50 rounded-lg border border-violet-200/60 active:bg-violet-100">
+            <span class="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0"></span>
+            <span class="text-[9px] font-bold text-violet-700">{{ cards.find(c => c.route === rec.route)?.title || rec.route }}</span>
+            <span class="text-[8px] text-violet-500 truncate">{{ rec.reason }}</span>
+          </div>
+        </div>
+      </div>
+    </MobileCollapsible>
+
     <!-- 功能卡片 — 2×2 网格 -->
     <div class="grid grid-cols-2 gap-3">
       <div v-for="card in cards" :key="card.route" @click="$router.push(card.route)"
-        class="bg-white rounded-xl p-3 border border-slate-200 shadow-sm active:bg-slate-50 relative overflow-hidden">
+        class="bg-white rounded-xl p-3 border shadow-sm active:bg-slate-50 relative overflow-hidden"
+        :class="recommendedRoutes.has(card.route) ? 'border-amber-300 ring-1 ring-amber-200' : 'border-slate-200'">
         <span v-if="dataShare.hasData && card.supportGlobal"
           class="absolute top-1.5 right-1.5 bg-emerald-600 text-white text-[7px] font-bold px-1 py-0.5 rounded-full">
           就绪
+        </span>
+        <span v-if="recommendedRoutes.has(card.route)"
+          class="absolute top-1.5 right-1.5 bg-amber-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full"
+          :class="dataShare.hasData && card.supportGlobal ? 'right-[38px]' : ''">
+          推荐
         </span>
         <div class="w-9 h-9 rounded-lg flex items-center justify-center mb-2" :class="card.iconBg">
           <component :is="card.icon" class="w-4.5 h-4.5" />
@@ -157,21 +190,90 @@
       </div>
     </div>
 
+    <!-- 数据洞察卡片 -->
+    <div v-if="dataShare.hasData && profiles.length" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 animate-fade-in">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <Lightbulb class="w-4 h-4 text-amber-500" /> 数据洞察
+        </h3>
+        <span v-if="isAnalyzing" class="flex items-center gap-1.5 text-xs text-violet-600 font-medium">
+          <Loader2 class="w-3.5 h-3.5 animate-spin" /> AI 分析中...
+        </span>
+      </div>
+      <div v-if="!isAnalyzing" class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- 列类型分布 -->
+        <div>
+          <div class="text-[10px] font-bold text-slate-400 mb-2 uppercase">列类型分布</div>
+          <div class="flex flex-wrap gap-1.5">
+            <span v-for="t in typeSummary" :key="t.label"
+              class="px-2.5 py-1 text-[11px] font-bold rounded-full border" :class="t.color">
+              {{ t.label }} ×{{ t.count }}
+            </span>
+          </div>
+          <div v-if="profiles.length" class="mt-3 space-y-1">
+            <div v-for="p in profiles.slice(0, 5)" :key="p.header" class="flex items-center gap-2 text-[10px]">
+              <span class="font-bold text-slate-600 truncate max-w-[80px]" :title="p.header">{{ p.header }}</span>
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-bold border"
+                :class="(TYPE_COLORS[p.type] || 'bg-slate-50 text-slate-400 border-slate-100')">
+                {{ TYPE_LABELS[p.type] || p.type }}
+              </span>
+              <span class="text-slate-400">{{ p.uniqueCount }} 唯一</span>
+            </div>
+            <div v-if="profiles.length > 5" class="text-[9px] text-slate-400">... 共 {{ profiles.length }} 列</div>
+          </div>
+        </div>
+        <!-- 核心列 -->
+        <div>
+          <div class="text-[10px] font-bold text-slate-400 mb-2 uppercase">核心处理列</div>
+          <div v-if="profiles[dataShare.coreColumn]" class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+            <div class="text-sm font-black text-emerald-800">{{ profiles[dataShare.coreColumn].header }}</div>
+            <div class="text-[11px] text-emerald-600 mt-1">{{ coreReason }}</div>
+            <div class="flex items-center gap-3 mt-2 text-[10px] text-emerald-700">
+              <span v-if="profiles[dataShare.coreColumn].fillRate != null">填充率 {{ profiles[dataShare.coreColumn].fillRate }}%</span>
+              <span v-if="profiles[dataShare.coreColumn].uniqueCount != null">{{ profiles[dataShare.coreColumn].uniqueCount }} 唯一值</span>
+            </div>
+          </div>
+        </div>
+        <!-- 建议操作 -->
+        <div>
+          <div class="text-[10px] font-bold text-slate-400 mb-2 uppercase">建议操作</div>
+          <div class="space-y-2">
+            <div v-for="rec in recommendations" :key="rec.route"
+              @click="$router.push(rec.route)"
+              class="flex items-start gap-2 p-2.5 bg-violet-50 border border-violet-200/60 rounded-lg cursor-pointer hover:bg-violet-100 transition-colors">
+              <span class="w-2 h-2 rounded-full bg-violet-400 mt-1 shrink-0"></span>
+              <div>
+                <div class="text-[11px] font-bold text-violet-700">{{ cards.find(c => c.route === rec.route)?.title || rec.route }}</div>
+                <div class="text-[10px] text-violet-500">{{ rec.reason }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 功能卡片列表 -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div v-for="card in cards" :key="card.route" @click="$router.push(card.route)"
-        class="group bg-white rounded-2xl p-6 border border-slate-200 shadow-sm cursor-pointer card-hover relative overflow-hidden transition-all duration-300"
-        :class="{
-          'border-emerald-500/20 bg-emerald-500/[0.01] hover:border-emerald-500/40 hover:shadow-md': dataShare.hasData && card.supportGlobal
-        }">
+        class="group bg-white rounded-2xl p-6 border shadow-sm cursor-pointer card-hover relative overflow-hidden transition-all duration-300"
+        :class="[
+          recommendedRoutes.has(card.route) ? 'ring-2 ring-amber-300/50 border-amber-300' : 'border-slate-200',
+          { 'border-emerald-500/20 bg-emerald-500/[0.01] hover:border-emerald-500/40 hover:shadow-md': dataShare.hasData && card.supportGlobal }
+        ]">
         <div class="absolute top-0 right-0 w-24 h-24 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"
           :class="card.bgAccent"></div>
-        
+
         <!-- 全局数据就绪角标 -->
-        <span v-if="dataShare.hasData && card.supportGlobal" 
+        <span v-if="dataShare.hasData && card.supportGlobal"
           class="absolute top-3 right-3 bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full z-20 flex items-center gap-1 shadow-sm">
           <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
           全局数据就绪
+        </span>
+        <!-- 推荐角标 -->
+        <span v-if="recommendedRoutes.has(card.route)"
+          class="absolute top-3 z-20 bg-amber-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm"
+          :class="dataShare.hasData && card.supportGlobal ? 'right-[100px]' : 'right-3'">
+          推荐
         </span>
 
         <div class="relative z-10">
@@ -194,10 +296,12 @@
 
 <script setup>
 import { ref } from 'vue'
-import { Languages, Brain, FileBarChart, Eraser, ArrowRight, UploadCloud, Database, X, FileSpreadsheet, RefreshCw } from 'lucide-vue-next'
+import { Languages, Brain, FileBarChart, Eraser, ArrowRight, UploadCloud, Database, X, FileSpreadsheet, RefreshCw, Lightbulb, Loader2 } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import { useDevice } from '../composables/useDevice'
+import { useDataInsight } from '../composables/useDataInsight'
 import FileUploader from '../components/common/FileUploader.vue'
+import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import { readFile } from '../services/excel'
 import { useToast } from '../services/toast'
 
@@ -206,6 +310,8 @@ const { isMobile } = useDevice()
 const toast = useToast()
 const dataShare = useDataShareStore()
 const isUploading = ref(false)
+
+const { profiles, typeSummary, coreReason, recommendations, recommendedRoutes, isAnalyzing, TYPE_LABELS, TYPE_COLORS } = useDataInsight()
 
 async function handleGlobalFile(file) {
   try {
