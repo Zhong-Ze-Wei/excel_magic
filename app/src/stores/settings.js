@@ -50,6 +50,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const concurrency = ref(parseInt(localStorage.getItem('magic_excel_concurrency')) || 3)
   watch(concurrency, (v) => localStorage.setItem('magic_excel_concurrency', String(v)))
 
+  // 数据洞察分析引擎: 'heuristic' | 'ai'
+  const dataInsightMode = ref(localStorage.getItem('data_insight_mode') || 'heuristic')
+  watch(dataInsightMode, (v) => localStorage.setItem('data_insight_mode', v))
+
   // 当前平台的完整配置
   const platformConfig = computed(() => API_PLATFORMS[currentPlatform.value])
   // 当前的 API Key
@@ -186,7 +190,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     currentPlatform, platformConfig, apiKey, isConfigured,
     translateModel, workModel, useSystemPrompt, showSettings,
-    selectedTranslateModel, selectedWorkModel, rulesConfig, concurrency,
+    selectedTranslateModel, selectedWorkModel, rulesConfig, concurrency, dataInsightMode,
     API_PLATFORMS, getApiConfig, setPlatform, saveApiKey, saveModelSelection,
     exportGlobalConfig, importGlobalConfig, resetAllConfig
   }
