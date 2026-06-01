@@ -57,15 +57,34 @@
         <Loader2 class="w-3.5 h-3.5 animate-spin" /> AI 分析中...
       </div>
       <div v-else class="space-y-2.5">
+        <!-- 表格类型 -->
+        <div class="flex items-center gap-2">
+          <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-bold">{{ tableType.label }}</span>
+          <span class="text-[10px] text-slate-400">{{ dataShare.rows.length }}行 × {{ dataShare.headers.length }}列</span>
+        </div>
+        <!-- 核心列 -->
+        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2">
+          <div class="text-[10px] font-bold text-emerald-800">核心列: {{ dataShare.headers[recommendedCoreIdx] }}</div>
+          <div class="text-[9px] text-emerald-600 mt-0.5 leading-relaxed">{{ coreReason }}</div>
+        </div>
+        <!-- 列分组概览 -->
         <div class="flex flex-wrap gap-1">
-          <span v-for="t in typeSummary" :key="t.label"
-            class="px-1.5 py-0.5 text-[9px] font-bold rounded-full border" :class="t.color">
-            {{ t.label }} ×{{ t.count }}
-          </span>
+          <template v-for="group in columnOverview" :key="group.type">
+            <span class="px-1.5 py-0.5 text-[9px] font-bold rounded-full border" :class="group.color">
+              {{ group.label }}×{{ group.columns.length }}
+            </span>
+          </template>
         </div>
-        <div class="text-[10px] text-slate-600">
-          <span class="font-bold text-emerald-700">核心列</span> {{ coreReason }}
+        <!-- 关键列 -->
+        <div class="space-y-0.5">
+          <div v-for="col in columnOverview.filter(g => g.type !== 'identifier').flatMap(g => g.columns).slice(0, 5)" :key="col.header"
+            class="flex items-center gap-1 text-[9px]" :class="col.isCore ? 'text-emerald-700 font-bold' : 'text-slate-500'">
+            <span class="truncate max-w-[60px]">{{ col.header }}</span>
+            <span v-if="col.stat" class="text-slate-400 shrink-0">({{ col.stat }})</span>
+            <span v-if="col.isCore" class="text-emerald-500">★</span>
+          </div>
         </div>
+        <!-- 建议 -->
         <div v-if="recommendations.length" class="space-y-1">
           <div v-for="rec in recommendations" :key="rec.route"
             @click="$router.push(rec.route)"
@@ -200,51 +219,58 @@
           <Loader2 class="w-3.5 h-3.5 animate-spin" /> AI 分析中...
         </span>
       </div>
-      <div v-if="!isAnalyzing" class="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <!-- 列类型分布 -->
-        <div>
-          <div class="text-[10px] font-bold text-slate-400 mb-2 uppercase">列类型分布</div>
-          <div class="flex flex-wrap gap-1.5">
-            <span v-for="t in typeSummary" :key="t.label"
-              class="px-2.5 py-1 text-[11px] font-bold rounded-full border" :class="t.color">
-              {{ t.label }} ×{{ t.count }}
-            </span>
-          </div>
-          <div v-if="profiles.length" class="mt-3 space-y-1">
-            <div v-for="p in profiles.slice(0, 5)" :key="p.header" class="flex items-center gap-2 text-[10px]">
-              <span class="font-bold text-slate-600 truncate max-w-[80px]" :title="p.header">{{ p.header }}</span>
-              <span class="px-1.5 py-0.5 rounded text-[9px] font-bold border"
-                :class="(TYPE_COLORS[p.type] || 'bg-slate-50 text-slate-400 border-slate-100')">
-                {{ TYPE_LABELS[p.type] || p.type }}
-              </span>
-              <span class="text-slate-400">{{ p.uniqueCount }} 唯一</span>
+      <div v-if="!isAnalyzing" class="space-y-5">
+        <!-- 数据画像 + 核心列 -->
+        <div class="flex flex-col sm:flex-row gap-5">
+          <!-- 左：画像 -->
+          <div class="sm:w-1/2 space-y-3">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold">{{ tableType.label }}</span>
+              <span class="text-xs text-slate-500">{{ dataShare.rows.length }}行 × {{ dataShare.headers.length }}列 · {{ tableType.desc }}</span>
             </div>
-            <div v-if="profiles.length > 5" class="text-[9px] text-slate-400">... 共 {{ profiles.length }} 列</div>
-          </div>
-        </div>
-        <!-- 核心列 -->
-        <div>
-          <div class="text-[10px] font-bold text-slate-400 mb-2 uppercase">核心处理列</div>
-          <div v-if="profiles[dataShare.coreColumn]" class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-            <div class="text-sm font-black text-emerald-800">{{ profiles[dataShare.coreColumn].header }}</div>
-            <div class="text-[11px] text-emerald-600 mt-1">{{ coreReason }}</div>
-            <div class="flex items-center gap-3 mt-2 text-[10px] text-emerald-700">
-              <span v-if="profiles[dataShare.coreColumn].fillRate != null">填充率 {{ profiles[dataShare.coreColumn].fillRate }}%</span>
-              <span v-if="profiles[dataShare.coreColumn].uniqueCount != null">{{ profiles[dataShare.coreColumn].uniqueCount }} 唯一值</span>
+            <!-- 列分组概览 -->
+            <div class="space-y-1.5">
+              <div v-for="group in columnOverview" :key="group.type" class="flex items-start gap-2">
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded border shrink-0" :class="group.color">
+                  {{ group.label }}({{ group.columns.length }})
+                </span>
+                <div class="flex flex-wrap gap-x-2 gap-y-0.5">
+                  <span v-for="col in group.columns.slice(0, 6)" :key="col.header"
+                    class="text-[11px]" :class="col.isCore ? 'text-emerald-700 font-bold' : 'text-slate-600'">
+                    {{ col.header }}<span v-if="col.stat" class="text-slate-400 font-normal">({{ col.stat }})</span>
+                    <span v-if="col.isCore" class="text-emerald-500">★</span>
+                  </span>
+                  <span v-if="group.columns.length > 6" class="text-[10px] text-slate-400">+{{ group.columns.length - 6 }}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        <!-- 建议操作 -->
-        <div>
-          <div class="text-[10px] font-bold text-slate-400 mb-2 uppercase">建议操作</div>
-          <div class="space-y-2">
-            <div v-for="rec in recommendations" :key="rec.route"
-              @click="$router.push(rec.route)"
-              class="flex items-start gap-2 p-2.5 bg-violet-50 border border-violet-200/60 rounded-lg cursor-pointer hover:bg-violet-100 transition-colors">
-              <span class="w-2 h-2 rounded-full bg-violet-400 mt-1 shrink-0"></span>
-              <div>
-                <div class="text-[11px] font-bold text-violet-700">{{ cards.find(c => c.route === rec.route)?.title || rec.route }}</div>
-                <div class="text-[10px] text-violet-500">{{ rec.reason }}</div>
+          <!-- 右：核心列 + 建议 -->
+          <div class="sm:w-1/2 space-y-4">
+            <!-- 核心列 -->
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs font-bold text-emerald-800">核心列:</span>
+                <span class="text-sm font-black text-emerald-900">{{ dataShare.headers[recommendedCoreIdx] }}</span>
+              </div>
+              <div class="text-[11px] text-emerald-600 leading-relaxed">{{ coreReason }}</div>
+              <button v-if="recommendedCoreIdx !== dataShare.coreColumn"
+                @click="dataShare.setCoreColumn(recommendedCoreIdx)"
+                class="mt-2 px-2 py-0.5 text-[10px] bg-emerald-600 text-white rounded hover:bg-emerald-700">
+                切换为此核心列
+              </button>
+            </div>
+            <!-- 建议操作 -->
+            <div class="space-y-2">
+              <div class="text-[10px] font-bold text-slate-400 uppercase">建议操作</div>
+              <div v-for="rec in recommendations" :key="rec.route"
+                @click="$router.push(rec.route)"
+                class="flex items-start gap-2 p-2.5 bg-violet-50 border border-violet-200/60 rounded-lg cursor-pointer hover:bg-violet-100 transition-colors">
+                <span class="w-2 h-2 rounded-full bg-violet-400 mt-1 shrink-0"></span>
+                <div>
+                  <div class="text-[11px] font-bold text-violet-700">{{ cards.find(c => c.route === rec.route)?.title || rec.route }}</div>
+                  <div class="text-[10px] text-violet-500">{{ rec.reason }}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -311,7 +337,7 @@ const toast = useToast()
 const dataShare = useDataShareStore()
 const isUploading = ref(false)
 
-const { profiles, typeSummary, coreReason, recommendations, recommendedRoutes, isAnalyzing, TYPE_LABELS, TYPE_COLORS } = useDataInsight()
+const { profiles, tableType, recommendedCoreIdx, coreReason, columnOverview, recommendations, recommendedRoutes, isAnalyzing } = useDataInsight()
 
 async function handleGlobalFile(file) {
   try {
