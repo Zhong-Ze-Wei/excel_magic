@@ -26,9 +26,10 @@ export function detectColumnType(values) {
   const dateCount = strValues.filter(v => DATE_REGEX.test(v)).length
   if (dateCount / total > 0.8) return 'date'
 
-  // 标识符
+  // 标识符 — 高唯一性 + 短值（排除长文本内容列）
   const unique = new Set(strValues)
-  if (unique.size === total && total > 5) return 'identifier'
+  const avgLen = strValues.reduce((s, v) => s + v.length, 0) / total
+  if (unique.size === total && total > 5 && avgLen < 30) return 'identifier'
 
   // 枚举
   if (unique.size <= 20 && unique.size / total <= 0.3) return 'enum'
