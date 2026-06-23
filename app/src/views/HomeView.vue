@@ -67,22 +67,12 @@
           <div class="text-[10px] font-bold text-emerald-800">核心列: {{ dataShare.headers[recommendedCoreIdx] }}</div>
           <div class="text-[9px] text-emerald-600 mt-0.5 leading-relaxed">{{ coreReason }}</div>
         </div>
-        <!-- 列分组概览 -->
+        <!-- 列类型分布 -->
         <div class="flex flex-wrap gap-1">
-          <template v-for="group in columnOverview" :key="group.type">
-            <span class="px-1.5 py-0.5 text-[9px] font-bold rounded-full border" :class="group.color">
-              {{ group.label }}×{{ group.columns.length }}
-            </span>
-          </template>
-        </div>
-        <!-- 关键列 -->
-        <div class="space-y-0.5">
-          <div v-for="col in columnOverview.filter(g => g.type !== 'identifier').flatMap(g => g.columns).slice(0, 5)" :key="col.header"
-            class="flex items-center gap-1 text-[9px]" :class="col.isCore ? 'text-emerald-700 font-bold' : 'text-slate-500'">
-            <span class="truncate max-w-[60px]">{{ col.header }}</span>
-            <span v-if="col.stat" class="text-slate-400 shrink-0">({{ col.stat }})</span>
-            <span v-if="col.isCore" class="text-emerald-500">★</span>
-          </div>
+          <span v-for="t in typeSummary" :key="t.label"
+            class="px-1.5 py-0.5 text-[9px] font-bold rounded-full border" :class="t.color">
+            {{ t.label }}×{{ t.count }}
+          </span>
         </div>
         <!-- 建议 -->
         <div v-if="recommendations.length" class="space-y-1">
@@ -228,21 +218,12 @@
               <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold">{{ tableType.label }}</span>
               <span class="text-xs text-slate-500">{{ dataShare.rows.length }}行 × {{ dataShare.headers.length }}列 · {{ tableType.desc }}</span>
             </div>
-            <!-- 列分组概览 -->
-            <div class="space-y-1.5">
-              <div v-for="group in columnOverview" :key="group.type" class="flex items-start gap-2">
-                <span class="px-2 py-0.5 text-[10px] font-bold rounded border shrink-0" :class="group.color">
-                  {{ group.label }}({{ group.columns.length }})
-                </span>
-                <div class="flex flex-wrap gap-x-2 gap-y-0.5">
-                  <span v-for="col in group.columns.slice(0, 6)" :key="col.header"
-                    class="text-[11px]" :class="col.isCore ? 'text-emerald-700 font-bold' : 'text-slate-600'">
-                    {{ col.header }}<span v-if="col.stat" class="text-slate-400 font-normal">({{ col.stat }})</span>
-                    <span v-if="col.isCore" class="text-emerald-500">★</span>
-                  </span>
-                  <span v-if="group.columns.length > 6" class="text-[10px] text-slate-400">+{{ group.columns.length - 6 }}</span>
-                </div>
-              </div>
+            <!-- 列类型分布徽章 -->
+            <div class="flex flex-wrap gap-1.5">
+              <span v-for="t in typeSummary" :key="t.label"
+                class="px-2.5 py-1 text-[11px] font-bold rounded-full border" :class="t.color">
+                {{ t.label }} ×{{ t.count }}
+              </span>
             </div>
           </div>
           <!-- 右：核心列 + 建议 -->
@@ -337,7 +318,7 @@ const toast = useToast()
 const dataShare = useDataShareStore()
 const isUploading = ref(false)
 
-const { profiles, tableType, recommendedCoreIdx, coreReason, columnOverview, recommendations, recommendedRoutes, isAnalyzing } = useDataInsight()
+const { profiles, tableType, recommendedCoreIdx, coreReason, typeSummary, recommendations, recommendedRoutes, isAnalyzing } = useDataInsight()
 
 async function handleGlobalFile(file) {
   try {
