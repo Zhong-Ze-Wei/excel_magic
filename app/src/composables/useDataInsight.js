@@ -122,34 +122,6 @@ export function useDataInsight() {
     return parts.join('，')
   })
 
-  // 列分组概览
-  const columnOverview = computed(() => {
-    const groups = {}
-    profiles.value.forEach(p => {
-      if (!groups[p.type]) {
-        groups[p.type] = { type: p.type, label: TYPE_LABELS[p.type] || p.type, color: TYPE_COLORS[p.type] || '', columns: [] }
-      }
-      let stat = ''
-      if (p.type === 'text') stat = p.avgLength ? `${p.avgLength}字` : `${p.uniqueCount}唯一`
-      else if (p.type === 'number') stat = p.min != null ? `${p.min}~${p.max}` : ''
-      else if (p.type === 'enum' || p.type === 'boolean') stat = `${p.uniqueCount}类`
-      else if (p.type === 'identifier') stat = `${p.uniqueCount}唯一`
-      else if (p.type === 'date') stat = p.dateRange || ''
-      groups[p.type].columns.push({ header: p.header, stat, isCore: false })
-    })
-    // 标记核心列
-    const coreIdx = recommendedCoreIdx.value
-    Object.values(groups).forEach(g => {
-      g.columns.forEach((c, i) => {
-        const globalIdx = profiles.value.findIndex(p => p.header === c.header)
-        c.isCore = globalIdx === coreIdx
-      })
-    })
-    // 排序：文本优先，然后按数量降序
-    const order = { text: 0, enum: 1, number: 2, boolean: 3, date: 4, identifier: 5, empty: 6 }
-    return Object.values(groups).sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9))
-  })
-
   // 列类型分布（紧凑分组）
   const typeSummary = computed(() => {
     const groups = {}
@@ -248,7 +220,7 @@ export function useDataInsight() {
 
   return {
     profiles, tableType, recommendedCoreIdx, coreReason,
-    columnOverview, typeSummary,
+    typeSummary,
     recommendations, recommendedRoutes, isAnalyzing,
     TYPE_LABELS, TYPE_COLORS
   }

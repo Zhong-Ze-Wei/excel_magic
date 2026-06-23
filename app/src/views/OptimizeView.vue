@@ -108,6 +108,10 @@
             class="py-2 bg-emerald-600 text-white rounded-lg text-[10px] font-bold active:bg-emerald-700">
             应用到全局
           </button>
+          <button v-if="aiRulesConfig" @click="tuneInCleaning"
+            class="col-span-2 py-2 bg-amber-500 text-white rounded-lg text-[10px] font-bold active:bg-amber-600 flex items-center justify-center gap-1">
+            <SlidersHorizontal class="w-3.5 h-3.5" /> 精调此方案
+          </button>
         </div>
       </div>
     </MobileCollapsible>
@@ -295,6 +299,10 @@
                 class="px-3 py-1 text-violet-600 hover:bg-violet-50 rounded-md text-xs font-medium transition-all">
                 数据摘要
               </button>
+              <button v-if="aiRulesConfig" @click="tuneInCleaning"
+                class="px-3 py-1 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md text-xs font-medium transition-all flex items-center gap-1">
+                <SlidersHorizontal class="w-3.5 h-3.5" /> 精调此方案
+              </button>
               <span class="w-px h-4 bg-slate-200 mx-1"></span>
               <button @click="applyToGlobal" v-if="dataShare.hasData"
                 class="px-3 py-1 text-emerald-600 hover:bg-emerald-50 rounded-md text-xs font-medium transition-all">
@@ -341,6 +349,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Sparkles, Download, SlidersHorizontal } from 'lucide-vue-next'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
@@ -362,6 +371,7 @@ import { DEFAULT_RULES_CONFIG } from '../config/defaultSettings'
 const toast = useToast()
 const dataShare = useDataShareStore()
 const settings = useSettingsStore()
+const router = useRouter()
 const { isMobile } = useDevice()
 
 const intentInput = ref('')
@@ -560,6 +570,18 @@ function shareDataTo(targetPath) {
     rows: cleanedRows.value.filter(r => r.displayDecision === 'keep').map(r => r.originalRow)
   }), targetPath, '优化后数据')
   toast.success('数据已共享')
+}
+
+function tuneInCleaning() {
+  if (!aiRulesConfig.value) return
+  Object.assign(settings.rulesConfig, DEFAULT_RULES_CONFIG, aiRulesConfig.value)
+  dataShare.setSharedData(
+    [...headers.value],
+    cleanedRows.value.filter(r => r.displayDecision === 'keep').map(r => r.originalRow),
+    '优化后数据-精调', false
+  )
+  router.push('/cleaning')
+  toast.success('AI 方案已带入清洗页，可继续精调')
 }
 
 function applyToGlobal() {
