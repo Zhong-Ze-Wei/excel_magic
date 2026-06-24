@@ -69,8 +69,7 @@
       <!-- 快捷入口 -->
       <div v-if="intent.confirmedAt && hasAnyTask" class="flex flex-wrap gap-1.5 pt-1">
         <button v-if="intent.tasks.clean" @click="$router.push('/cleaning')" class="px-2 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold active:bg-orange-100">清洗</button>
-        <button v-if="intent.tasks.translate" @click="$router.push('/translate')" class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-bold active:bg-blue-100">翻译</button>
-        <button v-if="intent.tasks.analyze" @click="$router.push('/analysis')" class="px-2 py-0.5 bg-violet-50 text-violet-700 rounded text-[10px] font-bold active:bg-violet-100">分析</button>
+        <button v-if="intent.tasks.process || intent.tasks.translate || intent.tasks.analyze" @click="$router.push('/process')" class="px-2 py-0.5 bg-violet-50 text-violet-700 rounded text-[10px] font-bold active:bg-violet-100">智能加工</button>
         <button v-if="intent.tasks.summary" @click="$router.push('/summary')" class="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold active:bg-emerald-100">摘要</button>
       </div>
     </div>
@@ -219,13 +218,9 @@
             class="px-3 py-1.5 bg-orange-50 text-orange-700 rounded-md text-xs font-bold hover:bg-orange-100 transition-colors">
             开始清洗
           </button>
-          <button v-if="intent.tasks.translate" @click="$router.push('/translate')"
-            class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md text-xs font-bold hover:bg-blue-100 transition-colors">
-            开始翻译
-          </button>
-          <button v-if="intent.tasks.analyze" @click="$router.push('/analysis')"
+          <button v-if="intent.tasks.process || intent.tasks.translate || intent.tasks.analyze" @click="$router.push('/process')"
             class="px-3 py-1.5 bg-violet-50 text-violet-700 rounded-md text-xs font-bold hover:bg-violet-100 transition-colors">
-            开始分析
+            开始智能加工
           </button>
           <button v-if="intent.tasks.summary" @click="$router.push('/summary')"
             class="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-md text-xs font-bold hover:bg-emerald-100 transition-colors">
@@ -310,8 +305,7 @@ const formattedTasks = computed(() => {
   if (!intent.confirmedAt) return '未指定'
   const arr = []
   if (intent.tasks.clean) arr.push('清洗')
-  if (intent.tasks.translate) arr.push('翻译')
-  if (intent.tasks.analyze) arr.push('分析')
+  if (intent.tasks.process || intent.tasks.translate || intent.tasks.analyze) arr.push('智能加工')
   if (intent.tasks.summary) arr.push('摘要')
   return arr.length ? arr.join(' / ') : '未指定'
 })

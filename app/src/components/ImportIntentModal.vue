@@ -80,21 +80,26 @@ const toast = useToast()
 
 const taskOptions = [
   { key: 'clean', label: '清洗' },
-  { key: 'translate', label: '翻译' },
-  { key: 'analyze', label: '分析' },
+  { key: 'process', label: '智能加工' },
   { key: 'summary', label: '摘要' }
 ]
 
 const form = reactive({
   coreColumnIdx: null,
-  tasks: { clean: false, translate: false, analyze: false, summary: false },
+  tasks: { clean: false, process: false, summary: false },
   note: ''
 })
 
 watch(() => intent.showModal, (v) => {
   if (v) {
     form.coreColumnIdx = intent.coreColumnIdx ?? dataShare.coreColumn ?? 0
-    form.tasks = { ...intent.tasks }
+    // 兼容旧意图：translate/analyze 字段存在则合并到 process
+    const oldHasTranslateOrAnalyze = intent.tasks.translate || intent.tasks.analyze
+    form.tasks = {
+      clean: !!intent.tasks.clean,
+      process: !!(intent.tasks.process || oldHasTranslateOrAnalyze),
+      summary: !!intent.tasks.summary
+    }
     form.note = intent.note
   }
 })

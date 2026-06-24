@@ -3,7 +3,7 @@ import { ref } from 'vue'
 
 export const useImportIntentStore = defineStore('importIntent', () => {
   const coreColumnIdx = ref(null)
-  const tasks = ref({ clean: false, translate: false, analyze: false, summary: false })
+  const tasks = ref({ clean: false, process: false, summary: false })
   const note = ref('')
   const confirmedAt = ref(null)
   const showModal = ref(false)
@@ -30,7 +30,7 @@ export const useImportIntentStore = defineStore('importIntent', () => {
 
   function reset() {
     coreColumnIdx.value = null
-    tasks.value = { clean: false, translate: false, analyze: false, summary: false }
+    tasks.value = { clean: false, process: false, summary: false }
     note.value = ''
     confirmedAt.value = null
   }
