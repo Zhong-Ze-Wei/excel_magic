@@ -243,6 +243,7 @@
     <CustomFilterForm v-if="showAddFilterForm"
       :filter="editingFilter"
       :headers="headers"
+      :labeling-results="dataShare.labelingResults"
       @save="handleSaveFilter"
       @cancel="showAddFilterForm = false; editingFilter = null" />
   </div>
@@ -475,6 +476,7 @@
     <CustomFilterForm v-if="showAddFilterForm"
       :filter="editingFilter"
       :headers="headers"
+      :labeling-results="dataShare.labelingResults"
       @save="handleSaveFilter"
       @cancel="showAddFilterForm = false; editingFilter = null" />
   </div>
@@ -728,7 +730,7 @@ function runPipeline() {
   if (!rows.value.length) return
   // 仅对前 100 行原始数据进行预览清洗打标，这保证了极速渲染和 0 内存开销！
   const previewRows = rows.value.slice(0, 100)
-  cleanedRows.value = runCleaningPipeline(previewRows, headers.value, sourceCol.value, settings.rulesConfig)
+  cleanedRows.value = runCleaningPipeline(previewRows, headers.value, sourceCol.value, settings.rulesConfig, dataShare.labelingResults)
   
   // 极速计算全表的真实指标统计（Stats）
   calculateFullStats()
@@ -740,7 +742,7 @@ function calculateFullStats() {
     fullStats.value = { keep: 0, delete: 0, suspect: 0 }
     return
   }
-  const fullResult = runCleaningPipeline(rows.value, headers.value, sourceCol.value, settings.rulesConfig)
+  const fullResult = runCleaningPipeline(rows.value, headers.value, sourceCol.value, settings.rulesConfig, dataShare.labelingResults)
   let keep = 0
   let del = 0
   let suspect = 0
@@ -870,7 +872,7 @@ function ruleClass(decision) {
 
 // 运行全量清洗 Pipeline 并应用用户覆写
 function getCleanedFullResult() {
-  const fullResult = runCleaningPipeline(rows.value, headers.value, sourceCol.value, settings.rulesConfig)
+  const fullResult = runCleaningPipeline(rows.value, headers.value, sourceCol.value, settings.rulesConfig, dataShare.labelingResults)
   cleanedRows.value.forEach((previewRow, idx) => {
     if (previewRow.hitRule === 'user_override' || previewRow.hitRule === 'user_reset') {
       fullResult[idx].decision = previewRow.decision

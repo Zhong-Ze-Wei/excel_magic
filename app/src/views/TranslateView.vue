@@ -316,6 +316,7 @@ async function startTranslate() {
     headers.value.push(newColName)
   }
   resultCol.value = headers.value.indexOf(newColName)
+  dataShare.addTranslatedColumn(sourceCol.value, resultCol.value, newColName)
 
   const systemPrompt = getTranslatePrompt(scenario.value, direction.value)
 

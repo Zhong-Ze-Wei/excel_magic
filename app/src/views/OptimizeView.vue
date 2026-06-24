@@ -455,6 +455,10 @@ function formatFilterConfig(filter) {
     case 'textEquals': return `= "${c.value}"`
     case 'regexMatch': return `/${c.pattern}/`
     case 'textLength': return `长度 ${({ lt: '<', gt: '>', eq: '=', lte: '≤', gte: '≥' })[c.operator] || c.operator} ${c.value}`
+    case 'labelColumnEquals': {
+      const vals = Array.isArray(c.values) && c.values.length ? c.values : (c.value ? [c.value] : [])
+      return `AI标签[${c.outputKey}] ${vals.length > 1 ? '∈' : '='} ${vals.join('/')}`
+    }
     default: return JSON.stringify(c)
   }
 }
