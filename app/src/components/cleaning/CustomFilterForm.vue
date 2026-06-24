@@ -24,8 +24,8 @@
           </select>
         </div>
 
-        <!-- 作用列 (所有类型通用) -->
-        <div>
+        <!-- 作用列 (labelColumnEquals 类型不使用数据列) -->
+        <div v-if="form.type !== 'labelColumnEquals'">
           <label class="block text-xs font-bold text-slate-600 mb-1">作用列</label>
           <select v-model.number="form.config.column" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-orange-500">
             <option :value="-1">清洗目标列 (当前选中的列)</option>
@@ -115,6 +115,26 @@
                 class="w-full p-2 border border-slate-200 rounded text-xs focus:border-orange-500 outline-none bg-white font-mono" />
             </div>
           </template>
+
+          <!-- labelColumnEquals — AI 打标列匹配 -->
+          <template v-if="form.type === 'labelColumnEquals'">
+            <div v-if="!labelingOutputColumns.length" class="text-[10px] text-amber-600 bg-amber-50 p-2 rounded">
+              暂无 AI 打标结果，请先在「数据分析」页完成打标
+            </div>
+            <template v-else>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-500 mb-1">AI 打标列</label>
+                <select v-model="form.config.outputKey" class="w-full p-2 border border-slate-200 rounded text-xs focus:border-orange-500 outline-none bg-white">
+                  <option v-for="col in labelingOutputColumns" :key="col.key" :value="col.key">{{ col.name }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-500 mb-1">匹配标签值 (多个用逗号分隔)</label>
+                <textarea v-model="labelValuesStr" rows="2" placeholder="如: 负面, 差评"
+                  class="w-full p-2 border border-slate-200 rounded text-xs focus:border-orange-500 outline-none resize-none bg-white"></textarea>
+              </div>
+            </template>
+          </template>
         </div>
 
         <!-- 策略 -->
@@ -153,22 +173,31 @@ import { X, Check } from 'lucide-vue-next'
 
 const props = defineProps({
   filter: { type: Object, default: null },
-  headers: { type: Array, default: () => [] }
+  headers: { type: Array, default: () => [] },
+  labelingResults: { type: Object, default: null }
 })
 const emit = defineEmits(['save', 'cancel'])
 
 const isEdit = computed(() => !!props.filter)
 
-const filterTypes = [
-  { value: 'textContains', label: '文本包含关键词' },
-  { value: 'textNotContains', label: '文本不包含关键词' },
-  { value: 'textEquals', label: '文本精确匹配' },
-  { value: 'regexMatch', label: '正则匹配' },
-  { value: 'textLength', label: '文本长度筛选' },
-  { value: 'columnEquals', label: '列值精确匹配' },
-  { value: 'columnGt', label: '数值列大于' },
-  { value: 'columnLt', label: '数值列小于' }
-]
+const filterTypes = computed(() => {
+  const types = [
+    { value: 'textContains', label: '文本包含关键词' },
+    { value: 'textNotContains', label: '文本不包含关键词' },
+    { value: 'textEquals', label: '文本精确匹配' },
+    { value: 'regexMatch', label: '正则匹配' },
+    { value: 'textLength', label: '文本长度筛选' },
+    { value: 'columnEquals', label: '列值精确匹配' },
+    { value: 'columnGt', label: '数值列大于' },
+    { value: 'columnLt', label: '数值列小于' }
+  ]
+  if (labelingOutputColumns.value.length) {
+    types.push({ value: 'labelColumnEquals', label: 'AI 打标列匹配' })
+  }
+  return types
+})
+
+const labelingOutputColumns = computed(() => props.labelingResults?.outputColumns || [])
 
 function makeDefaultConfig(type) {
   const base = { column: -1 } // -1 = 清洗目标列
@@ -187,6 +216,8 @@ function makeDefaultConfig(type) {
     case 'columnGt':
     case 'columnLt':
       return { ...base, column: 0, value: 0 }
+    case 'labelColumnEquals':
+      return { outputKey: labelingOutputColumns.value[0]?.key || '', value: '', values: [] }
     default:
       return base
   }
@@ -211,6 +242,16 @@ const configStr = computed({
 
 // 列值多选 <-> 字符串双向绑定
 const columnValuesStr = computed({
+  get() {
+    return (form.value.config.values || []).join(', ')
+  },
+  set(val) {
+    form.value.config.values = val.split(/[,，]/).map(s => s.trim()).filter(Boolean)
+  }
+})
+
+// AI 标签值 <-> 字符串双向绑定
+const labelValuesStr = computed({
   get() {
     return (form.value.config.values || []).join(', ')
   },

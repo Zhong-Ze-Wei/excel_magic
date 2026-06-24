@@ -214,7 +214,7 @@ export function checkGarbledText(text, threshold = 0.4) {
 /**
  * 自定义筛选规则评估
  */
-export function evaluateCustomFilter(filter, row, normText, sourceColIdx) {
+export function evaluateCustomFilter(filter, row, normText, sourceColIdx, ctx = {}) {
   const c = filter.config || {}
   // 取目标列的文本：config.column 为 undefined 或 -1 时回退到 sourceColIdx
   const targetCol = (c.column != null && c.column >= 0) ? c.column : sourceColIdx
@@ -279,6 +279,18 @@ export function evaluateCustomFilter(filter, row, normText, sourceColIdx) {
       const num = parseFloat(row[c.column])
       return { hit: !isNaN(num) && num < (c.value || 0), reason: `列[${c.column}]小于 ${c.value}`, confidence: 0.95 }
     }
+    case 'labelColumnEquals': {
+      const lr = ctx?.labelingResults
+      if (!lr?.analysisMap) return { hit: false }
+      const rowLabel = lr.analysisMap[ctx.rowIdx]
+      const val = rowLabel?.values?.[c.outputKey]
+      const actual = Array.isArray(val) ? val.join(',') : (val != null ? String(val) : '')
+      if (Array.isArray(c.values) && c.values.length > 0) {
+        const hit = c.values.some(v => String(v) === actual)
+        return { hit, reason: `AI标签[${c.outputKey}]∈${c.values.join('/')}`, confidence: 0.99 }
+      }
+      return { hit: actual === String(c.value ?? ''), reason: `AI标签[${c.outputKey}]=${c.value}`, confidence: 0.99 }
+    }
     default:
       return { hit: false }
   }
@@ -287,7 +299,7 @@ export function evaluateCustomFilter(filter, row, normText, sourceColIdx) {
 /**
  * 数据清洗 Pipeline 主控制中心
  */
-export function runCleaningPipeline(rows, headers, sourceColIdx, rulesConfig) {
+export function runCleaningPipeline(rows, headers, sourceColIdx, rulesConfig, labelingResults = null) {
   // 1. 文本标准化
   const normalizedTexts = rows.map(row => {
     const val = row[sourceColIdx]
@@ -460,7 +472,7 @@ export function runCleaningPipeline(rows, headers, sourceColIdx, rulesConfig) {
     if (decision === 'keep' && rulesConfig.customFilters?.length) {
       for (const filter of rulesConfig.customFilters) {
         if (!filter.enabled) continue
-        const res = evaluateCustomFilter(filter, row, normText, sourceColIdx)
+        const res = evaluateCustomFilter(filter, row, normText, sourceColIdx, { labelingResults, rowIdx: idx })
         if (res.hit) {
           decision = filter.policy === 'delete' ? 'delete' : 'suspect'
           hitRule = 'custom:' + filter.name
