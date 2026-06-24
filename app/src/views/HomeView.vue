@@ -51,41 +51,29 @@
       </div>
     </div>
 
-    <!-- 移动端数据洞察 -->
-    <MobileCollapsible v-if="dataShare.hasData && profiles.length" title="数据洞察" :default-open="true">
-      <div v-if="isAnalyzing" class="flex items-center gap-2 text-[10px] text-violet-600 py-2">
-        <Loader2 class="w-3.5 h-3.5 animate-spin" /> AI 分析中...
+    <!-- 移动端：数据集意图卡 -->
+    <div v-if="dataShare.hasData" class="bg-white rounded-xl border border-slate-200 shadow-sm p-3 space-y-2">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-1.5">
+          <Target class="w-3.5 h-3.5 text-blue-600" />
+          <span class="text-xs font-bold text-slate-800">数据集意图</span>
+        </div>
+        <button @click="reopenIntent" class="text-[10px] text-blue-600 active:text-blue-800 font-bold">编辑</button>
       </div>
-      <div v-else class="space-y-2.5">
-        <!-- 表格类型 -->
-        <div class="flex items-center gap-2">
-          <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-bold">{{ tableType.label }}</span>
-          <span class="text-[10px] text-slate-400">{{ dataShare.rows.length }}行 × {{ dataShare.headers.length }}列</span>
-        </div>
-        <!-- 核心列 -->
-        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2">
-          <div class="text-[10px] font-bold text-emerald-800">核心列: {{ dataShare.headers[recommendedCoreIdx] }}</div>
-          <div class="text-[9px] text-emerald-600 mt-0.5 leading-relaxed">{{ coreReason }}</div>
-        </div>
-        <!-- 列类型分布 -->
-        <div class="flex flex-wrap gap-1">
-          <span v-for="t in typeSummary" :key="t.label"
-            class="px-1.5 py-0.5 text-[9px] font-bold rounded-full border" :class="t.color">
-            {{ t.label }}×{{ t.count }}
-          </span>
-        </div>
-        <!-- 建议 -->
-        <div v-if="recommendations.length" class="space-y-1">
-          <div v-for="rec in recommendations" :key="rec.route"
-            @click="$router.push(rec.route)"
-            class="flex items-center gap-1.5 px-2 py-1.5 bg-violet-50 rounded-lg border border-violet-200/60 active:bg-violet-100">
-            <span class="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0"></span>
-            <span class="text-[9px] font-bold text-violet-700">{{ cards.find(c => c.route === rec.route)?.title || rec.route }}</span>
-            <span class="text-[8px] text-violet-500 truncate">{{ rec.reason }}</span>
-          </div>
-        </div>
+      <div v-if="intent.confirmedAt" class="space-y-1 text-[11px] text-slate-700">
+        <p>核心列：<strong class="text-emerald-700">{{ dataShare.headers[dataShare.coreColumn] || '未设置' }}</strong></p>
+        <p>任务：<span class="text-slate-600">{{ formattedTasks }}</span></p>
+        <p v-if="intent.note" class="text-slate-500 leading-relaxed">说明：{{ intent.note }}</p>
       </div>
-    </MobileCollapsible>
+      <p v-else class="text-[10px] text-slate-400 leading-relaxed">尚未设置处理意图，点击「编辑」选择核心列与任务。</p>
+      <!-- 快捷入口 -->
+      <div v-if="intent.confirmedAt && hasAnyTask" class="flex flex-wrap gap-1.5 pt-1">
+        <button v-if="intent.tasks.clean" @click="$router.push('/cleaning')" class="px-2 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold active:bg-orange-100">清洗</button>
+        <button v-if="intent.tasks.translate" @click="$router.push('/translate')" class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-bold active:bg-blue-100">翻译</button>
+        <button v-if="intent.tasks.analyze" @click="$router.push('/analysis')" class="px-2 py-0.5 bg-violet-50 text-violet-700 rounded text-[10px] font-bold active:bg-violet-100">分析</button>
+        <button v-if="intent.tasks.summary" @click="$router.push('/summary')" class="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold active:bg-emerald-100">摘要</button>
+      </div>
+    </div>
 
     <!-- 功能卡片 — 2×2 网格 -->
     <div class="grid grid-cols-2 gap-3">
@@ -199,63 +187,58 @@
       </div>
     </div>
 
-    <!-- 数据洞察卡片 -->
-    <div v-if="dataShare.hasData && profiles.length" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 animate-fade-in">
+    <!-- 数据集意图卡 -->
+    <div v-if="dataShare.hasData" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 animate-fade-in">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-          <Lightbulb class="w-4 h-4 text-amber-500" /> 数据洞察
+          <Target class="w-4 h-4 text-blue-600" /> 数据集意图
         </h3>
-        <span v-if="isAnalyzing" class="flex items-center gap-1.5 text-xs text-violet-600 font-medium">
-          <Loader2 class="w-3.5 h-3.5 animate-spin" /> AI 分析中...
-        </span>
+        <button @click="reopenIntent"
+          class="px-3 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
+          编辑意图
+        </button>
       </div>
-      <div v-if="!isAnalyzing" class="space-y-5">
-        <!-- 数据画像 + 核心列 -->
-        <div class="flex flex-col sm:flex-row gap-5">
-          <!-- 左：画像 -->
-          <div class="sm:w-1/2 space-y-3">
-            <div class="flex items-center gap-3 flex-wrap">
-              <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold">{{ tableType.label }}</span>
-              <span class="text-xs text-slate-500">{{ dataShare.rows.length }}行 × {{ dataShare.headers.length }}列 · {{ tableType.desc }}</span>
-            </div>
-            <!-- 列类型分布徽章 -->
-            <div class="flex flex-wrap gap-1.5">
-              <span v-for="t in typeSummary" :key="t.label"
-                class="px-2.5 py-1 text-[11px] font-bold rounded-full border" :class="t.color">
-                {{ t.label }} ×{{ t.count }}
-              </span>
-            </div>
+      <div v-if="intent.confirmedAt" class="space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+            <div class="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1">核心处理列</div>
+            <div class="text-sm font-black text-emerald-900">{{ dataShare.headers[dataShare.coreColumn] || '未设置' }}</div>
           </div>
-          <!-- 右：核心列 + 建议 -->
-          <div class="sm:w-1/2 space-y-4">
-            <!-- 核心列 -->
-            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-xs font-bold text-emerald-800">核心列:</span>
-                <span class="text-sm font-black text-emerald-900">{{ dataShare.headers[recommendedCoreIdx] }}</span>
-              </div>
-              <div class="text-[11px] text-emerald-600 leading-relaxed">{{ coreReason }}</div>
-              <button v-if="recommendedCoreIdx !== dataShare.coreColumn"
-                @click="dataShare.setCoreColumn(recommendedCoreIdx)"
-                class="mt-2 px-2 py-0.5 text-[10px] bg-emerald-600 text-white rounded hover:bg-emerald-700">
-                切换为此核心列
-              </button>
-            </div>
-            <!-- 建议操作 -->
-            <div class="space-y-2">
-              <div class="text-[10px] font-bold text-slate-400 uppercase">建议操作</div>
-              <div v-for="rec in recommendations" :key="rec.route"
-                @click="$router.push(rec.route)"
-                class="flex items-start gap-2 p-2.5 bg-violet-50 border border-violet-200/60 rounded-lg cursor-pointer hover:bg-violet-100 transition-colors">
-                <span class="w-2 h-2 rounded-full bg-violet-400 mt-1 shrink-0"></span>
-                <div>
-                  <div class="text-[11px] font-bold text-violet-700">{{ cards.find(c => c.route === rec.route)?.title || rec.route }}</div>
-                  <div class="text-[10px] text-violet-500">{{ rec.reason }}</div>
-                </div>
-              </div>
-            </div>
+          <div class="bg-violet-50 border border-violet-200 rounded-lg p-3">
+            <div class="text-[10px] font-bold text-violet-700 uppercase tracking-wider mb-1">任务</div>
+            <div class="text-sm font-bold text-violet-900">{{ formattedTasks }}</div>
           </div>
         </div>
+        <div v-if="intent.note" class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <div class="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">任务说明</div>
+          <div class="text-xs text-amber-900 leading-relaxed">{{ intent.note }}</div>
+        </div>
+        <!-- 快捷入口 -->
+        <div v-if="hasAnyTask" class="flex flex-wrap gap-2 pt-2">
+          <button v-if="intent.tasks.clean" @click="$router.push('/cleaning')"
+            class="px-3 py-1.5 bg-orange-50 text-orange-700 rounded-md text-xs font-bold hover:bg-orange-100 transition-colors">
+            开始清洗
+          </button>
+          <button v-if="intent.tasks.translate" @click="$router.push('/translate')"
+            class="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md text-xs font-bold hover:bg-blue-100 transition-colors">
+            开始翻译
+          </button>
+          <button v-if="intent.tasks.analyze" @click="$router.push('/analysis')"
+            class="px-3 py-1.5 bg-violet-50 text-violet-700 rounded-md text-xs font-bold hover:bg-violet-100 transition-colors">
+            开始分析
+          </button>
+          <button v-if="intent.tasks.summary" @click="$router.push('/summary')"
+            class="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-md text-xs font-bold hover:bg-emerald-100 transition-colors">
+            开始摘要
+          </button>
+        </div>
+      </div>
+      <div v-else class="text-center py-6">
+        <p class="text-sm text-slate-500 mb-3">尚未设置处理意图</p>
+        <button @click="reopenIntent"
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors">
+          选择核心列与任务
+        </button>
       </div>
     </div>
 
@@ -302,35 +285,46 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { Languages, Brain, FileBarChart, Eraser, ArrowRight, UploadCloud, Database, X, FileSpreadsheet, RefreshCw, Sparkles, Lightbulb, Loader2 } from 'lucide-vue-next'
+import { ref, computed } from 'vue'
+import { Languages, Brain, FileBarChart, Eraser, ArrowRight, UploadCloud, Database, X, FileSpreadsheet, RefreshCw, Sparkles, Target } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
+import { useImportIntentStore } from '../stores/importIntent'
 import { useDevice } from '../composables/useDevice'
-import { useDataInsight } from '../composables/useDataInsight'
+import { useFileUpload } from '../composables/useFileUpload'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
-import { readFile } from '../services/excel'
 import { useToast } from '../services/toast'
 
 const { isMobile } = useDevice()
 
 const toast = useToast()
 const dataShare = useDataShareStore()
-const isUploading = ref(false)
+const intent = useImportIntentStore()
 
-const { profiles, tableType, recommendedCoreIdx, coreReason, typeSummary, recommendations, recommendedRoutes, isAnalyzing } = useDataInsight()
+const { handleFile: handleGlobalFile } = useFileUpload()
 
-async function handleGlobalFile(file) {
-  try {
-    isUploading.value = true
-    const data = await readFile(file)
-    // 传递 true 开启首次推荐
-    dataShare.setSharedData(data.headers.map(String), data.rows, file.name, true, { sheetNames: data.sheetNames, currentSheet: data.currentSheet, file })
-  } catch (err) {
-    toast.error('文件解析失败: ' + err.message)
-  } finally {
-    isUploading.value = false
-  }
+// recommendedRoutes 留空 Set，保留卡片 class 逻辑兼容性
+const recommendedRoutes = new Set()
+
+const formattedTasks = computed(() => {
+  if (!intent.confirmedAt) return '未指定'
+  const arr = []
+  if (intent.tasks.clean) arr.push('清洗')
+  if (intent.tasks.translate) arr.push('翻译')
+  if (intent.tasks.analyze) arr.push('分析')
+  if (intent.tasks.summary) arr.push('摘要')
+  return arr.length ? arr.join(' / ') : '未指定'
+})
+
+const hasAnyTask = computed(() => intent.confirmedAt && Object.values(intent.tasks).some(Boolean))
+
+function reopenIntent() {
+  intent.open({
+    name: dataShare.sourceName,
+    rowCount: dataShare.rows.length,
+    colCount: dataShare.headers.length,
+    headers: [...dataShare.headers]
+  })
 }
 
 function loadGlobalDemo() {
@@ -353,13 +347,23 @@ function loadGlobalDemo() {
     ['15', 'User_015', '-'],
     ['16', 'User_016', '感觉一般，没有想象中好用，退货了。']
   ]
-  // 传递 true 开启首次推荐
-  dataShare.setSharedData(demoHeaders, demoRows, '社媒评论脏数据全局示例.csv', true)
-  toast.success('成功加载全局演示示例数据！现在您可以点击下方的”数据清洗”或其他卡片直接开始处理。')
+  // 演示数据不走 useFileUpload，手动加载并触发意图弹窗
+  dataShare.setSharedData(demoHeaders, demoRows, '社媒评论脏数据全局示例.csv', false)
+  if (intent.pendingFileMeta?.name !== '社媒评论脏数据全局示例.csv') {
+    intent.reset()
+  }
+  intent.open({
+    name: '社媒评论脏数据全局示例.csv',
+    rowCount: demoRows.length,
+    colCount: demoHeaders.length,
+    headers: [...demoHeaders]
+  })
+  toast.success('成功加载全局演示示例数据！请在弹窗中选择核心列与任务。')
 }
 
 function clearGlobalExcel() {
   dataShare.clearSharedData()
+  intent.reset()
 }
 
 const cards = [
