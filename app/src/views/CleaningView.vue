@@ -1,14 +1,6 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
   <div v-if="isMobile" class="px-3 py-3 space-y-3 pb-20 animate-fade-in">
-    <!-- 移动端标题 -->
-    <div class="bg-gradient-to-r from-orange-500/10 to-amber-500/10 rounded-xl border border-orange-200/50 p-3">
-      <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-        <Eraser class="w-5 h-5 text-orange-600" /> 数据清洗
-      </h2>
-      <p class="text-[10px] text-slate-500 mt-0.5">原子规则打标，不直接删除，支持审计与修正。</p>
-    </div>
-
     <!-- 全局关联状态 -->
     <div v-if="hasData && dataShare.hasData"
       class="bg-emerald-500/10 rounded-lg border border-emerald-500/20 px-3 py-2 flex justify-between items-center text-[10px]">
@@ -250,21 +242,6 @@
 
   <!-- ===== 桌面端模板（原样保留）===== -->
   <div v-else class="animate-fade-in max-w-7xl mx-auto space-y-6">
-    <!-- Header Summary Card -->
-    <div class="bg-gradient-to-r from-orange-500/10 to-amber-500/10 rounded-2xl border border-orange-200/50 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div>
-        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <Eraser class="w-6 h-6 text-orange-600 animate-bounce" /> 智能数据清洗系统
-        </h2>
-        <p class="text-xs text-slate-500 mt-1">
-          采用“原子判定规则” + “策略汇聚判定”架构，仅做风险打标而不直接删除，完全支持审计留痕与手动修正。
-        </p>
-      </div>
-      <button v-if="!hasData" @click="loadDemo" class="px-4 py-2 bg-white hover:bg-orange-50 border border-orange-200 text-orange-600 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5">
-        <RefreshCw class="w-3.5 h-3.5" /> 加载社媒评论脏数据示例
-      </button>
-    </div>
-
     <!-- 全局活跃 Excel 关联状态横幅 -->
     <div v-if="hasData && dataShare.hasData" 
       class="bg-emerald-500/10 rounded-xl border border-emerald-500/20 px-4 py-3 flex justify-between items-center text-xs animate-fade-in">
@@ -284,6 +261,10 @@
       <!-- Left Panel: Rules Configuration -->
       <div class="lg:col-span-4 space-y-6">
         <FileUploader v-if="!hasData" label="上传需要清洗的 Excel/CSV 文件" :icon="Eraser" iconBg="bg-orange-50" iconColor="text-orange-600" @file="handleFile" />
+        <button v-if="!hasData" @click="loadDemo"
+          class="w-full mt-2 py-2 bg-white hover:bg-orange-50 border border-orange-200 text-orange-600 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
+          <RefreshCw class="w-3.5 h-3.5" /> 加载社媒评论脏数据示例
+        </button>
 
         <CleaningRulesPanel v-if="hasData"
           :headers="headers"
@@ -316,7 +297,7 @@
           <Eraser class="w-16 h-16 mb-4 opacity-30 text-orange-500" />
           <h3 class="font-bold text-slate-700 text-sm">暂无数据</h3>
           <p class="text-xs text-slate-400 mt-1 max-w-sm text-center">
-            请在左侧上传您的 Excel/CSV 表格，或者点击顶部按钮一键加载极具针对性的脏数据评论样本进行体验。
+            请在左侧上传您的 Excel/CSV 表格，或者点击左侧按钮一键加载极具针对性的脏数据评论样本进行体验。
           </p>
         </div>
 

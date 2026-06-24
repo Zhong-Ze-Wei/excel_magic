@@ -7,8 +7,9 @@ const routes = [
   { path: '/translate', redirect: '/process' },
   { path: '/analysis', redirect: '/process' },
   { path: '/summary', name: 'summary', component: () => import('../views/SummaryView.vue') },
-  { path: '/optimize', name: 'optimize', component: () => import('../views/OptimizeView.vue') },
-  { path: '/cleaning', name: 'cleaning', component: () => import('../views/CleaningView.vue') }
+  // 数据清洗 = 简易模式（OptimizeView）+ 专家模式（CleaningView），统一入口在 CleaningHub
+  { path: '/cleaning', name: 'cleaning', component: () => import('../views/CleaningHub.vue') },
+  { path: '/optimize', redirect: '/cleaning' }
 ]
 
 export default createRouter({

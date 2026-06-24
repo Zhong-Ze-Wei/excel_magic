@@ -54,6 +54,13 @@ export const useSettingsStore = defineStore('settings', () => {
   const dataInsightMode = ref(localStorage.getItem('data_insight_mode') || 'heuristic')
   watch(dataInsightMode, (v) => localStorage.setItem('data_insight_mode', v))
 
+  // 数据清洗入口模式: 'simple' (AI 优化) | 'expert' (规则精调)
+  const cleaningMode = ref(localStorage.getItem('magic_excel_cleaning_mode') || 'simple')
+  watch(cleaningMode, (v) => localStorage.setItem('magic_excel_cleaning_mode', v))
+
+  // 最近一次 AI 优化方案的时间戳（会话内有效，null 表示尚未跑过 AI）
+  const lastAiConfigAt = ref(null)
+
   // 当前平台的完整配置
   const platformConfig = computed(() => API_PLATFORMS[currentPlatform.value])
   // 当前的 API Key
@@ -185,12 +192,17 @@ export const useSettingsStore = defineStore('settings', () => {
     
     rulesConfig.value = JSON.parse(JSON.stringify(DEFAULT_RULES_CONFIG))
     localStorage.setItem('magic_excel_cleaning_rules', JSON.stringify(rulesConfig.value))
+
+    cleaningMode.value = 'simple'
+    localStorage.setItem('magic_excel_cleaning_mode', 'simple')
+    lastAiConfigAt.value = null
   }
 
   return {
     currentPlatform, platformConfig, apiKey, isConfigured,
     translateModel, workModel, useSystemPrompt, showSettings,
     selectedTranslateModel, selectedWorkModel, rulesConfig, concurrency, dataInsightMode,
+    cleaningMode, lastAiConfigAt,
     API_PLATFORMS, getApiConfig, setPlatform, saveApiKey, saveModelSelection,
     exportGlobalConfig, importGlobalConfig, resetAllConfig
   }

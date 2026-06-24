@@ -29,8 +29,7 @@ const titles = {
   '/': '功能主页',
   '/process': '智能加工',
   '/summary': '数据摘要',
-  '/cleaning': '数据清洗',
-  '/optimize': '数据优化'
+  '/cleaning': '数据清洗'
 }
 
 const title = computed(() => titles[route.path] || '智能分析助手')
