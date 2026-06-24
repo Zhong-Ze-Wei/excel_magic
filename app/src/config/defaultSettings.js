@@ -20,9 +20,9 @@ export const DEFAULT_API_PLATFORMS = {
   aiping: {
     name: 'aiping.cn',
     url: 'https://www.aiping.cn/api/v1/chat/completions',
-    registerUrl: 'https://www.aiping.cn/#?invitation_code=WBEJSN',
+    registerUrl: 'https://www.aiping.cn/#?invitation_code=UVPGQPBMWB',
     keyUrl: 'https://www.aiping.cn/user/apikey',
-    inviteCode: 'WBEJSN',
+    inviteCode: 'UVPGQPBMWB',
     translateModels: [
       { id: 'DeepSeek-V4-Flash', name: 'DeepSeek-V4-Flash (默认)' },
       { id: 'GLM-4.7', name: 'GLM-4.7' },
