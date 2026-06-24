@@ -27,8 +27,7 @@ const settings = useSettingsStore()
 
 const titles = {
   '/': '功能主页',
-  '/translate': '批量翻译',
-  '/analysis': '数据分析',
+  '/process': '智能加工',
   '/summary': '数据摘要',
   '/cleaning': '数据清洗',
   '/optimize': '数据优化'

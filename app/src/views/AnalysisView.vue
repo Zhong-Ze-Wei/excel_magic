@@ -56,6 +56,16 @@
           </div>
         </div>
         <!-- 目标 -->
+        <div class="bg-slate-50 rounded-lg p-2 border border-slate-200 mb-1.5">
+          <div class="text-[9px] font-bold text-slate-500 uppercase mb-1">快捷模板</div>
+          <div class="flex flex-wrap gap-1">
+            <button v-for="tpl in PRESET_TEMPLATES" :key="tpl.id" @click="applyTemplate(tpl.id)"
+              class="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] text-slate-700 active:bg-violet-50 flex items-center gap-0.5">
+              <component :is="templateIcon(tpl.icon)" class="w-2 h-2" :class="templateColor(tpl.color)" />
+              {{ tpl.label }}
+            </button>
+          </div>
+        </div>
         <textarea v-model="userGoal" rows="2"
           class="w-full p-2 border border-slate-200 rounded-lg text-[10px] resize-none"
           placeholder="描述分析需求"></textarea>
@@ -266,6 +276,17 @@
 
             <!-- 3. 自然语言目标 + AI 生成打标方案 -->
             <div class="space-y-1.5">
+              <!-- 快捷模板 -->
+              <div class="bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+                <div class="text-[9px] font-bold text-slate-500 uppercase mb-1.5">快捷模板（一键填充）</div>
+                <div class="flex flex-wrap gap-1.5">
+                  <button v-for="tpl in PRESET_TEMPLATES" :key="tpl.id" @click="applyTemplate(tpl.id)"
+                    class="px-2.5 py-1 bg-white border border-slate-200 hover:border-violet-400 hover:bg-violet-50 rounded-md text-[10px] font-medium text-slate-700 transition-colors flex items-center gap-1">
+                    <component :is="templateIcon(tpl.icon)" class="w-2.5 h-2.5" :class="templateColor(tpl.color)" />
+                    {{ tpl.label }}
+                  </button>
+                </div>
+              </div>
               <label class="text-xs font-bold text-slate-700">我想让 AI 新增什么列</label>
               <textarea v-model="userGoal" rows="3"
                 class="w-full p-2 border border-slate-200 rounded-lg text-xs focus:border-violet-500 outline-none resize-none bg-slate-50"
@@ -486,7 +507,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { UploadCloud, SlidersHorizontal, Plus, X, Brain, BarChart2, Download, Sparkles, ChevronDown, Sliders, Trash2, Check, Pencil } from 'lucide-vue-next'
+import { UploadCloud, SlidersHorizontal, Plus, X, Brain, BarChart2, Download, Sparkles, ChevronDown, Sliders, Trash2, Check, Pencil, Languages, Heart, Tag } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
@@ -496,7 +517,7 @@ import OutputColumnsList from '../components/analysis/OutputColumnsList.vue'
 import { DEMO_DATA } from '../services/excel'
 import { useExport } from '../composables/useExport'
 import { callAI, callAIBatch } from '../services/ai'
-import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt } from '../services/prompts'
+import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt, PRESET_TEMPLATES, getPresetPlan } from '../services/prompts'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
 import { useGlobalDataSync } from '../composables/useGlobalDataSync'
@@ -814,6 +835,28 @@ async function generateLabelingPlanWithAI() {
   } finally {
     isGeneratingPlan.value = false
   }
+}
+
+// ── 智能加工预设模板 ──
+function templateIcon(name) {
+  return { Languages, Heart, Tag }[name] || Tag
+}
+function templateColor(c) {
+  return { blue: 'text-blue-600', rose: 'text-rose-600', violet: 'text-violet-600' }[c] || 'text-slate-600'
+}
+function applyTemplate(templateId) {
+  if (!rows.value.length) { toast.warn('请先上传数据'); return }
+  const idx = Number(dataShare.coreColumn)
+  if (idx == null || Number.isNaN(idx) || idx < 0 || idx >= headers.value.length) {
+    toast.warn('请先选择有效的核心列')
+    return
+  }
+  const plan = getPresetPlan(templateId, idx)
+  if (!plan) return
+  labelingPlan.value = plan
+  selectedInputColumns.value = [idx]
+  userGoal.value = plan.goal
+  toast.success(`已应用「${plan.taskName}」模板，可点击下方开始打标`)
 }
 
 // ── 从 Prompt 反向同步列配置 ──

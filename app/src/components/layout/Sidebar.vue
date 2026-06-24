@@ -28,13 +28,9 @@
         class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
         <Eraser class="w-4 h-4" /> 数据清洗
       </button>
-      <button @click="$router.push('/translate')" :class="navClass('translate')"
+      <button @click="$router.push('/process')" :class="navClass('process')"
         class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
-        <Languages class="w-4 h-4" /> 批量翻译
-      </button>
-      <button @click="$router.push('/analysis')" :class="navClass('analysis')"
-        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
-        <Brain class="w-4 h-4" /> 数据分析
+        <Wand2 class="w-4 h-4" /> 智能加工
       </button>
       <button @click="$router.push('/summary')" :class="navClass('summary')"
         class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
@@ -57,14 +53,14 @@
 <script setup>
 import { useRoute } from 'vue-router'
 import { useSettingsStore } from '../../stores/settings'
-import { Wand2, LayoutGrid, Languages, Brain, FileBarChart, Eraser, Settings, Sparkles } from 'lucide-vue-next'
+import { Wand2, LayoutGrid, FileBarChart, Eraser, Settings, Sparkles } from 'lucide-vue-next'
 
 const route = useRoute()
 const settings = useSettingsStore()
 
 const routeMap = {
   home: '/', optimize: '/optimize', cleaning: '/cleaning',
-  translate: '/translate', analysis: '/analysis', summary: '/summary'
+  process: '/process', summary: '/summary'
 }
 
 function navClass(name) {
