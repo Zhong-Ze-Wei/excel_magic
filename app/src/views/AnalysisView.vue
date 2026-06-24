@@ -858,6 +858,14 @@ async function startLabeling() {
   const inputCols = selectedInputColumns.value.length > 0 ? selectedInputColumns.value : (plan.inputColumns.map(name => headers.value.indexOf(name)).filter(i => i >= 0))
   if (inputCols.length === 0) { toast.warn('请选择至少一个 AI 参考列'); return }
 
+  if (selectedInputColumns.value.length === 1) {
+    const onlyIdx = selectedInputColumns.value[0]
+    if (onlyIdx !== dataShare.coreColumn && onlyIdx >= 0 && onlyIdx < headers.value.length) {
+      dataShare.setCoreColumn(onlyIdx)
+      toast.info(`核心列已同步为「${headers.value[onlyIdx]}」`)
+    }
+  }
+
   let start = parseInt(rangeStart.value) || 1
   let end = parseInt(rangeEnd.value) || rows.value.length
   if (start < 1) start = 1

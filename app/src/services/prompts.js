@@ -442,7 +442,7 @@ ${columnProfiles}${labelingNote}
 /**
  * AI 数据摘要 — 基于列级统计画像的深度分析 Prompt
  */
-export function getDataSummaryPrompt(profilesText, datasetMeta, crossTabsText, sampleText, theme, analysisAngles) {
+export function getDataSummaryPrompt(profilesText, datasetMeta, sampleText, theme, analysisAngles) {
   const themeSection = theme
     ? `\n6. 报告必须紧密围绕主题"${theme}"展开`
     : ''
@@ -451,7 +451,7 @@ export function getDataSummaryPrompt(profilesText, datasetMeta, crossTabsText, s
     : ''
 
   return {
-    systemPrompt: `你是一位资深数据分析师。你将收到一份完整的数据集统计画像（非原始行数据），包含每列的类型、分布、统计指标、交叉分析和少量样本。
+    systemPrompt: `你是一位资深数据分析师。你将收到一份完整的数据集统计画像（非原始行数据），包含每列的类型、分布、统计指标和少量样本。
 请基于这份画像撰写一份专业的中文数据分析报告。
 
 报告要求：
@@ -460,7 +460,6 @@ export function getDataSummaryPrompt(profilesText, datasetMeta, crossTabsText, s
    - ## 数据集概览（总行数、总列数、列类型分布、数据质量评价）
    - ## 列级洞察（按列类型分组，每类给出关键发现）
    - ## 数据分布特征（异常值、偏态、集中趋势）
-   - ## 交叉分析发现（如果提供了交叉统计）
    - ## 数据质量评估（缺失值、异常值、一致性问题）
    - ## 业务建议（基于数据特征给出 actionable 建议）${themeSection}
 3. 用具体数字说话，不要泛泛而谈
@@ -473,7 +472,6 @@ export function getDataSummaryPrompt(profilesText, datasetMeta, crossTabsText, s
 ${datasetMeta}
 
 ${profilesText}
-${crossTabsText ? crossTabsText + '\n' : ''}
 【分层样本（头/中/尾）】
 ${sampleText}${anglesSection}
 
