@@ -13,15 +13,14 @@
 
 <script setup>
 import { useRoute } from 'vue-router'
-import { LayoutGrid, Eraser, Languages, Brain, FileBarChart } from 'lucide-vue-next'
+import { LayoutGrid, Eraser, Wand2, FileBarChart } from 'lucide-vue-next'
 
 const route = useRoute()
 
 const tabs = [
   { route: '/', label: '首页', icon: LayoutGrid },
   { route: '/cleaning', label: '清洗', icon: Eraser },
-  { route: '/translate', label: '翻译', icon: Languages },
-  { route: '/analysis', label: '分析', icon: Brain },
+  { route: '/process', label: '加工', icon: Wand2 },
   { route: '/summary', label: '摘要', icon: FileBarChart }
 ]
 

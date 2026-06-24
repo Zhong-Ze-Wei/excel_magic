@@ -20,14 +20,9 @@ const settings = useSettingsStore()
 const titles = {
   '/': '功能主页',
   '/cleaning': '数据清洗',
-  '/translate': '批量翻译',
-  '/analysis': '数据分析',
+  '/process': '智能加工',
   '/summary': '数据摘要',
-  '/transform': '列变换',
-  '/grouping': '数据分组',
-  '/extract': '文本提取',
-  '/formula': '公式生成',
-  '/compare': '数据对比'
+  '/optimize': '数据优化'
 }
 
 const title = computed(() => titles[route.path] || '智能分析助手')

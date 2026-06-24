@@ -1,6 +1,18 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
   <div v-if="isMobile" class="px-3 py-3 space-y-3 pb-20 animate-fade-in">
+    <!-- 迁移提示 -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-2.5 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-1.5 text-[10px] text-blue-800 min-w-0">
+        <Info class="w-3.5 h-3.5 shrink-0" />
+        <span>翻译已升级为「智能加工」，支持翻译、打标、分类。</span>
+      </div>
+      <button @click="$router.push('/process')"
+        class="px-2 py-1 bg-blue-600 text-white rounded text-[10px] font-bold active:bg-blue-700 shrink-0">
+        前往
+      </button>
+    </div>
+
     <div class="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-xl border border-blue-200/50 p-3">
       <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
         <Languages class="w-5 h-5 text-blue-600" /> 批量翻译
@@ -105,6 +117,18 @@
 
   <!-- ===== 桌面端模板（原样保留）===== -->
   <div v-else class="animate-fade-in max-w-7xl mx-auto space-y-6">
+    <!-- 迁移提示横幅 -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
+      <div class="flex items-center gap-2 text-xs text-blue-800">
+        <Info class="w-4 h-4 shrink-0" />
+        <span>翻译功能已升级为「智能加工」，支持翻译、打标、分类等更多 AI 处理。</span>
+      </div>
+      <button @click="$router.push('/process')"
+        class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-xs font-bold hover:bg-blue-700 transition-colors shrink-0">
+        前往智能加工
+      </button>
+    </div>
+
     <!-- Header Summary Card -->
     <div class="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-2xl border border-blue-200/50 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
@@ -227,7 +251,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { Languages, Globe, SlidersHorizontal, Play, Download, Check } from 'lucide-vue-next'
+import { Languages, Globe, SlidersHorizontal, Play, Download, Check, Info } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
 import DataTable from '../components/common/DataTable.vue'
