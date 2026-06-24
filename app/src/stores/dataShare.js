@@ -17,34 +17,8 @@ export const useDataShareStore = defineStore('dataShare', () => {
   const hasData = computed(() => rows.value.length > 0)
   const hasMultipleSheets = computed(() => sheetNames.value.length > 1)
 
-  // 启发式选择核心列的方法（基于字数长度）
-  function heuristicDetectCoreColumn(headersList, rowsList) {
-    if (!rowsList || rowsList.length === 0) return 0
-    let bestColIdx = 0
-    let maxAvgLength = 0
-    const colCount = headersList.length
-    const sampleRows = rowsList.slice(0, 15)
-    
-    for (let c = 0; c < colCount; c++) {
-      let totalLen = 0
-      let nonNullCount = 0
-      sampleRows.forEach(row => {
-        const val = row[c]
-        if (val != null && val !== '') {
-          totalLen += String(val).trim().length
-          nonNullCount++
-        }
-      })
-      const avgLen = nonNullCount > 0 ? (totalLen / nonNullCount) : 0
-      if (avgLen > maxAvgLength) {
-        maxAvgLength = avgLen
-        bestColIdx = c
-      }
-    }
-    return bestColIdx
-  }
-
   // 存入共享数据
+  // autoDetect 参数保留兼容性，但已不再做启发式判断；越界时兜底为 0（首列）
   function setSharedData(newHeaders, newRows, name = '已清洗的数据', autoDetect = false, options = {}) {
     headers.value = [...newHeaders]
     rows.value = newRows.map(r => [...r])
@@ -52,14 +26,9 @@ export const useDataShareStore = defineStore('dataShare', () => {
     if (options.sheetNames) sheetNames.value = options.sheetNames
     if (options.currentSheet) currentSheet.value = options.currentSheet
     if (options.file) file.value = options.file
-    if (autoDetect) {
-      // 自动判断并推荐最佳核心处理列
-      coreColumn.value = heuristicDetectCoreColumn(newHeaders, newRows)
-    } else {
-      // 安全防范：当列数发生缩减导致之前的核心列越界时，安全修正为第 0 列
-      if (coreColumn.value >= newHeaders.length) {
-        coreColumn.value = 0
-      }
+    // 越界保护：列数缩减或未设置时，兜底为 0（首列）
+    if (coreColumn.value == null || coreColumn.value >= newHeaders.length) {
+      coreColumn.value = 0
     }
   }
 
@@ -102,7 +71,10 @@ export const useDataShareStore = defineStore('dataShare', () => {
     headers.value = data.headers
     rows.value = data.rows
     currentSheet.value = sheetName
-    coreColumn.value = heuristicDetectCoreColumn(data.headers, data.rows)
+    // 越界保护：切换 Sheet 后若原核心列越界，兜底为 0
+    if (coreColumn.value == null || coreColumn.value >= data.headers.length) {
+      coreColumn.value = 0
+    }
   }
 
   // 清理
