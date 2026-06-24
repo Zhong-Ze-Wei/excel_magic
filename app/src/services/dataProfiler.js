@@ -133,57 +133,6 @@ export function computeAllProfiles(headers, rows, selectedCols = null) {
   })
 }
 
-// ── 交叉统计 ──
-
-export function computeCrossTabs(headers, rows, dimColIndexes, valueColIndexes) {
-  if (!dimColIndexes || dimColIndexes.length === 0) return []
-  const results = []
-
-  for (const dimCI of dimColIndexes) {
-    const dimHeader = headers[dimCI]
-    // 按维度列分组
-    const groups = {}
-    rows.forEach(row => {
-      const dimVal = String(row[dimCI] ?? '').trim() || '(空)'
-      if (!groups[dimVal]) groups[dimVal] = []
-      groups[dimVal].push(row)
-    })
-
-    for (const valCI of valueColIndexes) {
-      if (valCI === dimCI) continue
-      const valHeader = headers[valCI]
-      const valType = detectColumnType(rows.map(r => r[valCI]))
-      const crossTab = { dimension: dimHeader, metric: valHeader, metricType: valType, groups: {} }
-
-      for (const [dimVal, groupRows] of Object.entries(groups)) {
-        const vals = groupRows.map(r => r[valCI]).filter(v => v != null && String(v).trim() !== '')
-
-        if (valType === 'number') {
-          const nums = vals.map(Number).filter(n => !isNaN(n))
-          if (nums.length > 0) {
-            crossTab.groups[dimVal] = {
-              count: nums.length,
-              mean: Math.round(nums.reduce((s, n) => s + n, 0) / nums.length * 100) / 100
-            }
-          }
-        } else {
-          // 枚举/文本：值分布
-          const freq = {}
-          vals.forEach(v => { freq[String(v)] = (freq[String(v)] || 0) + 1 })
-          const top = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5)
-          crossTab.groups[dimVal] = {
-            count: vals.length,
-            distribution: top.map(([k, v]) => `${k}(${Math.round(v / vals.length * 100)}%)`)
-          }
-        }
-      }
-      results.push(crossTab)
-    }
-  }
-
-  return results
-}
-
 // ── 分层抽样（头/中/尾） ──
 
 export function stratifiedSample(headers, rows, count = 6) {
@@ -208,7 +157,7 @@ export function stratifiedSample(headers, rows, count = 6) {
 
 // ── 格式化为 AI 可读文本 ──
 
-export function formatProfilesForAI(profiles, crossTabs = []) {
+export function formatProfilesForAI(profiles) {
   let text = ''
 
   text += '【列级统计画像】\n'
@@ -239,21 +188,6 @@ export function formatProfilesForAI(profiles, crossTabs = []) {
 
     if (p.samples?.length) {
       text += `  样例: ${p.samples.map(s => s.length > 50 ? s.substring(0, 50) + '...' : s).join(' | ')}\n`
-    }
-  }
-
-  if (crossTabs.length > 0) {
-    text += '\n【交叉分析】\n'
-    for (const ct of crossTabs) {
-      text += `\n按"${ct.dimension}"分组的"${ct.metric}"统计:\n`
-      const entries = Object.entries(ct.groups).slice(0, 10)
-      for (const [dimVal, stat] of entries) {
-        if (ct.metricType === 'number') {
-          text += `  ${dimVal}: 均值=${stat.mean} (n=${stat.count})\n`
-        } else {
-          text += `  ${dimVal}: ${stat.distribution?.join(' ') || '-'} (n=${stat.count})\n`
-        }
-      }
     }
   }
 

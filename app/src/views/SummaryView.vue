@@ -173,19 +173,6 @@
               <p class="text-[9px] text-slate-400 mt-1">选择要纳入统计分析的列，默认全选</p>
             </div>
 
-            <!-- 交叉分析维度（暂隐藏，AI 可自动发现交叉关系） -->
-            <div v-if="false && selectedCols.length >= 2">
-              <label class="block text-xs font-bold text-slate-600 mb-1.5">交叉分析维度 (最多 2 个)</label>
-              <div class="max-h-28 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1 custom-scrollbar">
-                <label v-for="i in selectedCols" :key="'dim-'+i" class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer hover:bg-slate-100 px-1 py-0.5 rounded">
-                  <input type="checkbox" :value="i" v-model="crossDimCols" :disabled="crossDimCols.length >= 2 && !crossDimCols.includes(i)"
-                    class="rounded text-emerald-600 focus:ring-emerald-500" />
-                  {{ headers[i] }}
-                </label>
-              </div>
-              <p class="text-[9px] text-slate-400 mt-1">选择分组维度，系统将按维度做交叉统计</p>
-            </div>
-
             <!-- 数据概况 -->
             <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5 text-xs text-slate-600">
               <div class="flex justify-between"><span>行数</span><span class="font-mono font-bold text-slate-800">{{ rows.length }}</span></div>
@@ -286,7 +273,7 @@ import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
 import { useGlobalDataSync } from '../composables/useGlobalDataSync'
 import { useFileUpload } from '../composables/useFileUpload'
-import { computeAllProfiles, computeColumnProfile, computeCrossTabs, formatProfilesForAI, stratifiedSample, formatSampleRows, detectColumnType } from '../services/dataProfiler'
+import { computeAllProfiles, computeColumnProfile, formatProfilesForAI, stratifiedSample, formatSampleRows, detectColumnType } from '../services/dataProfiler'
 import { useToast } from '../services/toast'
 
 const toast = useToast()
@@ -297,7 +284,6 @@ const { isMobile } = useDevice()
 const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
   onInit: (h) => {
     selectedCols.value = h.map((_, i) => i)
-    crossDimCols.value = []
     summaryText.value = ''
   }
 })
@@ -305,7 +291,6 @@ const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
 const { handleFile } = useFileUpload({
   onFileLoaded: (data) => {
     selectedCols.value = data.headers.map((_, i) => i)
-    crossDimCols.value = []
     summaryText.value = ''
   }
 })
@@ -313,7 +298,6 @@ const { handleFile } = useFileUpload({
 const isSummarizing = ref(false)
 const summaryText = ref('')
 const selectedCols = ref([])
-const crossDimCols = ref([])
 const analysisTheme = ref('')
 const isRecommending = ref(false)
 const recommendedAngles = ref([])
@@ -370,7 +354,6 @@ function reset() {
   rows.value = []
   summaryText.value = ''
   selectedCols.value = []
-  crossDimCols.value = []
   analysisTheme.value = ''
   recommendedAngles.value = []
 }
@@ -443,24 +426,17 @@ async function generateSummary() {
     }
     const allProfiles = [...profiles, ...labelingProfiles]
 
-    // 3. 交叉统计
-    const valueColIndexes = selectedCols.value.filter(i => !crossDimCols.value.includes(i))
-    const crossTabs = crossDimCols.value.length > 0 && valueColIndexes.length > 0
-      ? computeCrossTabs(headers.value, rows.value, crossDimCols.value, valueColIndexes)
-      : []
-
-    // 4. 格式化
-    const profilesText = formatProfilesForAI(allProfiles, crossTabs)
-    const crossTabsText = crossTabs.length > 0 ? '' : '' // 已内嵌在 profilesText 中
+    // 3. 格式化
+    const profilesText = formatProfilesForAI(allProfiles)
     const datasetMeta = `${rows.value.length} 行 x ${allProfiles.length} 列 (原始 ${headers.value.length} 列${labelingProfiles.length > 0 ? ` + ${labelingProfiles.length} AI打标列` : ''})`
 
-    // 5. 分层样本
+    // 4. 分层样本
     const sample = stratifiedSample(headers.value, rows.value, 6)
     const sampleText = formatSampleRows(sample)
 
-    // 6. 调用 AI
+    // 5. 调用 AI
     const { systemPrompt, userPrompt } = getDataSummaryPrompt(
-      profilesText, datasetMeta, crossTabsText, sampleText,
+      profilesText, datasetMeta, sampleText,
       analysisTheme.value.trim() || null,
       recommendedAngles.value.length > 0 ? recommendedAngles.value : null
     )
@@ -476,7 +452,6 @@ function loadDemo() {
   headers.value = [...demo.headers]
   rows.value = demo.rows.map(r => [...r])
   selectedCols.value = headers.value.map((_, i) => i)
-  crossDimCols.value = []
   summaryText.value = ''
   dataShare.setSharedData(headers.value, rows.value, '数据摘要示例.xlsx')
 }
