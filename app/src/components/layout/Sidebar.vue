@@ -20,10 +20,6 @@
 
       <div class="pt-4 pb-2 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Excel 处理</div>
 
-      <button @click="$router.push('/optimize')" :class="navClass('optimize')"
-        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
-        <Sparkles class="w-4 h-4" /> 数据优化
-      </button>
       <button @click="$router.push('/cleaning')" :class="navClass('cleaning')"
         class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
         <Eraser class="w-4 h-4" /> 数据清洗
@@ -53,13 +49,13 @@
 <script setup>
 import { useRoute } from 'vue-router'
 import { useSettingsStore } from '../../stores/settings'
-import { Wand2, LayoutGrid, FileBarChart, Eraser, Settings, Sparkles } from 'lucide-vue-next'
+import { Wand2, LayoutGrid, FileBarChart, Eraser, Settings } from 'lucide-vue-next'
 
 const route = useRoute()
 const settings = useSettingsStore()
 
 const routeMap = {
-  home: '/', optimize: '/optimize', cleaning: '/cleaning',
+  home: '/', cleaning: '/cleaning',
   process: '/process', summary: '/summary'
 }
 

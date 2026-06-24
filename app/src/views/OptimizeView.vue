@@ -1,13 +1,6 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
   <div v-if="isMobile" class="px-3 py-3 space-y-3 pb-20 animate-fade-in">
-    <div class="bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 rounded-xl border border-violet-200/50 p-3">
-      <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-        <Sparkles class="w-5 h-5 text-violet-600" /> 数据优化
-      </h2>
-      <p class="text-[10px] text-slate-500 mt-0.5">一句话描述目标，AI 自动识别核心列并配置清洗规则。</p>
-    </div>
-
     <!-- 全局关联状态 -->
     <div v-if="hasData && dataShare.hasData"
       class="bg-emerald-500/10 rounded-lg border border-emerald-500/20 px-3 py-2 flex justify-between items-center text-[10px]">
@@ -44,8 +37,8 @@
       </div>
     </MobileCollapsible>
 
-    <!-- 移动端 AI 配置方案 -->
-    <MobileCollapsible v-if="aiRulesConfig" title="AI 配置方案" :default-open="true">
+    <!-- 移动端当前清洗方案 -->
+    <MobileCollapsible v-if="aiRulesConfig" title="当前清洗方案" :default-open="true">
       <!-- 比例条 -->
       <div class="mb-2">
         <div class="flex justify-between text-[9px] font-bold mb-1">
@@ -108,10 +101,6 @@
             class="py-2 bg-emerald-600 text-white rounded-lg text-[10px] font-bold active:bg-emerald-700">
             应用到全局
           </button>
-          <button v-if="aiRulesConfig" @click="tuneInCleaning"
-            class="col-span-2 py-2 bg-amber-500 text-white rounded-lg text-[10px] font-bold active:bg-amber-600 flex items-center justify-center gap-1">
-            <SlidersHorizontal class="w-3.5 h-3.5" /> 精调此方案
-          </button>
         </div>
       </div>
     </MobileCollapsible>
@@ -151,16 +140,6 @@
 
   <!-- ===== 桌面端模板 ===== -->
   <div v-else class="animate-fade-in max-w-7xl mx-auto space-y-6">
-    <!-- Header -->
-    <div class="bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 rounded-2xl border border-violet-200/50 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div>
-        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <Sparkles class="w-6 h-6 text-violet-600" /> AI 数据优化
-        </h2>
-        <p class="text-xs text-slate-500 mt-1">描述你的清洗目标，AI 自动识别核心列并配置全套清洗规则。</p>
-      </div>
-    </div>
-
     <!-- 全局关联状态 -->
     <div v-if="hasData && dataShare.hasData"
       class="bg-emerald-500/10 rounded-xl border border-emerald-500/20 px-4 py-3 flex justify-between items-center text-xs animate-fade-in">
@@ -205,10 +184,10 @@
           </div>
         </div>
 
-        <!-- AI 配置方案可视化 -->
+        <!-- 当前清洗方案可视化 -->
         <div v-if="aiRulesConfig" class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3 animate-fade-in">
           <div class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-            <SlidersHorizontal class="w-3.5 h-3.5 text-violet-500" /> AI 配置方案
+            <SlidersHorizontal class="w-3.5 h-3.5 text-violet-500" /> 当前清洗方案
           </div>
 
           <!-- Keep/Delete 比例条 -->
@@ -299,10 +278,6 @@
                 class="px-3 py-1 text-violet-600 hover:bg-violet-50 rounded-md text-xs font-medium transition-all">
                 数据摘要
               </button>
-              <button v-if="aiRulesConfig" @click="tuneInCleaning"
-                class="px-3 py-1 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md text-xs font-medium transition-all flex items-center gap-1">
-                <SlidersHorizontal class="w-3.5 h-3.5" /> 精调此方案
-              </button>
               <span class="w-px h-4 bg-slate-200 mx-1"></span>
               <button @click="applyToGlobal" v-if="dataShare.hasData"
                 class="px-3 py-1 text-emerald-600 hover:bg-emerald-50 rounded-md text-xs font-medium transition-all">
@@ -349,7 +324,6 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { Sparkles, Download, SlidersHorizontal } from 'lucide-vue-next'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
@@ -371,7 +345,6 @@ import { DEFAULT_RULES_CONFIG } from '../config/defaultSettings'
 const toast = useToast()
 const dataShare = useDataShareStore()
 const settings = useSettingsStore()
-const router = useRouter()
 const { isMobile } = useDevice()
 
 const intentInput = ref('')
@@ -405,8 +378,9 @@ const { handleFile } = useFileUpload({
 
 const sourceCol = computed(() => dataShare.coreColumn)
 
-// AI 配置后的临时规则
-const aiRulesConfig = ref(null)
+// AI 配置直接写入 settings.rulesConfig（与清洗模式共享同一份规则）
+// aiRulesConfig 是其镜像：未跑过 AI 时返回 null
+const aiRulesConfig = computed(() => settings.lastAiConfigAt ? settings.rulesConfig : null)
 const cleanedRows = ref([])
 
 const totalCount = computed(() => rows.value.length)
@@ -475,7 +449,7 @@ watch(() => rows.value.length, (newLen) => {
   if (newLen === 0) {
     cleanedRows.value = []
     aiSummary.value = ''
-    aiRulesConfig.value = null
+    settings.lastAiConfigAt = null
   }
 })
 
@@ -533,8 +507,10 @@ async function runAiOptimize() {
       }
     }
 
-    aiRulesConfig.value = config
-    runPipelineWithConfig(config)
+    // AI 方案直接写入 settings.rulesConfig（合并到 store，与清洗模式共享）
+    Object.assign(settings.rulesConfig, config)
+    settings.lastAiConfigAt = Date.now()
+    runPipelineWithConfig(settings.rulesConfig)
 
     // 生成摘要
     const enabledCount = Object.keys(config).filter(k => config[k]?.enable).length
@@ -574,18 +550,6 @@ function shareDataTo(targetPath) {
     rows: cleanedRows.value.filter(r => r.displayDecision === 'keep').map(r => r.originalRow)
   }), targetPath, '优化后数据')
   toast.success('数据已共享')
-}
-
-function tuneInCleaning() {
-  if (!aiRulesConfig.value) return
-  Object.assign(settings.rulesConfig, DEFAULT_RULES_CONFIG, aiRulesConfig.value)
-  dataShare.setSharedData(
-    [...headers.value],
-    cleanedRows.value.filter(r => r.displayDecision === 'keep').map(r => r.originalRow),
-    '优化后数据-精调', false
-  )
-  router.push('/cleaning')
-  toast.success('AI 方案已带入清洗页，可继续精调')
 }
 
 function applyToGlobal() {
