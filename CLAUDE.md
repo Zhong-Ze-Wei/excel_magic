@@ -2,7 +2,7 @@
 
 ## Project
 
-Magic Excel — 纯前端 Excel/CSV 智能处理平台（Vue 3 SPA，无后端）。上传 Excel 后在浏览器内完成数据清洗、翻译、AI 打标、数据摘要。AI 能力通过 OpenAI 兼容 API 实现，Key 存 localStorage。
+Magic Excel — 纯前端 Excel/CSV 智能处理平台（Vue 3 SPA，无后端）。上传 Excel 后在浏览器内完成数据清洗、智能加工（翻译+打标）、数据摘要。AI 能力通过 OpenAI 兼容 API 实现，Key 存 localStorage。
 
 ## Dev
 
@@ -13,8 +13,16 @@ npm run build      # 生产构建
 npm test           # Vitest
 ```
 
+## 三大功能页（入口收敛后）
+
+- `/cleaning` → **CleaningHub**：清洗统一入口，内含简易模式（OptimizeView，AI 一句话清洗）和专家模式（CleaningView，规则精调），用 `settings.cleaningMode` 切换
+- `/process` → **AnalysisView**（智能加工）：翻译和打标合并为同一套「输出列」机制，翻译降级为预设模板之一
+- `/summary` → **SummaryView**：列画像 + AI 流式报告
+- 旧路由 `/translate`、`/analysis`、`/optimize` 已重定向（过渡期保留，计划清理 TranslateView）
+
 ## Key Conventions
 
+- **意图驱动上传**：`useFileUpload` 上传后自动弹 `ImportIntentModal` 收集「核心列 + 任务（clean/process/summary）+ 说明」，写入 `stores/importIntent.js`，替代旧的启发式列检测和模块推荐
 - 数据清洗采用**审计优先**策略：不直接删除，打标 keep/delete/suspect 后用户可覆写（详见 docs/adr/0002）
 - AI 打标采用 **labelingPlan** 模型：自然语言需求 → AI 生成 outputColumns 方案 → 编译 system prompt → 逐行打标（详见 docs/adr/0003）
 - 数据摘要用**列画像**替代原始行采样：预计算全表统计后发给 AI，不发原始行（详见 docs/adr/0004）
@@ -23,8 +31,9 @@ npm test           # Vitest
 - 全局通知用 `useToast()`，不用 `alert()`
 - 桌面端和移动端 UI 完全分离：`v-if="isDesktop"` / `v-else` 双模板，移动端用 MobileCollapsible 折叠面板 + MobileTableWrapper 表格包装
 - 数据总线 `stores/dataShare.js` 是全局数据枢纽，各页面通过 `useGlobalDataSync` composable 自动同步
-- 公共逻辑已提取为 composables：`useGlobalDataSync`（数据同步）、`useFileUpload`（文件上传）、`useExport`（导出）、`useShare`（共享/应用）
+- 公共逻辑已提取为 composables：`useGlobalDataSync`（数据同步）、`useFileUpload`（文件上传 + 意图弹窗）、`useExport`（导出）、`useShare`（共享/应用）
 - 大型组件已拆分：`CleaningRulesPanel`（清洗规则面板）、`OutputColumnsList`（打标输出列管理）、`StatsPieChart`（ECharts 饼图）
+- 多 Sheet 支持：dataShare 追踪 `sheetNames/currentSheet/file`，`setSheet()` 懒加载切换
 
 ## 分支与提交规范
 
