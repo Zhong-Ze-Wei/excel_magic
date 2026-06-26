@@ -339,6 +339,7 @@ import { useGlobalDataSync } from '../composables/useGlobalDataSync'
 import { useFileUpload } from '../composables/useFileUpload'
 import { useExport } from '../composables/useExport'
 import { useShare } from '../composables/useShare'
+import { useCleaningPipeline } from '../composables/useCleaningPipeline'
 import { useToast } from '../services/toast'
 import { DEFAULT_RULES_CONFIG } from '../config/defaultSettings'
 
@@ -368,7 +369,17 @@ const sourceCol = computed(() => dataShare.coreColumn)
 // AI 配置直接写入 settings.rulesConfig（与清洗模式共享同一份规则）
 // aiRulesConfig 是其镜像：未跑过 AI 时返回 null
 const aiRulesConfig = computed(() => settings.lastAiConfigAt ? settings.rulesConfig : null)
-const cleanedRows = ref([])
+
+// 清洗管道：全量跑，结果带 displayDecision（suspect → delete 展示层转换）
+const { cleanedRows: rawCleanedRows, runPipeline: runCleaning, clear: clearCleaned, getCleanRows } = useCleaningPipeline({
+  headers, rows, sourceCol,
+  getConfig: () => settings.rulesConfig
+})
+// 展示层：suspect 归入 delete，便于简易模式"保留/过滤"二分展示
+const cleanedRows = computed(() => rawCleanedRows.value.map(r => ({
+  ...r,
+  displayDecision: r.decision === 'suspect' ? 'delete' : r.decision
+})))
 
 const totalCount = computed(() => rows.value.length)
 
@@ -427,14 +438,14 @@ function formatFilterConfig(filter) {
 // 核心列变化时，如果已有 AI 配置，重新跑 pipeline
 watch(() => dataShare.coreColumn, () => {
   if (aiRulesConfig.value && rows.value.length) {
-    runPipelineWithConfig(aiRulesConfig.value)
+    runCleaning()
   }
 })
 
 // 数据变化时，清除旧结果
 watch(() => rows.value.length, (newLen) => {
   if (newLen === 0) {
-    cleanedRows.value = []
+    clearCleaned()
     aiSummary.value = ''
     settings.lastAiConfigAt = null
   }
@@ -497,7 +508,7 @@ async function runAiOptimize() {
     // AI 方案直接写入 settings.rulesConfig（合并到 store，与清洗模式共享）
     Object.assign(settings.rulesConfig, config)
     settings.lastAiConfigAt = Date.now()
-    runPipelineWithConfig(settings.rulesConfig)
+    runCleaning()
 
     // 生成摘要
     const enabledCount = Object.keys(config).filter(k => config[k]?.enable).length
@@ -510,15 +521,6 @@ async function runAiOptimize() {
   } finally {
     isOptimizing.value = false
   }
-}
-
-function runPipelineWithConfig(config) {
-  const result = runCleaningPipeline(rows.value, headers.value, sourceCol.value, config)
-  // suspect → delete 在展示层处理
-  cleanedRows.value = result.map(r => ({
-    ...r,
-    displayDecision: r.decision === 'suspect' ? 'delete' : r.decision
-  }))
 }
 
 function toggleDecision(item) {

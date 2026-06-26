@@ -467,6 +467,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { useExport } from '../composables/useExport'
 import { useShare } from '../composables/useShare'
+import { useCleaningPipeline } from '../composables/useCleaningPipeline'
 import { Eraser, Download, Check, X, RefreshCw, Sparkles, Plus, Pencil, RotateCcw } from 'lucide-vue-next'
 import FileUploader from '../components/common/FileUploader.vue'
 import CleaningRulesPanel from '../components/cleaning/CleaningRulesPanel.vue'
@@ -528,10 +529,13 @@ const expandedRules = reactive({
   garbledText: false
 })
 
-// 经过 Pipeline 清洗打标后的所有数据
-const cleanedRows = ref([])
-// 缓存在非响应式下全表运行统计的数值
-const fullStats = ref({ keep: 0, delete: 0, suspect: 0 })
+// 清洗管道：预览前 100 行 + 全量统计（专家模式）
+const { cleanedRows, fullStats, runPipeline, clear: clearCleaned } = useCleaningPipeline({
+  headers, rows, sourceCol,
+  getConfig: () => settings.rulesConfig,
+  getLabelingResults: () => dataShare.labelingResults,
+  previewLimit: 100
+})
 
 const totalCount = computed(() => rows.value.length)
 const displayCleanedRows = computed(() => cleanedRows.value) // cleanedRows 内部已经做过 slice(0, 100)
@@ -692,35 +696,6 @@ function handleKeywordsInput() {
   runPipeline()
 }
 
-// 执行打标判定与全量统计
-function runPipeline() {
-  if (!rows.value.length) return
-  // 仅对前 100 行原始数据进行预览清洗打标，这保证了极速渲染和 0 内存开销！
-  const previewRows = rows.value.slice(0, 100)
-  cleanedRows.value = runCleaningPipeline(previewRows, headers.value, sourceCol.value, settings.rulesConfig, dataShare.labelingResults)
-  
-  // 极速计算全表的真实指标统计（Stats）
-  calculateFullStats()
-}
-
-// 快速运行全表清洗统计 (非响应式，耗时极短，绝不卡死)
-function calculateFullStats() {
-  if (!rows.value.length) {
-    fullStats.value = { keep: 0, delete: 0, suspect: 0 }
-    return
-  }
-  const fullResult = runCleaningPipeline(rows.value, headers.value, sourceCol.value, settings.rulesConfig, dataShare.labelingResults)
-  let keep = 0
-  let del = 0
-  let suspect = 0
-  fullResult.forEach(r => {
-    if (r.decision === 'keep') keep++
-    if (r.decision === 'delete') del++
-    if (r.decision === 'suspect') suspect++
-  })
-  fullStats.value = { keep, delete: del, suspect }
-}
-
 // 文件加载处理
 // 启发式选择需要清洗的列
 function heuristicDetectCleanColumn(headersList, rowsList) {
@@ -774,7 +749,7 @@ function loadDemo() {
 function reset() {
   headers.value = []
   rows.value = []
-  cleanedRows.value = []
+  clearCleaned()
 }
 
 // 用户手动进行决策覆写
