@@ -35,7 +35,13 @@
       "Bash(grep -rl \"parseRobustJSON\" services/ views/)",
       "Bash(git reset *)",
       "Bash(git stash *)",
-      "Bash(xxd /e/ZZ\\\\'s_Code/AI/magic-excel/data/1000.csv)"
+      "Bash(xxd /e/ZZ\\\\'s_Code/AI/magic-excel/data/1000.csv)",
+      "Bash(git *)",
+      "Bash(start *)",
+      "Read(//e/ZZ's_Code/AI/docs/release-notes/**)",
+      "Bash(vercel whoami *)",
+      "Bash(env)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} time=%{time_total}s\\\\n\" --max-time 15 https://vercel.com/.well-known/openid-configuration)"
     ]
   },
   "hooks": {
@@ -46,6 +52,10 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/prevent-master-commit.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/adr-commit-check.sh"
           }
         ]
       }
