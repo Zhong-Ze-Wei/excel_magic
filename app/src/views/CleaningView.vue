@@ -474,7 +474,7 @@ import CustomFilterForm from '../components/cleaning/CustomFilterForm.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
 import StatsPieChart from '../components/common/StatsPieChart.vue'
-import { runCleaningPipeline } from '../services/cleaningRules'
+import { runCleaningPipeline, ATOMIC_RULES_META as rulesMeta } from '../services/cleaningRules'
 import { useDataShareStore } from '../stores/dataShare'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
@@ -672,20 +672,6 @@ const chartData = computed(() => [
   { name: '过滤', value: stats.value.delete, color: '#f43f5e' },
   { name: '待确认', value: stats.value.suspect, color: '#f59e0b' }
 ])
-
-// 规则源信息列表
-const rulesMeta = [
-  { key: 'tooShort', title: '字数过短过滤', description: '过滤除标点外核心有效字符数少于指定长度的简短无意义单元格。', isWeak: false },
-  { key: 'duplicate', title: '全表精确去重', description: '重复文本数量达到指定阈值时，自动将除首条外的所有重复行标记为删除。', isWeak: false },
-  { key: 'empty', title: '空文本过滤', description: '标准化后字符为空的单元格自动删除。', isWeak: false },
-  { key: 'pureEmoji', title: '纯表情过滤', description: '内容全部由表情符号(Emoji)构成的行自动标记为删除。', isWeak: false },
-  { key: 'pureSymbol', title: '纯标点符号过滤', description: '去除空格后全是非字母数字及中文汉字的标点/杂乱字符时标记为删除。', isWeak: false },
-  { key: 'linkOnly', title: '纯网址链接过滤', description: '内容为单独一个 HTTP/HTTPS/短链网址 of 行标记为删除。', isWeak: false },
-  { key: 'topicOnly', title: '纯话题过滤', description: '包含一个或多个微博/贴吧话题（#话题内容#），但非话题文本比率极低时过滤。', isWeak: false },
-  { key: 'shortMeaningless', title: '无意义短词过滤', description: '精确匹配水贴词汇（如：哈哈、打卡、顶、赞、支持），清除无营养灌水信息。', isWeak: false },
-  { key: 'adLink', title: '引流广告过滤', description: '匹配微商、客服引流关键字。若含链接则直接强删，仅有关键字则转入“待确认”或删除。', isWeak: true },
-  { key: 'garbledText', title: '疑似乱码清洗', description: '统计文本中包含的非汉字英数常规符号占比，超出判定阈值即怀疑为乱码。', isWeak: true }
-]
 
 function toggleRuleExpand(key) {
   expandedRules[key] = !expandedRules[key]
