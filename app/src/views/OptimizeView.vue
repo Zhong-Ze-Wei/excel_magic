@@ -57,7 +57,7 @@
           <span v-for="r in enabledAtomicRules" :key="r.key"
             class="px-1.5 py-0.5 text-[9px] font-bold rounded-full border"
             :class="ruleHitCounts[r.hitKey] ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
-            {{ r.title }}<span v-if="ruleHitCounts[r.hitKey]"> ×{{ ruleHitCounts[r.hitKey] }}</span>
+            {{ r.shortTitle }}<span v-if="ruleHitCounts[r.hitKey]"> ×{{ ruleHitCounts[r.hitKey] }}</span>
           </span>
         </div>
       </div>
@@ -210,7 +210,7 @@
               <span v-for="r in enabledAtomicRules" :key="r.key"
                 class="px-2 py-0.5 text-[10px] font-bold rounded-full border"
                 :class="ruleHitCounts[r.hitKey] ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
-                {{ r.title }}
+                {{ r.shortTitle }}
                 <span v-if="ruleHitCounts[r.hitKey]" class="ml-0.5 opacity-70">×{{ ruleHitCounts[r.hitKey] }}</span>
               </span>
             </div>
@@ -328,7 +328,7 @@ import { Sparkles, Download, SlidersHorizontal } from 'lucide-vue-next'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
-import { runCleaningPipeline } from '../services/cleaningRules'
+import { runCleaningPipeline, ATOMIC_RULES_META as RULES_META } from '../services/cleaningRules'
 import { getSmartFilterPrompt } from '../services/prompts'
 import { callAI } from '../services/ai'
 import { parseRobustJSON } from '../services/jsonParser'
@@ -351,19 +351,6 @@ const intentInput = ref('')
 const isOptimizing = ref(false)
 const aiSummary = ref('')
 const activeFilter = ref('all')
-
-const RULES_META = [
-  { key: 'empty', title: '空文本', hitKey: 'empty_text' },
-  { key: 'tooShort', title: '过短', hitKey: 'text_too_short' },
-  { key: 'duplicate', title: '重复', hitKey: 'exact_duplicate' },
-  { key: 'pureEmoji', title: '纯表情', hitKey: 'pure_emoji' },
-  { key: 'pureSymbol', title: '纯符号', hitKey: 'pure_symbol' },
-  { key: 'linkOnly', title: '纯链接', hitKey: 'link_only' },
-  { key: 'topicOnly', title: '话题', hitKey: 'topic_only' },
-  { key: 'shortMeaningless', title: '无意义', hitKey: 'short_meaningless' },
-  { key: 'adLink', title: '广告', hitKey: 'ad_link' },
-  { key: 'garbledText', title: '乱码', hitKey: 'suspect_garbled' }
-]
 
 const { headers, rows, hasData, importGlobalExcel, disconnectGlobalExcel } = useGlobalDataSync({
   onInit: () => {}
@@ -467,7 +454,7 @@ async function runAiOptimize() {
     for (let c = 0; c < headers.value.length; c++) {
       allColumnSamples[c] = rows.value.slice(0, 20).map(r => r[c] != null ? String(r[c]) : '')
     }
-    const rulesMeta = RULES_META.map(r => ({ key: r.key, title: r.title, description: r.title }))
+    const rulesMeta = RULES_META.map(r => ({ key: r.key, title: r.title, description: r.description }))
 
     const prompt = getSmartFilterPrompt(input, headers.value, sourceCol.value, allColumnSamples, rulesMeta)
     const raw = await callAI(prompt, '你是一个数据清洗专家。', settings.getApiConfig().workModel)

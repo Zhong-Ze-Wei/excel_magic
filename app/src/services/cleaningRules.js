@@ -1,4 +1,31 @@
 /**
+ * 原子规则的元信息（单一事实源）
+ *
+ * 各字段用途：
+ * - key：对应 rulesConfig 的键、runCleaningPipeline 内的分支判断
+ * - title：完整名称，用于专家模式规则面板、AI prompt（getSmartFilterPrompt）
+ * - shortTitle：简称，用于简易模式 chip 标签、命中统计展示
+ * - hitKey：命中时写入 result.hitRule 的标识，用于规则命中计数
+ * - description：规则说明，喂给 AI 让其理解每条规则的语义
+ * - isWeak：是否为弱规则（受 weakPolicy 影响，可能转 suspect）
+ *
+ * 顺序与 runCleaningPipeline 内的判定顺序保持一致（强删在前，弱删在后）。
+ * 新增/调整规则时，这里与 pipeline 实现、DEFAULT_RULES_CONFIG 三处需同步。
+ */
+export const ATOMIC_RULES_META = [
+  { key: 'empty',           title: '空文本过滤',     shortTitle: '空文本', hitKey: 'empty_text',       description: '标准化后字符为空的单元格自动删除。',                                                       isWeak: false },
+  { key: 'tooShort',        title: '字数过短过滤',   shortTitle: '过短',   hitKey: 'text_too_short',   description: '过滤除标点外核心有效字符数少于指定长度的简短无意义单元格。',                             isWeak: false },
+  { key: 'duplicate',       title: '全表精确去重',   shortTitle: '重复',   hitKey: 'exact_duplicate',  description: '重复文本数量达到指定阈值时，自动将除首条外的所有重复行标记为删除。',                     isWeak: false },
+  { key: 'linkOnly',        title: '纯网址链接过滤', shortTitle: '纯链接', hitKey: 'link_only',        description: '内容为单独一个 HTTP/HTTPS/短链网址的行标记为删除。',                                     isWeak: false },
+  { key: 'pureEmoji',       title: '纯表情过滤',     shortTitle: '纯表情', hitKey: 'pure_emoji',       description: '内容全部由表情符号(Emoji)构成的行自动标记为删除。',                                      isWeak: false },
+  { key: 'pureSymbol',      title: '纯标点符号过滤', shortTitle: '纯符号', hitKey: 'pure_symbol',      description: '去除空格后全是非字母数字及中文汉字的标点/杂乱字符时标记为删除。',                        isWeak: false },
+  { key: 'topicOnly',       title: '纯话题过滤',     shortTitle: '话题',   hitKey: 'topic_only',       description: '包含一个或多个微博/贴吧话题（#话题内容#），但非话题文本比率极低时过滤。',                isWeak: false },
+  { key: 'shortMeaningless',title: '无意义短词过滤', shortTitle: '无意义', hitKey: 'short_meaningless',description: '精确匹配水贴词汇（如：哈哈、打卡、顶、赞、支持），清除无营养灌水信息。',                isWeak: false },
+  { key: 'adLink',          title: '引流广告过滤',   shortTitle: '广告',   hitKey: 'ad_link',          description: '匹配微商、客服引流关键字。若含链接则直接强删，仅有关键字则转入"待确认"或删除。',         isWeak: true },
+  { key: 'garbledText',     title: '疑似乱码清洗',   shortTitle: '乱码',   hitKey: 'suspect_garbled',  description: '统计文本中包含的非汉字英数常规符号占比，超出判定阈值即怀疑为乱码。',                     isWeak: true }
+]
+
+/**
  * 文本标准化处理：去除控制字符、不可见字符，压缩连续空白，去除首尾空白
  */
 export function normalizeText(text) {
