@@ -54,8 +54,17 @@
             </label>
           </div>
         </div>
-        <div v-if="dataShare.labelingResults" class="bg-violet-50 p-2 rounded-lg border border-violet-200 text-[10px] text-violet-700">
-          AI 打标结果已就绪 ({{ dataShare.labelingResults.outputColumns.length }} 列)
+        <div v-if="dataShare.labelingResults?.outputColumns?.length">
+          <label class="block text-[10px] font-bold text-violet-700 mb-1 flex items-center gap-1">
+            <Tag class="w-3 h-3" /> AI 打标列 ({{ dataShare.labelingResults.outputColumns.length }})
+          </label>
+          <div class="max-h-20 overflow-y-auto bg-violet-50 border border-violet-200 rounded-lg p-2 space-y-1">
+            <label v-for="col in dataShare.labelingResults.outputColumns" :key="col.key"
+              class="flex items-center gap-1.5 text-[10px] text-violet-800">
+              <input type="checkbox" :value="col.key" v-model="selectedLabelingCols" class="rounded text-violet-600" />
+              <span class="truncate">{{ col.name }}</span>
+            </label>
+          </div>
         </div>
       </div>
     </MobileCollapsible>
@@ -173,17 +182,33 @@
               <p class="text-[9px] text-slate-400 mt-1">选择要纳入统计分析的列，默认全选</p>
             </div>
 
+            <!-- AI 打标列选择 -->
+            <div v-if="dataShare.labelingResults?.outputColumns?.length">
+              <label class="block text-xs font-bold text-violet-700 mb-1.5 flex items-center gap-1.5">
+                <Tag class="w-3.5 h-3.5" /> AI 打标列
+                <span class="text-[10px] font-normal text-violet-500">({{ selectedLabelingCols.length }} / {{ dataShare.labelingResults.outputColumns.length }})</span>
+              </label>
+              <div class="max-h-36 overflow-y-auto bg-violet-50 border border-violet-200 rounded-lg p-2 space-y-1 custom-scrollbar">
+                <label v-for="col in dataShare.labelingResults.outputColumns" :key="col.key"
+                  class="flex items-center gap-2 text-xs text-violet-800 cursor-pointer hover:bg-violet-100 px-1 py-0.5 rounded">
+                  <input type="checkbox" :value="col.key" v-model="selectedLabelingCols"
+                    class="rounded text-violet-600 focus:ring-violet-500" />
+                  <Tag class="w-3 h-3 text-violet-500 shrink-0" />
+                  <span class="truncate">{{ col.name }}</span>
+                </label>
+              </div>
+              <p class="text-[9px] text-violet-400 mt-1">智能加工产出的列，默认全部纳入；可取消勾选以排除</p>
+            </div>
+
             <!-- 数据概况 -->
             <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5 text-xs text-slate-600">
               <div class="flex justify-between"><span>行数</span><span class="font-mono font-bold text-slate-800">{{ rows.length }}</span></div>
-              <div class="flex justify-between"><span>选中列</span><span class="font-mono font-bold text-slate-800">{{ selectedCols.length }} / {{ headers.length }}</span></div>
+              <div class="flex justify-between"><span>选中原始列</span><span class="font-mono font-bold text-slate-800">{{ selectedCols.length }} / {{ headers.length }}</span></div>
+              <div v-if="dataShare.labelingResults?.outputColumns?.length" class="flex justify-between">
+                <span>选中 AI 打标列</span>
+                <span class="font-mono font-bold text-violet-700">{{ selectedLabelingCols.length }} / {{ dataShare.labelingResults.outputColumns.length }}</span>
+              </div>
               <div class="flex justify-between"><span>平均非空率</span><span class="font-mono font-bold text-slate-800">{{ averageFillRate }}%</span></div>
-            </div>
-
-            <!-- AI 打标结果提示 -->
-            <div v-if="dataShare.labelingResults" class="bg-violet-50 p-3 rounded-lg border border-violet-200 text-xs text-violet-700">
-              <span class="font-bold">AI 打标结果已就绪</span> ({{ dataShare.labelingResults.outputColumns.length }} 列)
-              <br>分析时将自动纳入打标列作为额外维度
             </div>
 
             <button @click="generateSummary" :disabled="isSummarizing || selectedCols.length === 0"
@@ -261,7 +286,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { marked } from 'marked'
-import { FileBarChart, SlidersHorizontal, Sparkles, Loader2, Lightbulb, Wand2 } from 'lucide-vue-next'
+import { FileBarChart, SlidersHorizontal, Sparkles, Loader2, Lightbulb, Wand2, Tag } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
@@ -298,6 +323,7 @@ const { handleFile } = useFileUpload({
 const isSummarizing = ref(false)
 const summaryText = ref('')
 const selectedCols = ref([])
+const selectedLabelingCols = ref([])
 const analysisTheme = ref('')
 const isRecommending = ref(false)
 const recommendedAngles = ref([])
@@ -349,11 +375,17 @@ watch(() => headers.value.length, () => {
   if (headers.value.length > 0) selectedCols.value = headers.value.map((_, i) => i)
 })
 
+// AI 打标列就绪时默认全选（保留原"自动纳入"语义，但用户可手动取消）
+watch(() => dataShare.labelingResults?.outputColumns, (cols) => {
+  if (cols?.length) selectedLabelingCols.value = cols.map(c => c.key)
+}, { immediate: true, deep: true })
+
 function reset() {
   headers.value = []
   rows.value = []
   summaryText.value = ''
   selectedCols.value = []
+  selectedLabelingCols.value = []
   analysisTheme.value = ''
   recommendedAngles.value = []
 }
@@ -411,12 +443,13 @@ async function generateSummary() {
     // 1. 列画像
     const profiles = computeAllProfiles(headers.value, rows.value, selectedCols.value)
 
-    // 2. AI 打标结果作为虚拟列
+    // 2. AI 打标结果作为虚拟列（仅纳入用户勾选的）
     const labelingProfiles = []
     if (dataShare.labelingResults?.analysisMap) {
       const lr = dataShare.labelingResults
       const doneRows = Object.values(lr.analysisMap).filter(r => r.status === 'done')
       for (const col of lr.outputColumns) {
+        if (!selectedLabelingCols.value.includes(col.key)) continue
         const values = doneRows.map(r => r.values?.[col.key] ?? null)
         labelingProfiles.push({
           ...computeColumnProfile(col.name + ' (AI)', values),
