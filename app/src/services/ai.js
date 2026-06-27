@@ -96,7 +96,7 @@ export async function callAI(content, systemPrompt, modelOverride) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: modelOverride || config.translateModel,
+      model: modelOverride || config.workModel,
       messages,
       temperature: 0.3,
       max_tokens: 2048
