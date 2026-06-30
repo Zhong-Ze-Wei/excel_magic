@@ -33,15 +33,15 @@ export function buildTableSnapshot(headers, rows, sampleCount = 8) {
  * 调用 AI 分析表格意图，返回 2-3 个任务方案建议。
  * @param {Array} headers
  * @param {Array} rows
- * @param {object} apiConfig settings.getApiConfig() 的返回值
+ * @param {string} modelOverride 模型 ID（settings.getApiConfig().workModel）
  * @returns {Promise<{suggestions: Array<{goal:string, coreColumnIdx:number, tasks:{clean,process,summary}, confidence:'high'|'medium'|'low'}>}>}
  */
-export async function analyzeTableIntent(headers, rows, apiConfig) {
+export async function analyzeTableIntent(headers, rows, modelOverride) {
   const { profilesText, sampleText } = buildTableSnapshot(headers, rows)
   const systemPrompt = getIntentAnalysisPrompt()
   const userPrompt = `【列画像】\n${profilesText}\n\n【样本数据】\n${sampleText}\n\n【表头】${JSON.stringify(headers)}`
 
-  const raw = await callAI(userPrompt, systemPrompt, apiConfig.workModel)
+  const raw = await callAI(userPrompt, systemPrompt, modelOverride)
   const parsed = parseRobustJSON(raw)
   if (!parsed || !Array.isArray(parsed.suggestions)) {
     throw new Error('AI 返回格式无法解析')

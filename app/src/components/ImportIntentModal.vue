@@ -57,10 +57,22 @@
             </button>
           </div>
 
-          <!-- 分析中 -->
-          <div v-if="analyzing" class="flex items-center gap-2 p-3 rounded-lg bg-blue-50/50 border border-blue-100">
-            <Loader2 class="w-3.5 h-3.5 text-blue-500 animate-spin" />
-            <span class="text-xs text-blue-600">AI 正在分析表格...</span>
+          <!-- 分析中（分阶段脉动展示） -->
+          <div v-if="analyzing" class="p-4 rounded-xl bg-gradient-to-br from-blue-50 to-violet-50 border border-blue-200/60">
+            <div class="flex items-center gap-2 mb-3">
+              <Sparkles class="w-4 h-4 text-blue-600 animate-pulse" />
+              <span class="text-xs font-bold text-blue-700">AI 正在理解你的表格</span>
+            </div>
+            <div class="space-y-2">
+              <div v-for="(step, i) in analysisSteps" :key="i"
+                class="flex items-center gap-2 text-[11px]"
+                :class="step.active ? 'text-blue-700' : step.done ? 'text-slate-400' : 'text-slate-300'">
+                <Check v-if="step.done" class="w-3 h-3 text-emerald-500 shrink-0" />
+                <Loader2 v-else-if="step.active" class="w-3 h-3 text-blue-500 animate-spin shrink-0" />
+                <span v-else class="w-3 h-3 shrink-0">·</span>
+                <span :class="step.active ? 'font-medium' : ''">{{ step.label }}</span>
+              </div>
+            </div>
           </div>
 
           <!-- 建议列表 -->
@@ -203,6 +215,32 @@ const suggestions = ref([])
 const analyzing = ref(false)
 const adoptedIdx = ref(null) // 已采纳的建议索引
 
+// 分析阶段（视觉化进度，让等待感更优雅）
+const analysisSteps = ref([
+  { label: '读取列结构与类型', done: false, active: false },
+  { label: '抽取样本数据', done: false, active: false },
+  { label: '推断可能的任务目标', done: false, active: false }
+])
+let stepTimer = null
+function startStepAnimation() {
+  analysisSteps.value.forEach(s => { s.done = false; s.active = false })
+  // 第一步立即激活
+  analysisSteps.value[0].active = true
+  let i = 0
+  stepTimer = setInterval(() => {
+    if (i < analysisSteps.value.length - 1) {
+      analysisSteps.value[i].done = true
+      analysisSteps.value[i].active = false
+      i++
+      analysisSteps.value[i].active = true
+    }
+  }, 1200)
+}
+function finishStepAnimation() {
+  if (stepTimer) { clearInterval(stepTimer); stepTimer = null }
+  analysisSteps.value.forEach(s => { s.done = true; s.active = false })
+}
+
 // 三个任务卡片：图标 + 标题 + 一句话描述 + 悬停说明
 const taskOptions = [
   { key: 'clean',   label: '清洗',     desc: '去噪去重',     icon: Sparkles,
@@ -272,8 +310,10 @@ async function runAnalysis() {
   analyzing.value = true
   suggestions.value = []
   adoptedIdx.value = null
+  startStepAnimation()
   try {
-    const result = await analyzeTableIntent(headers.value, dataShare.rows, settings.getApiConfig())
+    const result = await analyzeTableIntent(headers.value, dataShare.rows, settings.workModel)
+    finishStepAnimation()
     suggestions.value = result.suggestions || []
     if (suggestions.value.length) {
       // 默认采纳第一个（推荐项）
@@ -284,6 +324,7 @@ async function runAnalysis() {
   } catch (err) {
     toast.error('AI 分析失败：' + (err.message || '未知错误'))
   } finally {
+    if (stepTimer) { clearInterval(stepTimer); stepTimer = null }
     analyzing.value = false
   }
 }
