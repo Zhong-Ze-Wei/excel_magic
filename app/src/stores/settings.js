@@ -54,6 +54,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const dataInsightMode = ref(localStorage.getItem('data_insight_mode') || 'heuristic')
   watch(dataInsightMode, (v) => localStorage.setItem('data_insight_mode', v))
 
+  // 导入数据后是否自动调用 AI 分析「数据集意图」（默认开启，用户可在设置关闭改为手动触发）
+  const autoIntentAnalysis = ref(localStorage.getItem('auto_intent_analysis') !== 'false')
+  watch(autoIntentAnalysis, (v) => localStorage.setItem('auto_intent_analysis', String(v)))
+
   // 数据清洗入口模式: 'simple' (AI 优化) | 'expert' (规则精调)
   const cleaningMode = ref(localStorage.getItem('magic_excel_cleaning_mode') || 'simple')
   watch(cleaningMode, (v) => localStorage.setItem('magic_excel_cleaning_mode', v))
@@ -201,7 +205,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     currentPlatform, platformConfig, apiKey, isConfigured,
     translateModel, workModel, useSystemPrompt, showSettings,
-    selectedTranslateModel, selectedWorkModel, rulesConfig, concurrency, dataInsightMode,
+    selectedTranslateModel, selectedWorkModel, rulesConfig, concurrency, dataInsightMode, autoIntentAnalysis,
     cleaningMode, lastAiConfigAt,
     API_PLATFORMS, getApiConfig, setPlatform, saveApiKey, saveModelSelection,
     exportGlobalConfig, importGlobalConfig, resetAllConfig
