@@ -537,6 +537,10 @@ const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
     rangeEnd.value = r.length
     selectedInputColumns.value = dataShare.coreColumn != null ? [Number(dataShare.coreColumn)] : []
     analysisMap.value = {}
+    // 注入数据集意图的任务说明作为初始目标（用户可在页面内继续修改）
+    if (!userGoal.value && dataShare.intentNote) {
+      userGoal.value = dataShare.intentNote
+    }
   }
 })
 

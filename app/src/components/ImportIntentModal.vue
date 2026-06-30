@@ -306,6 +306,8 @@ function onSubmit() {
   if (form.coreColumnIdx !== dataShare.coreColumn) {
     dataShare.setCoreColumn(form.coreColumnIdx)
   }
+  // 任务说明写入共享上下文，供智能加工/清洗的 AI 调用使用
+  dataShare.setIntentNote(trimmedNote)
   const count = Object.values(form.tasks).filter(Boolean).length
   toast.success(`意图已保存：${count} 项任务`)
 }
