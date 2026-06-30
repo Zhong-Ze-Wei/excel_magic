@@ -517,7 +517,7 @@ import OutputColumnsList from '../components/analysis/OutputColumnsList.vue'
 import { DEMO_DATA } from '../services/excel'
 import { useExport } from '../composables/useExport'
 import { callAI, callAIBatch } from '../services/ai'
-import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt, PRESET_TEMPLATES, getPresetPlan } from '../services/prompts'
+import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt, PRESET_TEMPLATES, getPresetPlan, formatIntentContext } from '../services/prompts'
 import { normalizeLabelingPlan, validateLabelingPlan, normalizeRowResult } from '../services/labelingPlan'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
@@ -537,10 +537,6 @@ const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
     rangeEnd.value = r.length
     selectedInputColumns.value = dataShare.coreColumn != null ? [Number(dataShare.coreColumn)] : []
     analysisMap.value = {}
-    // 注入数据集意图的任务说明作为初始目标（用户可在页面内继续修改）
-    if (!userGoal.value && dataShare.intentNote) {
-      userGoal.value = dataShare.intentNote
-    }
   }
 })
 
@@ -749,7 +745,8 @@ async function generateLabelingPlanWithAI() {
     })
 
     const prompt = getLabelingPlanGenerationPrompt(userGoal.value, headers.value, sampleRows, inputCols)
-    const res = await callAI(prompt, '你是一个数据分析配置专家。', settings.getApiConfig().workModel)
+    const sysPrompt = '你是一个数据分析配置专家。' + formatIntentContext(dataShare.intentNote, '为表格新增列')
+    const res = await callAI(prompt, sysPrompt, settings.getApiConfig().workModel)
     const parsed = parseRobustJSON(res)
 
     const plan = normalizeLabelingPlan(parsed)
