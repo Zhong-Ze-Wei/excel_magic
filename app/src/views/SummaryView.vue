@@ -292,7 +292,7 @@ import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import { DEMO_DATA } from '../services/excel'
 import { callStreamingAI, callAI } from '../services/ai'
-import { getDataSummaryPrompt, getAnalysisThemePrompt } from '../services/prompts'
+import { getDataSummaryPrompt, getAnalysisThemePrompt, formatIntentContext } from '../services/prompts'
 import { parseRobustJSON } from '../services/jsonParser'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
@@ -468,11 +468,13 @@ async function generateSummary() {
     const sampleText = formatSampleRows(sample)
 
     // 5. 调用 AI
-    const { systemPrompt, userPrompt } = getDataSummaryPrompt(
+    const { systemPrompt: rawSys, userPrompt } = getDataSummaryPrompt(
       profilesText, datasetMeta, sampleText,
       analysisTheme.value.trim() || null,
       recommendedAngles.value.length > 0 ? recommendedAngles.value : null
     )
+    // 意图上下文作为参考段追加（不覆盖摘要自己的 theme）
+    const systemPrompt = rawSys + formatIntentContext(dataShare.intentNote, '数据摘要与洞察')
     await callStreamingAI(systemPrompt, userPrompt, (chunk) => { summaryText.value += chunk })
   } catch (e) {
     summaryText.value += `\n\n[错误] ${e.message}`

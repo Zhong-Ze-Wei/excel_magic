@@ -329,7 +329,7 @@ import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
 import { runCleaningPipeline, ATOMIC_RULES_META as RULES_META } from '../services/cleaningRules'
-import { getSmartFilterPrompt } from '../services/prompts'
+import { getSmartFilterPrompt, formatIntentContext } from '../services/prompts'
 import { callAI } from '../services/ai'
 import { parseRobustJSON } from '../services/jsonParser'
 import { useDataShareStore } from '../stores/dataShare'
@@ -468,10 +468,8 @@ async function runAiOptimize() {
     const rulesMeta = RULES_META.map(r => ({ key: r.key, title: r.title, description: r.description }))
 
     const prompt = getSmartFilterPrompt(input, headers.value, sourceCol.value, allColumnSamples, rulesMeta)
-    // 携带数据集意图的任务说明作为上下文（如有），帮助 AI 理解清洗目标
-    const systemPrompt = dataShare.intentNote
-      ? `你是一个数据清洗专家。\n\n【数据集任务上下文】${dataShare.intentNote}`
-      : '你是一个数据清洗专家。'
+    // 意图上下文作为参考段注入（不覆盖本步目标），帮 AI 理解清洗在整体任务中的位置
+    const systemPrompt = '你是一个数据清洗专家。' + formatIntentContext(dataShare.intentNote, '数据清洗')
     const raw = await callAI(prompt, systemPrompt, settings.getApiConfig().workModel)
     const parsed = parseRobustJSON(raw)
 

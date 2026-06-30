@@ -22,7 +22,7 @@ npm test           # Vitest
 
 ## Key Conventions
 
-- **意图驱动上传**：`useFileUpload` 上传后自动弹 `ImportIntentModal` 收集「核心列 + 任务（clean/process/summary）+ 说明」，写入 `stores/importIntent.js`，替代旧的启发式列检测和模块推荐
+- **意图驱动上传**：`useFileUpload` 上传后自动弹 `ImportIntentModal` 收集「核心列 + 任务（clean/process/summary）+ 说明」，写入 `stores/importIntent.js`；任务说明同步写 `dataShare.intentNote`，以**参考段**形式（`formatIntentContext`）分层注入三功能区的 AI 调用，不覆盖各模块自己的目标字段（详见 docs/adr/0008）。弹窗支持 **AI 一键分析**（`services/intentAnalysis.js` 读表格快照推断 2-3 个任务目标建议），默认自动触发，可在设置「AI 自动行为」关闭
 - 数据清洗采用**审计优先**策略：不直接删除，打标 keep/delete/suspect 后用户可覆写（详见 docs/adr/0002）
 - AI 打标采用 **labelingPlan** 模型：自然语言需求 → AI 生成 outputColumns 方案 → 编译 system prompt → 逐行打标（详见 docs/adr/0003）
 - 数据摘要用**列画像**替代原始行采样：预计算全表统计后发给 AI，不发原始行（详见 docs/adr/0004）
