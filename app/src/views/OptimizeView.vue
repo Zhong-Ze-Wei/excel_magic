@@ -468,7 +468,11 @@ async function runAiOptimize() {
     const rulesMeta = RULES_META.map(r => ({ key: r.key, title: r.title, description: r.description }))
 
     const prompt = getSmartFilterPrompt(input, headers.value, sourceCol.value, allColumnSamples, rulesMeta)
-    const raw = await callAI(prompt, '你是一个数据清洗专家。', settings.getApiConfig().workModel)
+    // 携带数据集意图的任务说明作为上下文（如有），帮助 AI 理解清洗目标
+    const systemPrompt = dataShare.intentNote
+      ? `你是一个数据清洗专家。\n\n【数据集任务上下文】${dataShare.intentNote}`
+      : '你是一个数据清洗专家。'
+    const raw = await callAI(prompt, systemPrompt, settings.getApiConfig().workModel)
     const parsed = parseRobustJSON(raw)
 
     if (!parsed) { toast.error('AI 返回格式异常'); return }

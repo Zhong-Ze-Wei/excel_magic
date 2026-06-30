@@ -8,6 +8,7 @@ export const useDataShareStore = defineStore('dataShare', () => {
   const coreColumn = ref(0) // 全局共享的核心处理列索引
   const labelingResults = ref(null) // { outputColumns: [...], analysisMap: { [rowIdx]: { values: {...} } } }
   const translatedColumns = ref([]) // [{ originalIdx, translatedIdx, translatedName }]
+  const intentNote = ref('') // 数据集意图的任务说明，作为 AI 模块的共享上下文
 
   // 多 Sheet 支持
   const sheetNames = ref([])
@@ -88,12 +89,18 @@ export const useDataShareStore = defineStore('dataShare', () => {
     sheetNames.value = []
     currentSheet.value = ''
     file.value = null
+    intentNote.value = ''
+  }
+
+  // 写入数据集意图的任务说明（共享上下文）
+  function setIntentNote(note) {
+    intentNote.value = String(note || '').slice(0, 500)
   }
 
   return {
-    headers, rows, sourceName, coreColumn, hasData, labelingResults, translatedColumns,
+    headers, rows, sourceName, coreColumn, hasData, labelingResults, translatedColumns, intentNote,
     sheetNames, currentSheet, hasMultipleSheets, file,
     setSharedData, setCoreColumn, getAndClearSharedData, clearSharedData,
-    setLabelingResults, clearLabelingResults, addTranslatedColumn, setSheet
+    setLabelingResults, clearLabelingResults, addTranslatedColumn, setSheet, setIntentNote
   }
 })
