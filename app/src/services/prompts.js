@@ -119,6 +119,41 @@ recommendations 的 route 只能是以下值：/optimize（数据优化）、/cl
 }
 
 /**
+ * 数据集意图分析 system prompt
+ *
+ * 让 AI 读完表格快照后，给出 2-3 个「用户可能想做什么」的任务方案建议。
+ * 粒度定位：中等——比"分析这份数据"具体，比"清洗→打标→聚类"宏观。
+ * 例：「找出差评原因，定位物流相关的负面评论」是理想粒度。
+ */
+export function getIntentAnalysisPrompt() {
+  return `你是一个数据分析顾问。用户刚导入一张表格，还没告诉你要做什么。你的任务是读完数据快照后，推测用户最可能想完成的 2-3 个任务目标，作为建议供其选择。
+
+判断要点：
+1. 先理解这是什么数据（电商评论？销售流水？问卷反馈？），再推断典型诉求。
+2. 每个目标要具体到能指导后续动作，但不要替用户规划到操作步骤。
+3. 不同目标应覆盖不同的诉求方向（如：清洗导出 / 深度分析 / 内容加工），不要给出三个雷同的变体。
+4. 第一个目标应是你最有把握的「主推测」，confidence 设 high。
+
+返回纯 JSON，不要 markdown 代码块，不要解释：
+{
+  "suggestions": [
+    {
+      "goal": "一句话任务目标，具体但不过细，如：分析差评原因，定位物流相关的负面评论",
+      "coreColumnIdx": 2,
+      "tasks": { "clean": true, "process": true, "summary": true },
+      "confidence": "high"
+    }
+  ]
+}
+
+字段说明：
+- goal：任务目标，10-30 字，动词开头，聚焦「想达成什么」而非「怎么做」
+- coreColumnIdx：最该作为处理对象的核心列索引（从 0 开始）
+- tasks：建议启用的任务，clean=数据清洗、process=智能加工(翻译/打标)、summary=数据摘要
+- confidence：推测把握，high/medium/low`
+}
+
+/**
  * 获取 AI 自动生成标签 prompt
  */
 export function getTagGenerationPrompt(samples, taxonomyGoal = '') {
