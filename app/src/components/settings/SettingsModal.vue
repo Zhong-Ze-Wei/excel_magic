@@ -10,7 +10,7 @@
             <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
               <Settings2 class="w-5 h-5 text-blue-600" /> 系统设置中心
             </h3>
-            <p class="text-[11px] text-slate-400 mt-0.5">配置您的 API 接口底座与数据清洗原子规则默认阈值</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">配置 API 接口、AI 自动行为与数据洞察引擎</p>
           </div>
           <button @click="settings.showSettings = false" class="text-slate-400 hover:text-slate-600 transition-colors">
             <X class="w-5 h-5" />
@@ -19,20 +19,15 @@
 
         <!-- Tabs Navigation -->
         <div class="px-6 border-b border-slate-100 flex gap-6 bg-slate-50/50">
-          <button @click="activeTab = 'api'" 
+          <button @click="activeTab = 'api'"
             class="py-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5"
             :class="activeTab === 'api' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'">
             <Key class="w-3.5 h-3.5" /> API 密钥与模型
           </button>
-          <button @click="activeTab = 'rules'" 
-            class="py-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5"
-            :class="activeTab === 'rules' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'">
-            <Eraser class="w-3.5 h-3.5" /> 清洗规则与阈值
-          </button>
           <button @click="activeTab = 'insight'"
             class="py-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5"
             :class="activeTab === 'insight' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'">
-            <Lightbulb class="w-3.5 h-3.5" /> 数据洞察
+            <Lightbulb class="w-3.5 h-3.5" /> AI 行为与数据洞察
           </button>
         </div>
 
@@ -143,151 +138,28 @@
             </div>
           </div>
 
-          <!-- Tab 2: Cleaning Rules Configurations -->
-          <div v-show="activeTab === 'rules'" class="space-y-4 animate-fade-in">
-            <!-- Weak Policy setting -->
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-2">
-              <label class="block text-xs font-bold text-slate-800">弱规则全局过滤策略</label>
-              <div class="flex gap-6 mt-1">
-                <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-                  <input type="radio" v-model="settings.rulesConfig.weakPolicy" value="mark" class="text-blue-600 focus:ring-blue-500">
-                  标记为待人工确认 🟡
-                </label>
-                <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-                  <input type="radio" v-model="settings.rulesConfig.weakPolicy" value="delete" class="text-blue-600 focus:ring-blue-500">
-                  直接进行强制删除 🔴
-                </label>
-              </div>
-              <p class="text-[10px] text-slate-400 leading-normal">
-                * 弱规则（如疑似乱码、疑似引流敏感词）命中时，是转移至审计页由人手动确立还是自动过滤。
-              </p>
-            </div>
 
-            <!-- Rules Grid list -->
-            <div class="space-y-3">
-              <!-- 字数过滤 -->
-              <div class="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
-                <div class="flex justify-between items-center">
-                  <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" v-model="settings.rulesConfig.tooShort.enable" class="rounded text-blue-600 focus:ring-blue-500" />
-                    <span class="text-xs font-bold text-slate-700">字数过短过滤 (tooShort)</span>
-                  </label>
-                  <span class="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-100 text-red-800">强删规则</span>
-                </div>
-                <div v-if="settings.rulesConfig.tooShort.enable" class="pl-6 space-y-1.5">
-                  <span class="text-[10px] text-slate-500">字数过滤长度阈值 (有效汉字英数少于此值则删除):</span>
-                  <input type="number" v-model.number="settings.rulesConfig.tooShort.minLength" min="1" 
-                    class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500 font-mono" />
-                </div>
-              </div>
-
-              <!-- 精确去重 -->
-              <div class="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
-                <div class="flex justify-between items-center">
-                  <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" v-model="settings.rulesConfig.duplicate.enable" class="rounded text-blue-600 focus:ring-blue-500" />
-                    <span class="text-xs font-bold text-slate-700">全表数据精确去重 (duplicate)</span>
-                  </label>
-                  <span class="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-100 text-red-800">强删规则</span>
-                </div>
-                <div v-if="settings.rulesConfig.duplicate.enable" class="pl-6 space-y-1.5">
-                  <span class="text-[10px] text-slate-500">触发去重的重复次数阈值:</span>
-                  <input type="number" v-model.number="settings.rulesConfig.duplicate.minCount" min="2" 
-                    class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500 font-mono" />
-                </div>
-              </div>
-
-              <!-- 纯话题过滤 -->
-              <div class="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
-                <div class="flex justify-between items-center">
-                  <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" v-model="settings.rulesConfig.topicOnly.enable" class="rounded text-blue-600 focus:ring-blue-500" />
-                    <span class="text-xs font-bold text-slate-700">纯话题标签过滤 (topicOnly)</span>
-                  </label>
-                  <span class="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-100 text-red-800">强删规则</span>
-                </div>
-                <div v-if="settings.rulesConfig.topicOnly.enable" class="pl-6 space-y-1.5">
-                  <span class="text-[10px] text-slate-500">话题标签字符占比阈值 (0.1 ~ 1.0):</span>
-                  <input type="number" step="0.1" v-model.number="settings.rulesConfig.topicOnly.ratioThreshold" min="0.1" max="1.0" 
-                    class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500 font-mono" />
-                </div>
-              </div>
-
-              <!-- 无意义短词 -->
-              <div class="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
-                <div class="flex justify-between items-center">
-                  <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" v-model="settings.rulesConfig.shortMeaningless.enable" class="rounded text-blue-600 focus:ring-blue-500" />
-                    <span class="text-xs font-bold text-slate-700">无意义短词灌水过滤 (shortMeaningless)</span>
-                  </label>
-                  <span class="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-100 text-red-800">强删规则</span>
-                </div>
-                <div v-if="settings.rulesConfig.shortMeaningless.enable" class="pl-6 space-y-1.5">
-                  <span class="text-[10px] text-slate-500">水贴高频词库 (逗号/换行分隔):</span>
-                  <textarea v-model="settings.rulesConfig.shortMeaningless.phrasesStr" rows="2" @input="syncPhrases" 
-                    class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500 resize-none font-mono"></textarea>
-                </div>
-              </div>
-
-              <!-- 营销广告 -->
-              <div class="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
-                <div class="flex justify-between items-center">
-                  <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" v-model="settings.rulesConfig.adLink.enable" class="rounded text-blue-600 focus:ring-blue-500" />
-                    <span class="text-xs font-bold text-slate-700">微商引流广告过滤 (adLink)</span>
-                  </label>
-                  <span class="px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-800">弱规则</span>
-                </div>
-                <div v-if="settings.rulesConfig.adLink.enable" class="pl-6 space-y-1.5">
-                  <span class="text-[10px] text-slate-500">引流推广敏感词库 (逗号/换行分隔):</span>
-                  <textarea v-model="settings.rulesConfig.adLink.keywordsStr" rows="2" @input="syncKeywords" 
-                    class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500 resize-none font-mono"></textarea>
-                </div>
-              </div>
-
-              <!-- 乱码清洗 -->
-              <div class="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
-                <div class="flex justify-between items-center">
-                  <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" v-model="settings.rulesConfig.garbledText.enable" class="rounded text-blue-600 focus:ring-blue-500" />
-                    <span class="text-xs font-bold text-slate-700">非法乱码字符清洗 (garbledText)</span>
-                  </label>
-                  <span class="px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-800">弱规则</span>
-                </div>
-                <div v-if="settings.rulesConfig.garbledText.enable" class="pl-6 space-y-1.5">
-                  <span class="text-[10px] text-slate-500">乱码判定非规则字符占比阈值 (0.1 ~ 1.0):</span>
-                  <input type="number" step="0.05" v-model.number="settings.rulesConfig.garbledText.threshold" min="0.1" max="1.0" 
-                    class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500 font-mono" />
-                </div>
-              </div>
-
-              <!-- 基础快捷规则 -->
-              <div class="border border-slate-200 rounded-xl p-4 bg-white space-y-2.5">
-                <span class="text-xs font-bold text-slate-800 block">基础过滤开关</span>
-                <div class="grid gap-3.5" :class="isMobile ? 'grid-cols-1' : 'grid-cols-2'">
-                  <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-600">
-                    <input type="checkbox" v-model="settings.rulesConfig.empty.enable" class="rounded text-blue-600 focus:ring-blue-500" />
-                    空文本过滤
-                  </label>
-                  <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-600">
-                    <input type="checkbox" v-model="settings.rulesConfig.pureEmoji.enable" class="rounded text-blue-600 focus:ring-blue-500" />
-                    纯 Emoji 表情过滤
-                  </label>
-                  <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-600">
-                    <input type="checkbox" v-model="settings.rulesConfig.pureSymbol.enable" class="rounded text-blue-600 focus:ring-blue-500" />
-                    纯标点特殊符号过滤
-                  </label>
-                  <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-600">
-                    <input type="checkbox" v-model="settings.rulesConfig.linkOnly.enable" class="rounded text-blue-600 focus:ring-blue-500" />
-                    纯 HTTP 链接过滤
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Tab 3: Data Insight -->
+          <!-- Tab 2: AI 行为与数据洞察 -->
           <div v-show="activeTab === 'insight'" class="space-y-5 animate-fade-in">
+            <!-- AI 行为开关 -->
+            <div class="bg-slate-50 p-5 rounded-xl border border-slate-200/60 space-y-3">
+              <label class="block text-xs font-bold text-slate-800">AI 自动行为</label>
+              <p class="text-[10px] text-slate-500 leading-relaxed -mt-1">
+                控制产品中 AI 自动介入的时机。关闭后对应环节改为手动触发，不消耗 API 额度。
+              </p>
+              <label class="flex items-center justify-between p-3 rounded-lg border-2 transition-all cursor-pointer"
+                :class="settings.autoIntentAnalysis ? 'border-blue-500 bg-blue-50/30' : 'border-transparent bg-white hover:bg-slate-50'">
+                <div class="flex items-center gap-2.5">
+                  <Sparkles class="w-4 h-4 text-blue-600" />
+                  <div>
+                    <span class="text-xs font-bold text-slate-700">导入后自动分析表格意图</span>
+                    <p class="text-[10px] text-slate-500 mt-0.5 leading-relaxed">上传数据后，AI 自动读取表格快照、推断核心列与任务目标，给出建议。关闭则改为弹窗内手动点击。</p>
+                  </div>
+                </div>
+                <input type="checkbox" v-model="settings.autoIntentAnalysis" class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
+              </label>
+            </div>
+
             <div class="bg-slate-50 p-5 rounded-xl border border-slate-200/60 space-y-4">
               <label class="block text-xs font-bold text-slate-800">数据洞察分析引擎</label>
 
@@ -363,7 +235,7 @@
 import { ref, reactive, watch } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import { testConnection } from '../../services/ai'
-import { X, CheckCircle2, Gift, Copy, Eye, EyeOff, Settings2, Eraser, Key, Download, Upload, RotateCcw, Lightbulb } from 'lucide-vue-next'
+import { X, CheckCircle2, Gift, Copy, Eye, EyeOff, Settings2, Key, Download, Upload, RotateCcw, Lightbulb, Sparkles } from 'lucide-vue-next'
 import { useToast } from '../../services/toast'
 import { useDevice } from '../../composables/useDevice'
 
@@ -435,19 +307,6 @@ function handleSave() {
   }
   settings.showSettings = false
   toast.success('系统设置已成功保存！')
-}
-
-// 词库分词同步
-function syncPhrases() {
-  const cfg = settings.rulesConfig
-  const raw = cfg.shortMeaningless.phrasesStr || ''
-  cfg.shortMeaningless.phrases = raw.split(/[,，\n]/).map(x => x.trim()).filter(Boolean)
-}
-
-function syncKeywords() {
-  const cfg = settings.rulesConfig
-  const raw = cfg.adLink.keywordsStr || ''
-  cfg.adLink.keywords = raw.split(/[,，\n]/).map(x => x.trim()).filter(Boolean)
 }
 
 // 触发隐藏的备份文件 input
