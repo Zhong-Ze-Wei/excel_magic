@@ -16,11 +16,15 @@
 
     <!-- 有数据 -->
     <div v-else class="space-y-4">
-      <!-- 数据来源 -->
-      <div class="flex items-center justify-between text-xs">
-        <span class="text-slate-500 truncate">{{ dataShare.sourceName }} · {{ rows.length }} 行</span>
-        <button @click="disconnectGlobalExcel" class="text-slate-400 hover:text-rose-500 shrink-0 ml-2">更换</button>
-      </div>
+      <!-- 全局关联横幅（带折叠表格预览） -->
+      <GlobalDataBanner
+        :visible="hasData && dataShare.hasData"
+        :source-name="dataShare.sourceName"
+        :headers="headers"
+        :rows="rows"
+        :mobile="isMobile"
+        @disconnect="disconnectGlobalExcel"
+      />
 
       <!-- 任务目标 -->
       <section class="bg-white rounded-2xl border border-slate-200/60 p-4">
@@ -115,6 +119,7 @@ import { useGlobalDataSync } from '../composables/useGlobalDataSync'
 import { useFileUpload } from '../composables/useFileUpload'
 import { useLabeling } from '../composables/useLabeling'
 import { useExport } from '../composables/useExport'
+import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
 import { useToast } from '../services/toast'
 import { callAI } from '../services/ai'
 import { getLabelingPlanGenerationPrompt, getPresetPlan, PRESET_TEMPLATES, formatIntentContext } from '../services/prompts'

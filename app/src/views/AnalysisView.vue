@@ -8,14 +8,14 @@
       <p class="text-[10px] text-slate-500 mt-0.5">自然语言描述需求 → AI 生成方案 → 批量打标。</p>
     </div>
 
-    <div v-if="hasData && dataShare.hasData"
-      class="bg-emerald-500/10 rounded-lg border border-emerald-500/20 px-3 py-2 flex justify-between items-center text-[10px]">
-      <div class="flex items-center gap-1.5 text-emerald-800 min-w-0">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-        <span class="truncate">已关联 <strong>{{ dataShare.sourceName }}</strong></span>
-      </div>
-      <button @click="disconnectGlobalExcel" class="text-rose-500 font-bold shrink-0 ml-2">断开</button>
-    </div>
+    <GlobalDataBanner
+      :visible="hasData && dataShare.hasData"
+      :source-name="dataShare.sourceName"
+      :headers="headers"
+      :rows="rows"
+      :mobile="true"
+      @disconnect="disconnectGlobalExcel"
+    />
 
     <!-- 文件上传 -->
     <MobileCollapsible title="数据文件" :default-open="!hasData">
@@ -185,20 +185,14 @@
       </button>
     </div>
 
-    <!-- 全局 Excel 关联横幅 -->
-    <div v-if="hasData && dataShare.hasData"
-      class="bg-emerald-500/10 rounded-xl border border-emerald-500/20 px-4 py-3 flex justify-between items-center text-xs animate-fade-in">
-      <div class="flex items-center gap-2 text-emerald-800">
-        <span class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-        </span>
-        <span>当前已关联：<strong>{{ dataShare.sourceName }}</strong> ({{ rows.length }} 行)</span>
-      </div>
-      <button @click="disconnectGlobalExcel" class="text-rose-500 hover:text-rose-600 font-bold hover:underline">
-        断开关联
-      </button>
-    </div>
+    <!-- 全局关联横幅（带折叠表格预览） -->
+    <GlobalDataBanner
+      :visible="hasData && dataShare.hasData"
+      :source-name="dataShare.sourceName"
+      :headers="headers"
+      :rows="rows"
+      @disconnect="disconnectGlobalExcel"
+    />
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       <!-- 左侧配置面板 -->
@@ -439,6 +433,7 @@ import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
 import StatsPieChart from '../components/common/StatsPieChart.vue'
 import OutputColumnsList from '../components/analysis/OutputColumnsList.vue'
 import EditColumnDialog from '../components/analysis/EditColumnDialog.vue'
+import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
 import { DEMO_DATA } from '../services/excel'
 import { useExport } from '../composables/useExport'
 import { useLabeling } from '../composables/useLabeling'
