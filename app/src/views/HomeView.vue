@@ -212,6 +212,22 @@
           <div class="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">任务说明</div>
           <div class="text-xs text-amber-900 leading-relaxed">{{ intent.note }}</div>
         </div>
+        <!-- AI 三步方案精简预览 -->
+        <div v-if="intent.pipelinePlan" class="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1">
+          <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">AI 规划方案</div>
+          <div v-if="intent.pipelinePlan.clean" class="flex items-center gap-1.5 text-[11px] text-slate-600">
+            <span class="text-orange-500">🧹</span>
+            <span>清洗：{{ dataShare.headers[intent.pipelinePlan.clean.sourceCol] || '主列' }}</span>
+          </div>
+          <div v-if="intent.pipelinePlan.process" class="flex items-center gap-1.5 text-[11px] text-slate-600">
+            <span class="text-violet-500">🏷️</span>
+            <span>加工：{{ intent.pipelinePlan.process.outputColumns.map(c => c.name).join(' + ') }}</span>
+          </div>
+          <div v-if="intent.pipelinePlan.summary" class="flex items-center gap-1.5 text-[11px] text-slate-600">
+            <span class="text-emerald-500">📊</span>
+            <span>摘要：{{ intent.pipelinePlan.summary.theme }}</span>
+          </div>
+        </div>
         <!-- 快捷入口 -->
         <div v-if="hasAnyTask" class="flex flex-wrap gap-2 pt-2">
           <button v-if="intent.tasks.clean" @click="$router.push('/cleaning')"
