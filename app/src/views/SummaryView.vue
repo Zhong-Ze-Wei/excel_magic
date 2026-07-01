@@ -1,6 +1,6 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
-  <div v-if="isMobile" class="px-3 py-3 space-y-3 pb-20 animate-fade-in">
+  <div v-if="isMobile" :class="PAGE.mobile + ' animate-fade-in'">
     <div class="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-xl border border-emerald-200/50 p-3">
       <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
         <FileBarChart class="w-5 h-5 text-emerald-600" /> 数据摘要
@@ -109,7 +109,7 @@
   </div>
 
   <!-- ===== 桌面端模板（原样保留）===== -->
-  <div v-else class="animate-fade-in max-w-7xl mx-auto space-y-6">
+  <div v-else :class="PAGE.desktop">
     <!-- Header -->
     <div class="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-2xl border border-emerald-200/50 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
@@ -300,6 +300,7 @@ import { useGlobalDataSync } from '../composables/useGlobalDataSync'
 import { useFileUpload } from '../composables/useFileUpload'
 import { computeAllProfiles, computeColumnProfile, formatProfilesForAI, stratifiedSample, formatSampleRows, detectColumnType } from '../services/dataProfiler'
 import { useToast } from '../services/toast'
+import { PAGE } from '../styles/tokens'
 
 const toast = useToast()
 const dataShare = useDataShareStore()

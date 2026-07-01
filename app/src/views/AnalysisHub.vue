@@ -1,6 +1,6 @@
 <template>
   <!-- 模式切换栏 -->
-  <div :class="isMobile ? 'px-3 pt-3' : 'max-w-7xl mx-auto pt-6'">
+  <div :class="responsiveClass(isMobile, HUB_BAR.wrapper.mobile, HUB_BAR.wrapper.desktop)">
     <div class="flex items-center justify-between bg-gradient-to-r from-violet-50 to-fuchsia-50 rounded-xl border border-violet-200/60 px-4 py-2.5">
       <div class="flex items-center gap-2 text-xs min-w-0">
         <component :is="modeIcon" class="w-4 h-4 shrink-0" :class="modeColor" />
@@ -27,6 +27,7 @@ import { Sparkles, SlidersHorizontal } from 'lucide-vue-next'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
 import { useToast } from '../services/toast'
+import { responsiveClass, HUB_BAR } from '../styles/tokens'
 import AnalysisSimpleView from './AnalysisSimpleView.vue'
 import AnalysisView from './AnalysisView.vue'
 

@@ -1,6 +1,6 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
-  <div v-if="isMobile" class="px-3 py-3 space-y-3 pb-20 animate-fade-in">
+  <div v-if="isMobile" :class="PAGE.mobile + ' animate-fade-in'">
     <!-- 全局关联横幅（带折叠表格预览） -->
     <GlobalDataBanner
       :visible="hasData && dataShare.hasData"
@@ -241,7 +241,7 @@
   </div>
 
   <!-- ===== 桌面端模板（原样保留）===== -->
-  <div v-else class="animate-fade-in max-w-7xl mx-auto space-y-6">
+  <div v-else :class="PAGE.desktop">
     <!-- 全局关联横幅（带折叠表格预览） -->
     <GlobalDataBanner
       :visible="hasData && dataShare.hasData"
@@ -251,9 +251,9 @@
       @disconnect="disconnectGlobalExcel"
     />
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <div :class="TWO_COL.grid">
       <!-- Left Panel: Rules Configuration -->
-      <div class="lg:col-span-4 space-y-6">
+      <div :class="TWO_COL.left">
         <FileUploader v-if="!hasData" label="上传需要清洗的 Excel/CSV 文件" :icon="Eraser" iconBg="bg-orange-50" iconColor="text-orange-600" @file="handleFile" />
         <button v-if="!hasData" @click="loadDemo"
           class="w-full mt-2 py-2 bg-white hover:bg-orange-50 border border-orange-200 text-orange-600 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
@@ -285,7 +285,7 @@
       </div>
 
       <!-- Right Panel: Data Preview & Audit Table -->
-      <div class="lg:col-span-8 space-y-6">
+      <div :class="TWO_COL.right">
         <!-- Empty State -->
         <div v-if="!hasData" class="bg-white rounded-xl border border-slate-200 shadow-sm p-16 flex flex-col items-center justify-center text-slate-400">
           <Eraser class="w-16 h-16 mb-4 opacity-30 text-orange-500" />
@@ -411,6 +411,7 @@ import CleaningRulesPanel from '../components/cleaning/CleaningRulesPanel.vue'
 import CustomFilterForm from '../components/cleaning/CustomFilterForm.vue'
 import CleaningAuditTable from '../components/cleaning/CleaningAuditTable.vue'
 import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
+import { PAGE, TWO_COL } from '../styles/tokens'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
 import StatsPieChart from '../components/common/StatsPieChart.vue'
