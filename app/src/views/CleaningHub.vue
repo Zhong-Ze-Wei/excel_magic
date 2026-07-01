@@ -1,6 +1,6 @@
 <template>
   <!-- 模式切换栏：与子视图根 padding 对齐 -->
-  <div :class="responsiveClass(isMobile, HUB_BAR.wrapper.mobile, HUB_BAR.wrapper.desktop)">
+  <div :class="isMobile ? HUB_BAR.mobile : HUB_BAR.desktop">
     <div class="flex items-center justify-between bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl border border-orange-200/60 px-4 py-2.5">
       <div class="flex items-center gap-2 text-xs min-w-0">
         <component :is="modeIcon" class="w-4 h-4 shrink-0" :class="modeColor" />
@@ -26,7 +26,7 @@ import { Sparkles, SlidersHorizontal } from 'lucide-vue-next'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
 import { useToast } from '../services/toast'
-import { responsiveClass, HUB_BAR } from '../styles/tokens'
+import { HUB_BAR } from '../styles/tokens'
 import OptimizeView from './OptimizeView.vue'
 import CleaningView from './CleaningView.vue'
 

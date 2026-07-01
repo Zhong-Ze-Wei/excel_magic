@@ -1,5 +1,5 @@
 <template>
-  <div :class="responsiveClass(isMobile, PAGE.mobile, PAGE.desktop)">
+  <div :class="isMobile ? PAGE.mobile : PAGE.desktop">
     <!-- 无数据：上传引导 -->
     <div v-if="!hasData" class="bg-white rounded-2xl border border-slate-200/60 p-8 text-center">
       <Sparkles class="w-8 h-8 text-violet-500 mx-auto mb-3" />
@@ -27,7 +27,7 @@
       />
 
       <!-- 任务目标 -->
-      <section :class="[CARD.base, CARD.pad]">
+      <section class="bg-white rounded-xl border border-slate-200/60 p-4">
         <label class="block text-[10px] font-bold text-slate-500 mb-1.5">任务目标</label>
         <textarea v-model="userGoal" rows="2" placeholder="例：把评论翻译成英文，并打上情感标签"
           class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-violet-500 resize-none"></textarea>
@@ -38,7 +38,7 @@
       </section>
 
       <!-- 模板快选 -->
-      <section :class="[CARD.base, CARD.pad]">
+      <section class="bg-white rounded-xl border border-slate-200/60 p-4">
         <p class="text-[10px] font-bold text-slate-500 mb-2">或选预设模板</p>
         <div class="grid grid-cols-2 gap-2">
           <button v-for="tpl in PRESET_TEMPLATES" :key="tpl.id" @click="applyTemplate(tpl.id)"
@@ -121,7 +121,7 @@ import { useLabeling } from '../composables/useLabeling'
 import { useExport } from '../composables/useExport'
 import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
 import { useToast } from '../services/toast'
-import { LAYOUT, responsiveClass, PAGE, CARD } from '../styles/tokens'
+import { PAGE } from '../styles/tokens'
 import { callAI } from '../services/ai'
 import { getLabelingPlanGenerationPrompt, getPresetPlan, PRESET_TEMPLATES, formatIntentContext } from '../services/prompts'
 import { normalizeLabelingPlan } from '../services/labelingPlan'
