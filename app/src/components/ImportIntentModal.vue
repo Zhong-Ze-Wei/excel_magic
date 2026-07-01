@@ -166,6 +166,72 @@
             </div>
           </div>
         </section>
+
+        <!-- ⑥ AI 三步方案预览（用户确认目标后自动生成，展示三步基础配置） -->
+        <section v-if="hasAnyTask && (pipelinePlan || planningPipeline)">
+          <h4 class="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2">
+            <span class="w-1 h-3.5 bg-blue-500 rounded-full"></span>
+            AI 帮你规划的三步方案
+          </h4>
+
+          <!-- 规划中 -->
+          <div v-if="planningPipeline" class="p-3 rounded-lg bg-blue-50/50 border border-blue-100 flex items-center gap-2">
+            <Loader2 class="w-3.5 h-3.5 text-blue-500 animate-spin" />
+            <span class="text-xs text-blue-600">AI 正在规划三步方案...</span>
+          </div>
+
+          <!-- 三步方案预览 -->
+          <div v-else-if="pipelinePlan" class="space-y-1.5">
+            <!-- 清洗 -->
+            <div v-if="pipelinePlan.clean" class="p-2.5 rounded-lg border border-orange-200/60 bg-orange-50/30">
+              <div class="flex items-center gap-1.5 mb-1">
+                <Sparkles class="w-3 h-3 text-orange-600" />
+                <span class="text-[11px] font-bold text-orange-800">清洗</span>
+              </div>
+              <p class="text-[10px] text-slate-600 leading-relaxed">
+                主列：{{ headers[pipelinePlan.clean.sourceCol] }}
+                <span v-if="cleanRuleCount"> · {{ cleanRuleCount }} 条规则</span>
+              </p>
+            </div>
+            <div v-else-if="form.tasks.clean" class="p-2 rounded-lg border border-slate-200 bg-slate-50">
+              <span class="text-[10px] text-slate-400">🧹 清洗：AI 未能规划，进页面手动配</span>
+            </div>
+
+            <!-- 加工 -->
+            <div v-if="pipelinePlan.process" class="p-2.5 rounded-lg border border-violet-200/60 bg-violet-50/30">
+              <div class="flex items-center gap-1.5 mb-1">
+                <Repeat class="w-3 h-3 text-violet-600" />
+                <span class="text-[11px] font-bold text-violet-800">智能加工</span>
+              </div>
+              <p class="text-[10px] text-slate-600 leading-relaxed">
+                产出：{{ pipelinePlan.process.outputColumns.map(c => c.name + '(' + c.type + ')').join('、') }}
+              </p>
+            </div>
+            <div v-else-if="form.tasks.process" class="p-2 rounded-lg border border-slate-200 bg-slate-50">
+              <span class="text-[10px] text-slate-400">🏷️ 加工：AI 未能规划，进页面手动配</span>
+            </div>
+
+            <!-- 摘要 -->
+            <div v-if="pipelinePlan.summary" class="p-2.5 rounded-lg border border-emerald-200/60 bg-emerald-50/30">
+              <div class="flex items-center gap-1.5 mb-1">
+                <AlignJustify class="w-3 h-3 text-emerald-600" />
+                <span class="text-[11px] font-bold text-emerald-800">摘要</span>
+              </div>
+              <p class="text-[10px] text-slate-600 leading-relaxed">
+                主题：{{ pipelinePlan.summary.theme }}
+                <span v-if="pipelinePlan.summary.focusColumns.length"> · 关注 {{ pipelinePlan.summary.focusColumns.length }} 列</span>
+              </p>
+            </div>
+            <div v-else-if="form.tasks.summary" class="p-2 rounded-lg border border-slate-200 bg-slate-50">
+              <span class="text-[10px] text-slate-400">📊 摘要：AI 未能规划，进页面手动配</span>
+            </div>
+
+            <button @click="runPipelinePlan" :disabled="planningPipeline"
+              class="w-full text-center text-[10px] text-slate-400 hover:text-blue-600 py-1 flex items-center justify-center gap-1 disabled:opacity-50">
+              <RefreshCw class="w-3 h-3" /> 重新规划
+            </button>
+          </div>
+        </section>
       </div>
 
       <!-- Footer -->
@@ -191,6 +257,7 @@ import { useDataShareStore } from '../stores/dataShare'
 import { useSettingsStore } from '../stores/settings'
 import { useToast } from '../services/toast'
 import { buildTableSnapshot, analyzeTableIntent } from '../services/intentAnalysis'
+import { planPipeline } from '../services/pipelinePlanner'
 
 const intent = useImportIntentStore()
 const dataShare = useDataShareStore()
@@ -205,6 +272,10 @@ const snapshot = ref(null)
 const suggestions = ref([])
 const analyzing = ref(false)
 const adoptedIdx = ref(null)
+
+// 三步方案预演状态
+const pipelinePlan = ref(null)
+const planningPipeline = ref(false)
 
 // 分析阶段（视觉化进度）
 const analysisSteps = ref([
@@ -246,6 +317,19 @@ const form = reactive({
   goal: ''  // 主输入：你想做什么（合并了原 note）
 })
 
+// 是否至少选了一个任务（控制三步方案区显隐）
+const hasAnyTask = computed(() => form.tasks.clean || form.tasks.process || form.tasks.summary)
+// 清洗规则条数（用于预览展示）
+const cleanRuleCount = computed(() => {
+  if (!pipelinePlan.value?.clean?.aiRulesConfig) return 0
+  const cfg = pipelinePlan.value.clean.aiRulesConfig
+  let n = 0
+  for (const k of Object.keys(cfg)) {
+    if (cfg[k]?.enable) n++
+  }
+  return n + (cfg.customFilters?.length || 0)
+})
+
 // 弹窗打开时的初始化
 watch(() => intent.showModal, async (v) => {
   if (!v) return
@@ -273,6 +357,8 @@ watch(() => intent.showModal, async (v) => {
       await runAnalysis()
     }
   }
+  // 三步方案：读缓存（不重跑），用户主动点「重新规划」才重新生成
+  pipelinePlan.value = intent.pipelinePlan || null
 })
 
 function buildLocalSnapshot() {
@@ -309,6 +395,8 @@ async function runAnalysis() {
     if (suggestions.value.length) {
       // 首次分析：默认采纳推荐项（填入主输入），用户可改
       adoptSuggestion(suggestions.value[0], 0)
+      // 采纳后自动触发三步方案预演（目标确定了，AI 可以规划具体方案）
+      if (!pipelinePlan.value) runPipelinePlan()
     } else {
       toast.info('AI 暂无候选，请手动填写目标')
     }
@@ -328,6 +416,32 @@ function adoptSuggestion(s, idx) {
   adoptedIdx.value = typeof idx === 'number' ? idx : suggestions.value.indexOf(s)
 }
 
+// 采纳候选后自动触发三步规划（目标确定了，AI 可以规划具体方案了）
+async function runPipelinePlan() {
+  const goal = form.goal.trim()
+  if (!goal || !hasAnyTask.value) return
+  if (!settings.isConfigured || !headers.value.length || !dataShare.rows?.length) return
+
+  planningPipeline.value = true
+  pipelinePlan.value = null
+  try {
+    const result = await planPipeline({
+      goal,
+      headers: headers.value,
+      rows: dataShare.rows,
+      tasks: { ...form.tasks },
+      coreColumnIdx: form.coreColumnIdx ?? 0,
+      workModel: settings.workModel
+    })
+    pipelinePlan.value = result
+    console.log('[三步方案] 规划完成:', result)
+  } catch (err) {
+    console.error('[三步方案] 规划失败:', err)
+  } finally {
+    planningPipeline.value = false
+  }
+}
+
 function onSubmit() {
   if (form.coreColumnIdx == null) return
   const trimmedGoal = form.goal.slice(0, 500)
@@ -335,7 +449,8 @@ function onSubmit() {
     coreColumnIdx: form.coreColumnIdx,
     tasks: { ...form.tasks },
     note: trimmedGoal,            // goal 存入 note 字段（兼容下游 intentNote）
-    suggestions: suggestions.value // 缓存候选，下次不重跑
+    suggestions: suggestions.value, // 缓存候选，下次不重跑
+    pipelinePlan: pipelinePlan.value // 缓存三步方案，各模块进入时消费
   })
   if (form.coreColumnIdx !== dataShare.coreColumn) {
     dataShare.setCoreColumn(form.coreColumnIdx)
