@@ -165,35 +165,6 @@
         <button @click="syncPlanFromPrompt" :disabled="isSyncingPlan" class="flex-1 text-[10px] py-1.5 bg-slate-50 text-slate-600 rounded-lg font-bold disabled:opacity-50">同步列配置</button>
       </div>
     </MobileCollapsible>
-
-    <!-- 编辑列弹窗 -->
-    <div v-if="editingColumn != null" class="fixed inset-0 bg-black/40 z-50 flex items-end justify-center" @click.self="editingColumn = null">
-      <div class="bg-white rounded-t-2xl shadow-2xl w-full max-w-md animate-fade-in max-h-[85vh] overflow-y-auto">
-        <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
-          <h3 class="font-bold text-sm text-slate-800">{{ editingColumnIdx >= 0 ? '编辑' : '添加' }}输出列</h3>
-          <button @click="editingColumn = null" class="text-slate-400 active:text-slate-600"><X class="w-4 h-4" /></button>
-        </div>
-        <div class="p-4 space-y-3">
-          <div><label class="block text-[10px] font-bold text-slate-500 mb-1">列名</label><input v-model="editingColumn.name" type="text" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" /></div>
-          <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Key</label><input v-model="editingColumn.key" type="text" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono" /></div>
-          <div><label class="block text-[10px] font-bold text-slate-500 mb-1">类型</label>
-            <select v-model="editingColumn.type" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-              <option value="enum">单选标签</option><option value="multi_enum">多选标签</option>
-              <option value="boolean">是否判断</option><option value="text">自由文本</option><option value="number">数值评分</option>
-            </select>
-          </div>
-          <div><label class="block text-[10px] font-bold text-slate-500 mb-1">说明</label><input v-model="editingColumn.description" type="text" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" /></div>
-          <div v-if="editingColumn.type === 'enum' || editingColumn.type === 'multi_enum'">
-            <label class="block text-[10px] font-bold text-slate-500 mb-1">选项 (逗号分隔)</label>
-            <textarea v-model="editingOptionsStr" rows="2" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs resize-none"></textarea>
-          </div>
-        </div>
-        <div class="px-4 py-3 border-t border-slate-100 flex justify-end gap-2 sticky bottom-0 bg-white">
-          <button @click="editingColumn = null" class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600">取消</button>
-          <button @click="saveEditingColumn" class="px-4 py-2 bg-violet-600 text-white rounded-lg text-xs font-bold">保存</button>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- ===== 桌面端模板（原样保留）===== -->
@@ -445,64 +416,16 @@
       </div>
     </div>
 
-    <!-- 编辑列弹窗 -->
-    <div v-if="editingColumn != null" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" @click.self="editingColumn = null">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in">
-        <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
-          <h3 class="font-bold text-sm text-slate-800">{{ editingColumnIdx >= 0 ? '编辑' : '添加' }}输出列</h3>
-          <button @click="editingColumn = null" class="text-slate-400 hover:text-slate-600"><X class="w-4 h-4" /></button>
-        </div>
-        <div class="p-5 space-y-3 max-h-[70vh] overflow-y-auto">
-          <div>
-            <label class="block text-[10px] font-bold text-slate-500 mb-1">列名</label>
-            <input v-model="editingColumn.name" type="text" placeholder="如：情感倾向"
-              class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-violet-500" />
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-500 mb-1">字段 key</label>
-            <input v-model="editingColumn.key" type="text" placeholder="如：sentiment"
-              class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono outline-none focus:border-violet-500" />
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-500 mb-1">类型</label>
-            <select v-model="editingColumn.type" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-violet-500">
-              <option value="enum">单选标签 (enum)</option>
-              <option value="multi_enum">多选标签 (multi_enum)</option>
-              <option value="hierarchical_enum">二级分类 (hierarchical_enum)</option>
-              <option value="boolean">是否判断 (boolean)</option>
-              <option value="text">自由文本 (text)</option>
-              <option value="number">数值评分 (number)</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-500 mb-1">说明</label>
-            <input v-model="editingColumn.description" type="text" placeholder="这个字段判断什么"
-              class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-violet-500" />
-          </div>
-          <div v-if="editingColumn.type === 'enum' || editingColumn.type === 'multi_enum'">
-            <label class="block text-[10px] font-bold text-slate-500 mb-1">选项 (逗号分隔)</label>
-            <textarea v-model="editingOptionsStr" rows="2" placeholder="选项1, 选项2, 选项3"
-              class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-violet-500 resize-none"></textarea>
-          </div>
-          <div v-if="editingColumn.type === 'hierarchical_enum'">
-            <label class="block text-[10px] font-bold text-slate-500 mb-1">分类体系 (JSON)</label>
-            <textarea v-model="editingHierStr" rows="4" placeholder='{"大类1":["子1","子2"]}'
-              class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono outline-none focus:border-violet-500 resize-none"></textarea>
-          </div>
-          <label class="flex items-center gap-1.5 text-[10px] text-slate-600 cursor-pointer">
-            <input type="checkbox" v-model="editingColumn.required" class="rounded text-violet-600 focus:ring-violet-500" />
-            必填
-          </label>
-        </div>
-        <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
-          <button @click="editingColumn = null" class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50">取消</button>
-          <button @click="saveEditingColumn" class="px-4 py-2 bg-violet-600 text-white rounded-lg text-xs font-bold hover:bg-violet-700 flex items-center gap-1">
-            <Check class="w-3.5 h-3.5" /> 保存
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
+
+  <!-- 编辑列弹窗（移动端/桌面端共用，脱离 isMobile 分支） -->
+  <EditColumnDialog
+    :show="editingColumn != null"
+    :column="editingColumn"
+    :index="editingColumnIdx"
+    @save="onSaveColumn"
+    @cancel="editingColumn = null"
+  />
 </template>
 
 <script setup>
@@ -514,6 +437,7 @@ import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
 import StatsPieChart from '../components/common/StatsPieChart.vue'
 import OutputColumnsList from '../components/analysis/OutputColumnsList.vue'
+import EditColumnDialog from '../components/analysis/EditColumnDialog.vue'
 import { DEMO_DATA } from '../services/excel'
 import { useExport } from '../composables/useExport'
 import { useLabeling } from '../composables/useLabeling'
@@ -583,8 +507,6 @@ const showAdvanced = ref(false)
 // 编辑列弹窗
 const editingColumn = ref(null)
 const editingColumnIdx = ref(-1)
-const editingOptionsStr = ref('')
-const editingHierStr = ref('')
 
 // 分析结果映射表 { [rowIdx]: { status, values: {key: val}, errorMessage } }
 const analysisMap = ref({})
@@ -621,47 +543,24 @@ function resetPromptToAuto() {
 function addOutputColumn() {
   editingColumnIdx.value = -1
   editingColumn.value = { key: '', name: '', type: 'enum', description: '', options: [], required: true }
-  editingOptionsStr.value = ''
-  editingHierStr.value = ''
 }
 
 function editOutputColumn(idx) {
   editingColumnIdx.value = idx
   const col = labelingPlan.value.outputColumns[idx]
   editingColumn.value = { ...col, options: Array.isArray(col.options) ? [...col.options] : { ...(col.options || {}) } }
-  if (col.type === 'enum' || col.type === 'multi_enum') {
-    editingOptionsStr.value = (Array.isArray(col.options) ? col.options : []).join(', ')
-  } else if (col.type === 'hierarchical_enum' && col.options && typeof col.options === 'object') {
-    editingHierStr.value = JSON.stringify(col.options, null, 2)
-  }
 }
 
 function removeOutputColumn(idx) {
   labelingPlan.value.outputColumns.splice(idx, 1)
 }
 
-function saveEditingColumn() {
-  const col = editingColumn.value
-  if (!col.name.trim() || !col.key.trim()) return
-
-  // 自动生成 key
-  col.key = col.key.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '') || col.name.trim()
-
-  // 解析 options
-  if (col.type === 'enum' || col.type === 'multi_enum') {
-    col.options = editingOptionsStr.value.split(/[,，]/).map(s => s.trim()).filter(Boolean)
-  } else if (col.type === 'hierarchical_enum') {
-    try {
-      col.options = JSON.parse(editingHierStr.value || '{}')
-    } catch { col.options = {} }
+// EditColumnDialog 保存回调：写回 labelingPlan.outputColumns
+function onSaveColumn({ index, column }) {
+  if (index >= 0) {
+    labelingPlan.value.outputColumns[index] = column
   } else {
-    col.options = undefined
-  }
-
-  if (editingColumnIdx.value >= 0) {
-    labelingPlan.value.outputColumns[editingColumnIdx.value] = { ...col }
-  } else {
-    labelingPlan.value.outputColumns.push({ ...col })
+    labelingPlan.value.outputColumns.push(column)
   }
   editingColumn.value = null
 }
