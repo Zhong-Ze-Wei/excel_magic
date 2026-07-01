@@ -99,6 +99,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'AnalysisSimpleView' })
 import { ref, computed } from 'vue'
 import { Sparkles, UploadCloud, Languages, Heart, Tag } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'

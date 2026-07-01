@@ -15,9 +15,10 @@
     </div>
   </div>
 
-  <!-- 动态挂载子视图 -->
-  <AnalysisSimpleView v-if="isSimple" />
-  <AnalysisView v-else />
+  <!-- 动态挂载子视图（keep-alive 缓存，切换不销毁，避免数据丢失） -->
+  <keep-alive>
+    <component :is="isSimple ? AnalysisSimpleView : AnalysisView" />
+  </keep-alive>
 </template>
 
 <script setup>

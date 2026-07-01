@@ -429,6 +429,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'AnalysisExpertView' })
 import { ref, computed, watch } from 'vue'
 import { UploadCloud, SlidersHorizontal, Plus, X, Brain, BarChart2, Download, Sparkles, ChevronDown, Sliders, Trash2, Check, Pencil, Languages, Heart, Tag } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
