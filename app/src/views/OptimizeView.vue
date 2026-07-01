@@ -366,14 +366,14 @@ const { handleFile } = useFileUpload({
 
 const sourceCol = computed(() => dataShare.coreColumn)
 
-// AI 配置直接写入 settings.rulesConfig（与清洗模式共享同一份规则）
-// aiRulesConfig 是其镜像：未跑过 AI 时返回 null
-const aiRulesConfig = computed(() => settings.lastAiConfigAt ? settings.rulesConfig : null)
+// 简易模式的 AI 规则配置：独立内存态，不写 settings.rulesConfig（用完即弃，不持久化，不污染专家模式）
+// null 表示尚未跑过 AI；跑过后承载 AI 生成的 rulesConfig 副本
+const aiRulesConfig = ref(null)
 
 // 清洗管道：全量跑，结果带 displayDecision（suspect → delete 展示层转换）
 const { cleanedRows: rawCleanedRows, runPipeline: runCleaning, clear: clearCleaned, getCleanRows } = useCleaningPipeline({
   headers, rows, sourceCol,
-  getConfig: () => settings.rulesConfig
+  getConfig: () => aiRulesConfig.value || settings.rulesConfig
 })
 // 展示层：suspect 归入 delete，便于简易模式"保留/过滤"二分展示
 const cleanedRows = computed(() => rawCleanedRows.value.map(r => ({
@@ -447,7 +447,7 @@ watch(() => rows.value.length, (newLen) => {
   if (newLen === 0) {
     clearCleaned()
     aiSummary.value = ''
-    settings.lastAiConfigAt = null
+    aiRulesConfig.value = null
   }
 })
 
@@ -507,9 +507,8 @@ async function runAiOptimize() {
       }
     }
 
-    // AI 方案直接写入 settings.rulesConfig（合并到 store，与清洗模式共享）
-    Object.assign(settings.rulesConfig, config)
-    settings.lastAiConfigAt = Date.now()
+    // AI 方案写入简易模式独立内存态（用完即弃，不持久化，不污染专家模式的 settings.rulesConfig）
+    aiRulesConfig.value = config
     runCleaning()
 
     // 生成摘要
