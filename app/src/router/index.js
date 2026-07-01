@@ -2,7 +2,8 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 
 const routes = [
   { path: '/', name: 'home', component: () => import('../views/HomeView.vue') },
-  { path: '/process', name: 'process', component: () => import('../views/AnalysisView.vue') },
+  // 智能加工 = 简易模式（AnalysisSimpleView）+ 专家模式（AnalysisView），统一入口在 AnalysisHub
+  { path: '/process', name: 'process', component: () => import('../views/AnalysisHub.vue') },
   // 过渡期：translate/analysis 重定向到 /process，一周后随 TranslateView 删除一并清理
   { path: '/translate', redirect: '/process' },
   { path: '/analysis', redirect: '/process' },
