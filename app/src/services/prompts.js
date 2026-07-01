@@ -109,34 +109,6 @@ ${JSON.stringify(sampleRows, null, 2)}
 }
 
 /**
- * AI 数据洞察 — 分析表格结构并给出语义解读和模块推荐
- */
-export function getDataInsightPrompt(headers, profilesText, sampleRows) {
-  return `你是一个数据分析专家。分析以下表格的列结构、统计画像和样本数据，给出数据洞察。
-
-【列信息与统计画像】
-${profilesText}
-
-【样本数据】（前 5 行）
-${JSON.stringify(sampleRows, null, 2)}
-
-返回纯 JSON，不要 markdown 代码块，不要解释：
-{
-  "columnAnalysis": [
-    {"index": 0, "name": "列名", "semanticType": "语义类型(如序号/用户ID/评论/评分/日期等)", "summary": "一句话描述该列内容特征"}
-  ],
-  "recommendedCoreColumn": 2,
-  "coreReason": "核心列推荐理由，一句话",
-  "recommendations": [
-    {"route": "/optimize", "reason": "推荐理由"}
-  ]
-}
-
-recommendations 的 route 只能是以下值：/optimize（数据优化）、/cleaning（数据清洗）、/translate（批量翻译）、/analysis（数据分析）、/summary（数据摘要）。
-推荐 2-3 个最相关的模块，按相关性排序。`
-}
-
-/**
  * 数据集意图分析 system prompt
  *
  * 让 AI 读完表格快照后，给出 2-3 个「用户可能想做什么」的任务方案建议。

@@ -10,7 +10,7 @@
             <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
               <Settings2 class="w-5 h-5 text-blue-600" /> 系统设置中心
             </h3>
-            <p class="text-[11px] text-slate-400 mt-0.5">配置 API 接口、AI 自动行为与数据洞察引擎</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">配置 API 接口与 AI 自动行为</p>
           </div>
           <button @click="settings.showSettings = false" class="text-slate-400 hover:text-slate-600 transition-colors">
             <X class="w-5 h-5" />
@@ -27,7 +27,7 @@
           <button @click="activeTab = 'insight'"
             class="py-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5"
             :class="activeTab === 'insight' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'">
-            <Lightbulb class="w-3.5 h-3.5" /> AI 行为与数据洞察
+            <Lightbulb class="w-3.5 h-3.5" /> AI 行为
           </button>
         </div>
 
@@ -139,7 +139,7 @@
           </div>
 
 
-          <!-- Tab 2: AI 行为与数据洞察 -->
+          <!-- Tab 2: AI 行为 -->
           <div v-show="activeTab === 'insight'" class="space-y-5 animate-fade-in">
             <!-- AI 行为开关 -->
             <div class="bg-slate-50 p-5 rounded-xl border border-slate-200/60 space-y-3">
@@ -158,40 +158,6 @@
                 </div>
                 <input type="checkbox" v-model="settings.autoIntentAnalysis" class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
               </label>
-            </div>
-
-            <div class="bg-slate-50 p-5 rounded-xl border border-slate-200/60 space-y-4">
-              <label class="block text-xs font-bold text-slate-800">数据洞察分析引擎</label>
-
-              <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 transition-all"
-                :class="settings.dataInsightMode === 'heuristic' ? 'border-blue-500 bg-blue-50/30' : 'border-transparent bg-white hover:bg-slate-50'">
-                <input type="radio" v-model="settings.dataInsightMode" value="heuristic" class="mt-0.5 text-blue-600 focus:ring-blue-500" />
-                <div>
-                  <span class="text-xs font-bold text-slate-700">启发式规则分析（默认）</span>
-                  <p class="text-[10px] text-slate-500 mt-0.5 leading-relaxed">纯本地计算，瞬时完成，不消耗 API 额度。适合快速了解数据结构。</p>
-                </div>
-              </label>
-
-              <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 transition-all"
-                :class="settings.dataInsightMode === 'ai' ? 'border-blue-500 bg-blue-50/30' : 'border-transparent bg-white hover:bg-slate-50'">
-                <input type="radio" v-model="settings.dataInsightMode" value="ai" class="mt-0.5 text-blue-600 focus:ring-blue-500" />
-                <div>
-                  <span class="text-xs font-bold text-slate-700">AI 深度分析</span>
-                  <p class="text-[10px] text-slate-500 mt-0.5 leading-relaxed">调用 AI 模型进行语义理解，提供更精准的列类型解读和模块推荐。需要配置 API Key。</p>
-                </div>
-              </label>
-
-              <div v-if="settings.dataInsightMode === 'ai' && !settings.isConfigured"
-                class="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-700">
-                未检测到 API Key 配置，AI 模式将自动降级为规则分析。
-              </div>
-            </div>
-
-            <div class="px-4 py-3 bg-white border border-slate-200/60 rounded-xl space-y-1.5">
-              <span class="text-[10px] font-bold text-slate-500">说明</span>
-              <p class="text-[10px] text-slate-400 leading-relaxed">
-                数据洞察在首页上传文件后自动生成，包含：列类型分析与分布统计、核心处理列的自动识别与理由、基于数据特征的模块使用建议。
-              </p>
             </div>
           </div>
         </div>

@@ -5,7 +5,7 @@
       <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
         <FileBarChart class="w-5 h-5 text-emerald-600" /> 数据摘要
       </h2>
-      <p class="text-[10px] text-slate-500 mt-0.5">AI 分析列级统计画像，生成数据洞察报告。</p>
+      <p class="text-[10px] text-slate-500 mt-0.5">AI 分析列级统计画像，生成数据报告。</p>
     </div>
 
     <div v-if="hasData && dataShare.hasData"
@@ -117,7 +117,7 @@
           <FileBarChart class="w-6 h-6 text-emerald-600" /> AI 数据摘要
         </h2>
         <p class="text-xs text-slate-500 mt-1">
-          自动分析全表列级统计画像，生成高维数据洞察报告。
+          自动分析全表列级统计画像，生成数据报告。
         </p>
       </div>
       <button v-if="!hasData" @click="loadDemo"

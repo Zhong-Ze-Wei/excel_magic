@@ -50,10 +50,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const concurrency = ref(parseInt(localStorage.getItem('magic_excel_concurrency')) || 3)
   watch(concurrency, (v) => localStorage.setItem('magic_excel_concurrency', String(v)))
 
-  // 数据洞察分析引擎: 'heuristic' | 'ai'
-  const dataInsightMode = ref(localStorage.getItem('data_insight_mode') || 'heuristic')
-  watch(dataInsightMode, (v) => localStorage.setItem('data_insight_mode', v))
-
   // 导入数据后是否自动调用 AI 分析「数据集意图」（默认开启，用户可在设置关闭改为手动触发）
   const autoIntentAnalysis = ref(localStorage.getItem('auto_intent_analysis') !== 'false')
   watch(autoIntentAnalysis, (v) => localStorage.setItem('auto_intent_analysis', String(v)))
@@ -210,7 +206,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     currentPlatform, platformConfig, apiKey, isConfigured,
     translateModel, workModel, useSystemPrompt, showSettings,
-    selectedTranslateModel, selectedWorkModel, rulesConfig, concurrency, dataInsightMode, autoIntentAnalysis,
+    selectedTranslateModel, selectedWorkModel, rulesConfig, concurrency, autoIntentAnalysis,
     cleaningMode, processMode, lastAiConfigAt,
     API_PLATFORMS, getApiConfig, setPlatform, saveApiKey, saveModelSelection,
     exportGlobalConfig, importGlobalConfig, resetAllConfig
