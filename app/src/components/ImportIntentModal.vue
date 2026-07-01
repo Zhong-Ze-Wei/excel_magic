@@ -29,7 +29,6 @@
               {{ snapshot.dominantType }}
             </span>
           </div>
-          <!-- 列类型徽章 -->
           <div class="flex flex-wrap gap-1">
             <span v-for="(p, i) in snapshot.profiles.slice(0, 8)" :key="i"
               class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] bg-white border border-slate-200 text-slate-500"
@@ -43,18 +42,25 @@
           </div>
         </section>
 
-        <!-- ② AI 建议 -->
+        <!-- ② 主输入：你想做什么（合并了原任务说明，AI 候选填入它，用户可自由编辑） -->
+        <section>
+          <h4 class="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2">
+            <span class="w-1 h-3.5 bg-blue-500 rounded-full"></span>
+            你想用这份数据做什么？
+          </h4>
+          <textarea v-model="form.goal" rows="2"
+            placeholder="例：清洗掉水军评论，把剩余的翻译成英文并做情感分析"
+            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500 resize-none"></textarea>
+          <p class="text-[10px] text-slate-400 mt-1">作为 AI 模块的上下文。点下方候选可快速填入，也可自由编辑。</p>
+        </section>
+
+        <!-- ③ AI 候选（点选填入主输入 + 同步列/任务，可组合） -->
         <section>
           <div class="flex items-center justify-between mb-2">
             <h4 class="flex items-center gap-1.5 text-xs font-bold text-slate-700">
               <span class="w-1 h-3.5 bg-blue-500 rounded-full"></span>
-              AI 建议
+              AI 候选目标
             </h4>
-            <button v-if="!analyzing && suggestions.length === 0"
-              @click="runAnalysis"
-              class="text-[10px] text-blue-600 hover:text-blue-700 font-medium flex items-center gap-0.5">
-              <RefreshCw class="w-3 h-3" /> 重新分析
-            </button>
           </div>
 
           <!-- 分析中（分阶段脉动展示） -->
@@ -75,31 +81,29 @@
             </div>
           </div>
 
-          <!-- 建议列表 -->
-          <div v-else-if="suggestions.length" class="space-y-2">
+          <!-- 候选 radio 列表（可组合：点选填入主输入 + 同步列/任务） -->
+          <div v-else-if="suggestions.length" class="space-y-1.5">
             <button v-for="(s, i) in suggestions" :key="i" type="button"
-              @click="adoptSuggestion(s)"
+              @click="adoptSuggestion(s, i)"
               :class="[
-                'w-full text-left p-3 rounded-xl border-2 transition-all',
+                'w-full text-left p-2.5 rounded-lg border transition-all',
                 adoptedIdx === i
-                  ? 'border-blue-500 bg-blue-50/60 shadow-sm'
+                  ? 'border-blue-500 bg-blue-50/60'
                   : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
               ]">
               <div class="flex items-start justify-between gap-2">
-                <span class="text-xs font-bold text-slate-800 leading-snug">{{ s.goal }}</span>
+                <span class="text-xs font-medium text-slate-700 leading-snug">{{ s.goal }}</span>
                 <span v-if="i === 0" class="shrink-0 px-1.5 py-0.5 rounded text-[8px] font-bold bg-blue-600 text-white">推荐</span>
                 <Check v-else-if="adoptedIdx === i" class="shrink-0 w-3.5 h-3.5 text-blue-600" />
               </div>
-              <div class="flex items-center gap-1.5 mt-1.5">
-                <span class="text-[9px] text-slate-400">核心列：{{ headers[s.coreColumnIdx] }}</span>
+              <div class="flex items-center gap-1.5 mt-1">
+                <span class="text-[9px] text-slate-400">{{ ['清洗','加工','摘要'].filter((_, idx) => [s.tasks.clean, s.tasks.process, s.tasks.summary][idx]).join('+') }}</span>
                 <span class="text-slate-200">·</span>
-                <span class="text-[9px] text-slate-400">
-                  {{ ['清洗','加工','摘要'].filter((_, idx) => [s.tasks.clean, s.tasks.process, s.tasks.summary][idx]).join('+') }}
-                </span>
+                <span class="text-[9px] text-slate-400">核心列：{{ headers[s.coreColumnIdx] }}</span>
               </div>
             </button>
-            <button @click="runAnalysis" class="w-full text-center text-[10px] text-slate-400 hover:text-blue-600 py-1">
-              都不合适？重新分析
+            <button @click="runAnalysis" class="w-full text-center text-[10px] text-slate-400 hover:text-blue-600 py-1 flex items-center justify-center gap-1">
+              <RefreshCw class="w-3 h-3" /> 都不合适？换一批
             </button>
           </div>
 
@@ -112,7 +116,7 @@
           </div>
         </section>
 
-        <!-- ③ 核心列选择 -->
+        <!-- ④ 核心列选择 -->
         <section>
           <h4 class="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2">
             <span class="w-1 h-3.5 bg-blue-500 rounded-full"></span>
@@ -125,7 +129,7 @@
           <p class="text-[10px] text-slate-400 mt-1">数据清洗、翻译、分析默认作用的列</p>
         </section>
 
-        <!-- ④ 任务卡片选择（带 tooltip） -->
+        <!-- ⑤ 任务卡片选择（带 tooltip） -->
         <section>
           <h4 class="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2">
             <span class="w-1 h-3.5 bg-blue-500 rounded-full"></span>
@@ -154,7 +158,6 @@
                 <span class="text-xs font-bold text-slate-700">{{ t.label }}</span>
                 <span class="text-[10px] text-slate-400 leading-tight mt-0.5">{{ t.desc }}</span>
               </button>
-              <!-- 悬停说明 -->
               <div class="absolute z-20 left-1/2 -translate-x-1/2 bottom-full mb-1.5
                 hidden group-hover:block w-44 p-2 rounded-lg bg-slate-800 text-white text-[10px] leading-relaxed shadow-xl">
                 {{ t.tooltip }}
@@ -162,18 +165,6 @@
               </div>
             </div>
           </div>
-        </section>
-
-        <!-- ⑤ 任务说明 -->
-        <section>
-          <h4 class="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2">
-            <span class="w-1 h-3.5 bg-blue-500 rounded-full"></span>
-            任务说明（可选）
-          </h4>
-          <textarea v-model="form.note" rows="2"
-            placeholder="例：清洗掉无意义评论，翻译剩余内容为中文"
-            class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-500 resize-none"></textarea>
-          <p class="text-[10px] text-slate-400 mt-1">作为 AI 模块的上下文（最多 500 字）</p>
         </section>
       </div>
 
@@ -210,12 +201,12 @@ const headers = computed(() => intent.pendingFileMeta?.headers || dataShare.head
 
 // 数据快照（纯前端，弹窗打开时立即算）
 const snapshot = ref(null)
-// AI 建议列表
+// AI 候选列表（本地副本，从 intent.suggestions 缓存读取或新跑）
 const suggestions = ref([])
 const analyzing = ref(false)
-const adoptedIdx = ref(null) // 已采纳的建议索引
+const adoptedIdx = ref(null)
 
-// 分析阶段（视觉化进度，让等待感更优雅）
+// 分析阶段（视觉化进度）
 const analysisSteps = ref([
   { label: '读取列结构与类型', done: false, active: false },
   { label: '抽取样本数据', done: false, active: false },
@@ -224,7 +215,6 @@ const analysisSteps = ref([
 let stepTimer = null
 function startStepAnimation() {
   analysisSteps.value.forEach(s => { s.done = false; s.active = false })
-  // 第一步立即激活
   analysisSteps.value[0].active = true
   let i = 0
   stepTimer = setInterval(() => {
@@ -241,7 +231,6 @@ function finishStepAnimation() {
   analysisSteps.value.forEach(s => { s.done = true; s.active = false })
 }
 
-// 三个任务卡片：图标 + 标题 + 一句话描述 + 悬停说明
 const taskOptions = [
   { key: 'clean',   label: '清洗',     desc: '去噪去重',     icon: Sparkles,
     tooltip: '自动过滤空文本、纯表情、纯符号、重复行、广告、乱码等噪声数据，让后续分析更干净。' },
@@ -254,14 +243,12 @@ const taskOptions = [
 const form = reactive({
   coreColumnIdx: null,
   tasks: { clean: true, process: true, summary: true },
-  note: ''
+  goal: ''  // 主输入：你想做什么（合并了原 note）
 })
 
 // 弹窗打开时的初始化
 watch(() => intent.showModal, async (v) => {
   if (!v) return
-  // 重置状态
-  suggestions.value = []
   analyzing.value = false
   adoptedIdx.value = null
   // 立即算快照（纯前端，秒级）
@@ -274,18 +261,23 @@ watch(() => intent.showModal, async (v) => {
     process: hasSaved ? !!(intent.tasks.process || intent.tasks.translate || intent.tasks.analyze) : true,
     summary: hasSaved ? !!intent.tasks.summary : true
   }
-  form.note = intent.note
-  // 默认自动分析（可被设置关闭）
-  if (settings.autoIntentAnalysis && settings.isConfigured && headers.value.length) {
-    await runAnalysis()
+  form.goal = intent.note || ''
+  // 候选：优先读缓存（已生成过就不重跑），无缓存且开启自动分析才跑
+  if (intent.suggestions && intent.suggestions.length) {
+    suggestions.value = intent.suggestions
+    // 默认选中第一个（推荐项）的高亮，但不覆盖用户已编辑的 goal
+    adoptedIdx.value = 0
+  } else {
+    suggestions.value = []
+    if (settings.autoIntentAnalysis && settings.isConfigured && headers.value.length) {
+      await runAnalysis()
+    }
   }
 })
 
-// 构建本地快照（含主类型判断）
 function buildLocalSnapshot() {
   if (!headers.value.length) return null
   const { profiles } = buildTableSnapshot(headers.value, dataShare.rows || [])
-  // 判断主类型：哪种列类型最多
   const typeCount = {}
   profiles.forEach(p => { typeCount[p.type] = (typeCount[p.type] || 0) + 1 })
   const dominantType = Object.entries(typeCount).sort((a, b) => b[1] - a[1])[0]?.[0]
@@ -297,7 +289,6 @@ function buildLocalSnapshot() {
   }
 }
 
-// 跑 AI 分析
 async function runAnalysis() {
   if (!headers.value.length || !dataShare.rows?.length) {
     toast.warning('暂无数据可分析')
@@ -316,10 +307,10 @@ async function runAnalysis() {
     finishStepAnimation()
     suggestions.value = result.suggestions || []
     if (suggestions.value.length) {
-      // 默认采纳第一个（推荐项）
+      // 首次分析：默认采纳推荐项（填入主输入），用户可改
       adoptSuggestion(suggestions.value[0], 0)
     } else {
-      toast.info('AI 暂无建议，请手动配置')
+      toast.info('AI 暂无候选，请手动填写目标')
     }
   } catch (err) {
     toast.error('AI 分析失败：' + (err.message || '未知错误'))
@@ -329,8 +320,9 @@ async function runAnalysis() {
   }
 }
 
-// 采纳建议：填充表单
+// 采纳候选：goal 填入主输入 + 同步列/任务（用户可在主输入继续编辑文字）
 function adoptSuggestion(s, idx) {
+  form.goal = s.goal          // ← 修复：原代码丢弃了 goal，现在填入主输入
   form.coreColumnIdx = s.coreColumnIdx
   form.tasks = { ...s.tasks }
   adoptedIdx.value = typeof idx === 'number' ? idx : suggestions.value.indexOf(s)
@@ -338,22 +330,22 @@ function adoptSuggestion(s, idx) {
 
 function onSubmit() {
   if (form.coreColumnIdx == null) return
-  const trimmedNote = form.note.slice(0, 500)
+  const trimmedGoal = form.goal.slice(0, 500)
   intent.submit({
     coreColumnIdx: form.coreColumnIdx,
     tasks: { ...form.tasks },
-    note: trimmedNote
+    note: trimmedGoal,            // goal 存入 note 字段（兼容下游 intentNote）
+    suggestions: suggestions.value // 缓存候选，下次不重跑
   })
   if (form.coreColumnIdx !== dataShare.coreColumn) {
     dataShare.setCoreColumn(form.coreColumnIdx)
   }
-  // 任务说明写入共享上下文，供智能加工/清洗的 AI 调用使用
-  dataShare.setIntentNote(trimmedNote)
+  // 目标写入共享上下文，供智能加工/清洗的 AI 调用使用
+  dataShare.setIntentNote(trimmedGoal)
   const count = Object.values(form.tasks).filter(Boolean).length
   toast.success(`意图已保存：${count} 项任务`)
 }
 
-// 列类型展示辅助
 const TYPE_LABELS = { number: '数值', text: '文本', enum: '枚举', boolean: '布尔', date: '日期', identifier: '标识', empty: '空' }
 const TYPE_ICONS = { number: '#', text: 'T', enum: 'E', boolean: 'B', date: 'D', identifier: 'ID', empty: '·' }
 function typeLabel(t) { return TYPE_LABELS[t] || t }

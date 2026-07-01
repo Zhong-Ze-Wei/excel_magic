@@ -4,7 +4,11 @@ import { ref } from 'vue'
 export const useImportIntentStore = defineStore('importIntent', () => {
   const coreColumnIdx = ref(null)
   const tasks = ref({ clean: false, process: false, summary: false })
+  // 任务目标（合并了原 note 语义）：用户想用这份数据做什么。AI 候选填入它，用户可编辑。
+  // 下游（清洗/加工/摘要）通过 dataShare.intentNote 消费，字段名保留 note 以兼容。
   const note = ref('')
+  // AI 生成的候选方案缓存：避免每次打开弹窗都重跑 AI。null=未生成过，[]=已生成但无候选
+  const suggestions = ref(null)
   const confirmedAt = ref(null)
   const showModal = ref(false)
   const pendingFileMeta = ref(null)
@@ -19,24 +23,28 @@ export const useImportIntentStore = defineStore('importIntent', () => {
     pendingFileMeta.value = null
   }
 
-  function submit({ coreColumnIdx: idx, tasks: t, note: n }) {
+  function submit({ coreColumnIdx: idx, tasks: t, note: n, suggestions: sg }) {
     coreColumnIdx.value = idx
     tasks.value = { ...t }
     note.value = n
+    // 缓存候选方案，下次打开不重跑（除非用户主动换一批）
+    if (sg !== undefined) suggestions.value = sg
     confirmedAt.value = Date.now()
     showModal.value = false
     pendingFileMeta.value = null
   }
 
+  // 新文件上传时清空旧意图 + 旧候选（让弹窗重新跑 AI）
   function reset() {
     coreColumnIdx.value = null
     tasks.value = { clean: false, process: false, summary: false }
     note.value = ''
+    suggestions.value = null
     confirmedAt.value = null
   }
 
   return {
-    coreColumnIdx, tasks, note, confirmedAt, showModal, pendingFileMeta,
+    coreColumnIdx, tasks, note, suggestions, confirmedAt, showModal, pendingFileMeta,
     open, close, submit, reset
   }
 })
