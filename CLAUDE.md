@@ -16,7 +16,7 @@ npm test           # Vitest
 ## 三大功能页（入口收敛后）
 
 - `/cleaning` → **CleaningHub**：清洗统一入口，内含简易模式（OptimizeView，AI 一句话清洗）和专家模式（CleaningView，规则精调），用 `settings.cleaningMode` 切换。**两模式共享同一份 `settings.rulesConfig`**——简易模式 AI 跑完的方案自动沉淀到专家模式，`settings.lastAiConfigAt` 标记会话内是否跑过 AI
-- `/process` → **AnalysisView**（智能加工）：翻译和打标合并为同一套「输出列」机制，翻译降级为预设模板之一
+- `/process` → **AnalysisHub**（智能加工，双模式，ADR 0009）：简易模式（AnalysisSimpleView，模板快选+AI 生成+一键打标）/ 专家模式（AnalysisView，outputColumns 手编+高级 Prompt）。两子视图共享 `dataShare.labelingPlan` 单一真源（切换零迁移）+ `useLabeling` composable（打标引擎）。翻译降级为预设模板之一
 - `/summary` → **SummaryView**：列画像 + AI 流式报告
 - 旧路由 `/translate`、`/analysis`、`/optimize` 已重定向（过渡期保留，计划清理 TranslateView）
 
