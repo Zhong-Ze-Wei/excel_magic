@@ -288,6 +288,7 @@ import { ref, computed, watch } from 'vue'
 import { marked } from 'marked'
 import { FileBarChart, SlidersHorizontal, Sparkles, Loader2, Lightbulb, Wand2, Tag } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
+import { useImportIntentStore } from '../stores/importIntent'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import { DEMO_DATA } from '../services/excel'
@@ -304,12 +305,22 @@ import { PAGE } from '../styles/tokens'
 
 const toast = useToast()
 const dataShare = useDataShareStore()
+const intent = useImportIntentStore()
 const settings = useSettingsStore()
 const { isMobile } = useDevice()
 
 const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
   onInit: (h) => {
-    selectedCols.value = h.map((_, i) => i)
+    // 消费 AI 预演的摘要方案：关注列 + 主题（来自意图弹窗三步规划）
+    const plan = intent.pipelinePlan?.summary
+    if (plan?.focusColumns?.length) {
+      selectedCols.value = plan.focusColumns
+    } else {
+      selectedCols.value = h.map((_, i) => i)
+    }
+    if (plan?.theme && !analysisTheme.value) {
+      analysisTheme.value = plan.theme
+    }
     summaryText.value = ''
   }
 })

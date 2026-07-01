@@ -114,6 +114,7 @@ import { ref, computed } from 'vue'
 import { Sparkles, UploadCloud, Languages, Heart, Tag, Download } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import { useSettingsStore } from '../stores/settings'
+import { useImportIntentStore } from '../stores/importIntent'
 import { useDevice } from '../composables/useDevice'
 import { useGlobalDataSync } from '../composables/useGlobalDataSync'
 import { useFileUpload } from '../composables/useFileUpload'
@@ -130,6 +131,7 @@ import { DEMO_DATA } from '../services/excel'
 
 const dataShare = useDataShareStore()
 const settings = useSettingsStore()
+const intent = useImportIntentStore()
 const { isMobile } = useDevice()
 const toast = useToast()
 
@@ -138,6 +140,20 @@ const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
   onInit: (h, r) => {
     rangeStart.value = 1
     rangeEnd.value = r.length
+    // 消费 AI 预演的加工方案（来自意图弹窗三步规划）
+    if (intent.pipelinePlan?.process?.outputColumns?.length && !labelingPlan.value.outputColumns.length) {
+      const pp = intent.pipelinePlan.process
+      dataShare.labelingPlan = {
+        taskName: pp.taskName || '',
+        goal: pp.goal || '',
+        inputColumns: pp.inputColumns || [],
+        outputColumns: pp.outputColumns,
+        compiledPrompt: '',
+        promptDirty: false
+      }
+      if (!userGoal.value) userGoal.value = pp.goal || ''
+      toast.info('已应用 AI 预规划的加工方案，可调整')
+    }
   }
 })
 

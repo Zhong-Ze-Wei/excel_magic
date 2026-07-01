@@ -329,6 +329,7 @@ import { getSmartFilterPrompt, formatIntentContext } from '../services/prompts'
 import { callAI } from '../services/ai'
 import { parseRobustJSON } from '../services/jsonParser'
 import { useDataShareStore } from '../stores/dataShare'
+import { useImportIntentStore } from '../stores/importIntent'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
 import { useGlobalDataSync } from '../composables/useGlobalDataSync'
@@ -344,6 +345,7 @@ import { DEFAULT_RULES_CONFIG } from '../config/defaultSettings'
 const toast = useToast()
 const dataShare = useDataShareStore()
 const settings = useSettingsStore()
+const intent = useImportIntentStore()
 const { isMobile } = useDevice()
 
 const intentInput = ref('')
@@ -446,6 +448,12 @@ watch(() => rows.value.length, (newLen) => {
     clearCleaned()
     aiSummary.value = ''
     aiRulesConfig.value = null
+  } else if (!aiRulesConfig.value && intent.pipelinePlan?.clean?.aiRulesConfig) {
+    // 消费 AI 预演的清洗方案（来自意图弹窗的三步规划）
+    aiRulesConfig.value = intent.pipelinePlan.clean.aiRulesConfig
+    aiSummary.value = intent.pipelinePlan.clean.aiRulesConfig._aiSummary || '已应用 AI 预规划的清洗方案'
+    runCleaning()
+    toast.info('已应用 AI 预规划的清洗方案，可调整')
   }
 })
 
