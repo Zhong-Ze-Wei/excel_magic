@@ -23,25 +23,30 @@
     <div class="overflow-hidden transition-all duration-300 ease-in-out"
       :style="{ maxHeight: isOpen ? contentHeight + 'px' : '0px' }">
       <div ref="contentRef" class="px-4 pb-3">
-        <div class="bg-white rounded-lg border border-emerald-100 overflow-auto max-h-[240px]">
-          <table class="w-full text-left border-collapse text-[10px]">
-            <thead class="bg-emerald-50/50 sticky top-0 text-emerald-700 font-bold border-b border-emerald-100">
+        <div class="bg-white rounded-lg border border-emerald-100 overflow-auto max-h-[280px]">
+          <table class="text-left border-collapse text-[10px]" style="min-width: 100%; width: max-content;">
+            <thead class="bg-emerald-50/50 sticky top-0 text-emerald-700 font-bold border-b border-emerald-100 z-10">
               <tr>
-                <th class="px-2 py-1.5 w-8 text-center">#</th>
-                <th v-for="(h, i) in previewHeaders" :key="i" class="px-2 py-1.5 whitespace-nowrap">{{ h }}</th>
+                <th class="px-2 py-1.5 w-8 text-center sticky left-0 bg-emerald-50/95">#</th>
+                <th v-for="(h, i) in headers" :key="i" class="px-3 py-1.5 whitespace-nowrap border-l border-emerald-100/50 first:border-l-0">{{ h }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-slate-600">
               <tr v-for="(row, ri) in previewRows" :key="ri" class="hover:bg-slate-50/50">
-                <td class="px-2 py-1 text-center text-slate-400 font-mono">{{ ri + 1 }}</td>
-                <td v-for="(h, ci) in previewHeaders" :key="ci" class="px-2 py-1 max-w-[180px] truncate">{{ row[ci] ?? '' }}</td>
+                <td class="px-2 py-1 text-center text-slate-400 font-mono sticky left-0 bg-white/95">{{ ri + 1 }}</td>
+                <td v-for="(h, ci) in headers" :key="ci" class="px-3 py-1 whitespace-nowrap border-l border-slate-100/50 first:border-l-0">{{ row[ci] ?? '' }}</td>
               </tr>
             </tbody>
           </table>
         </div>
-        <p v-if="rowCount > previewLimit" class="text-[10px] text-slate-400 mt-1.5 text-center">
-          仅显示前 {{ previewLimit }} 行（共 {{ rowCount }} 行）
-        </p>
+        <div class="flex items-center justify-between mt-1.5">
+          <p v-if="rowCount > previewLimit" class="text-[10px] text-slate-400">
+            仅显示前 {{ previewLimit }} 行（共 {{ rowCount }} 行）
+          </p>
+          <p v-if="headers.length > 8" class="text-[10px] text-slate-400 ml-auto">
+            {{ headers.length }} 列 · ← 横向拖动查看 →
+          </p>
+        </div>
       </div>
     </div>
   </div>
@@ -66,7 +71,6 @@ const contentRef = ref(null)
 const contentHeight = ref(1000)
 
 const rowCount = computed(() => props.rows.length)
-const previewHeaders = computed(() => props.headers.slice(0, 10))
 const previewRows = computed(() => props.rows.slice(0, props.previewLimit))
 
 function toggle() {
