@@ -9,6 +9,10 @@ export const useDataShareStore = defineStore('dataShare', () => {
   const labelingResults = ref(null) // { outputColumns: [...], analysisMap: { [rowIdx]: { values: {...} } } }
   const translatedColumns = ref([]) // [{ originalIdx, translatedIdx, translatedName }]
   const intentNote = ref('') // 数据集意图的任务说明，作为 AI 模块的共享上下文
+  // 打标方案（单一真源）：简易/专家视图共享，切换零迁移
+  const labelingPlan = ref({
+    taskName: '', goal: '', inputColumns: [], outputColumns: [], compiledPrompt: '', promptDirty: false
+  })
 
   // 多 Sheet 支持
   const sheetNames = ref([])
@@ -90,6 +94,7 @@ export const useDataShareStore = defineStore('dataShare', () => {
     currentSheet.value = ''
     file.value = null
     intentNote.value = ''
+    labelingPlan.value = { taskName: '', goal: '', inputColumns: [], outputColumns: [], compiledPrompt: '', promptDirty: false }
   }
 
   // 写入数据集意图的任务说明（共享上下文）
@@ -98,7 +103,7 @@ export const useDataShareStore = defineStore('dataShare', () => {
   }
 
   return {
-    headers, rows, sourceName, coreColumn, hasData, labelingResults, translatedColumns, intentNote,
+    headers, rows, sourceName, coreColumn, hasData, labelingResults, translatedColumns, intentNote, labelingPlan,
     sheetNames, currentSheet, hasMultipleSheets, file,
     setSharedData, setCoreColumn, getAndClearSharedData, clearSharedData,
     setLabelingResults, clearLabelingResults, addTranslatedColumn, setSheet, setIntentNote

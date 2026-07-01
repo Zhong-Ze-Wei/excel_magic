@@ -62,6 +62,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const cleaningMode = ref(localStorage.getItem('magic_excel_cleaning_mode') || 'simple')
   watch(cleaningMode, (v) => localStorage.setItem('magic_excel_cleaning_mode', v))
 
+  // 智能加工入口模式: 'simple' (模板驱动) | 'expert' (outputColumns 手编)
+  const processMode = ref(localStorage.getItem('magic_excel_process_mode') || 'simple')
+  watch(processMode, (v) => localStorage.setItem('magic_excel_process_mode', v))
+
   // 最近一次 AI 优化方案的时间戳（会话内有效，null 表示尚未跑过 AI）
   const lastAiConfigAt = ref(null)
 
@@ -198,6 +202,7 @@ export const useSettingsStore = defineStore('settings', () => {
     localStorage.setItem('magic_excel_cleaning_rules', JSON.stringify(rulesConfig.value))
 
     cleaningMode.value = 'simple'
+    processMode.value = 'simple'
     localStorage.setItem('magic_excel_cleaning_mode', 'simple')
     lastAiConfigAt.value = null
   }
@@ -206,7 +211,7 @@ export const useSettingsStore = defineStore('settings', () => {
     currentPlatform, platformConfig, apiKey, isConfigured,
     translateModel, workModel, useSystemPrompt, showSettings,
     selectedTranslateModel, selectedWorkModel, rulesConfig, concurrency, dataInsightMode, autoIntentAnalysis,
-    cleaningMode, lastAiConfigAt,
+    cleaningMode, processMode, lastAiConfigAt,
     API_PLATFORMS, getApiConfig, setPlatform, saveApiKey, saveModelSelection,
     exportGlobalConfig, importGlobalConfig, resetAllConfig
   }

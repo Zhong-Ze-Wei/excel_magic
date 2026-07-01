@@ -490,13 +490,10 @@ const selectedInputColumns = ref([])
 const userGoal = ref('')
 
 // 核心状态：打标方案
-const labelingPlan = ref({
-  taskName: '',
-  goal: '',
-  inputColumns: [],
-  outputColumns: [],
-  compiledPrompt: '',
-  promptDirty: false
+// 打标方案（单一真源在 dataShare.labelingPlan，简易/专家视图共享）
+const labelingPlan = computed({
+  get: () => dataShare.labelingPlan,
+  set: (v) => { dataShare.labelingPlan = v }
 })
 
 // 控制变量
