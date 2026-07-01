@@ -1,6 +1,6 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
-  <div v-if="isMobile" class="px-3 py-3 space-y-3 pb-20 animate-fade-in">
+  <div v-if="isMobile" :class="PAGE.mobile + ' animate-fade-in'">
     <!-- 全局关联横幅（带折叠表格预览） -->
     <GlobalDataBanner
       :visible="hasData && dataShare.hasData"
@@ -139,7 +139,7 @@
   </div>
 
   <!-- ===== 桌面端模板 ===== -->
-  <div v-else class="animate-fade-in max-w-7xl mx-auto space-y-6">
+  <div v-else :class="PAGE.desktop">
     <!-- 全局关联横幅（带折叠表格预览） -->
     <GlobalDataBanner
       :visible="hasData && dataShare.hasData"
@@ -149,9 +149,9 @@
       @disconnect="disconnectGlobalExcel"
     />
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <div :class="TWO_COL.grid">
       <!-- Left Panel: Upload + AI Intent -->
-      <div class="lg:col-span-4 space-y-6">
+      <div :class="TWO_COL.left">
         <FileUploader v-if="!hasData" label="上传需要优化的 Excel/CSV 文件" :icon="Sparkles" iconBg="bg-violet-50" iconColor="text-violet-600" @file="handleFile" />
 
         <!-- AI 意图卡片 -->
@@ -231,7 +231,7 @@
       </div>
 
       <!-- Right Panel: Results -->
-      <div class="lg:col-span-8 space-y-6">
+      <div :class="TWO_COL.right">
         <!-- Empty State -->
         <div v-if="!hasData" class="bg-white rounded-xl border border-slate-200 shadow-sm p-16 flex flex-col items-center justify-center text-slate-400">
           <Sparkles class="w-16 h-16 mb-4 opacity-30 text-violet-500" />
@@ -338,6 +338,7 @@ import { useShare } from '../composables/useShare'
 import { useCleaningPipeline } from '../composables/useCleaningPipeline'
 import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
 import { useToast } from '../services/toast'
+import { PAGE, TWO_COL } from '../styles/tokens'
 import { DEFAULT_RULES_CONFIG } from '../config/defaultSettings'
 
 const toast = useToast()

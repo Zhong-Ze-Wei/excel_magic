@@ -1,6 +1,6 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
-  <div v-if="isMobile" class="px-3 py-3 space-y-3 pb-20 animate-fade-in">
+  <div v-if="isMobile" :class="PAGE.mobile + ' animate-fade-in'">
     <div class="bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 rounded-xl border border-violet-200/50 p-3">
       <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
         <Brain class="w-5 h-5 text-violet-600" /> AI 打标
@@ -168,7 +168,7 @@
   </div>
 
   <!-- ===== 桌面端模板（原样保留）===== -->
-  <div v-else class="animate-fade-in max-w-7xl mx-auto space-y-6">
+  <div v-else :class="PAGE.desktop">
     <!-- Header -->
     <div class="bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 rounded-2xl border border-violet-200/50 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
@@ -194,9 +194,9 @@
       @disconnect="disconnectGlobalExcel"
     />
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <div :class="TWO_COL.grid">
       <!-- 左侧配置面板 -->
-      <div class="lg:col-span-4 space-y-6">
+      <div :class="TWO_COL.left">
         <FileUploader v-if="!hasData" label="上传数据文件" :icon="UploadCloud" iconBg="bg-violet-50" iconColor="text-violet-600" @file="handleFile" />
 
         <div v-if="hasData" class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4 animate-fade-in">
@@ -309,7 +309,7 @@
       </div>
 
       <!-- 右侧：统计 + 表格 -->
-      <div class="lg:col-span-8 space-y-6">
+      <div :class="TWO_COL.right">
         <!-- 统计卡片 -->
         <div v-if="hasData" class="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
           <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
@@ -434,6 +434,7 @@ import StatsPieChart from '../components/common/StatsPieChart.vue'
 import OutputColumnsList from '../components/analysis/OutputColumnsList.vue'
 import EditColumnDialog from '../components/analysis/EditColumnDialog.vue'
 import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
+import { PAGE, TWO_COL } from '../styles/tokens'
 import { DEMO_DATA } from '../services/excel'
 import { useExport } from '../composables/useExport'
 import { useLabeling } from '../composables/useLabeling'
