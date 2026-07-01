@@ -99,7 +99,7 @@
           <p class="text-[9px] text-slate-400 truncate">{{ col.description }}</p>
         </div>
       </div>
-      <button @click="startLabeling" :disabled="isAnalyzing"
+      <button @click="runLabelingBatch" :disabled="isAnalyzing"
         class="w-full mt-3 py-2.5 bg-violet-600 text-white rounded-lg text-xs font-bold active:bg-violet-700 disabled:opacity-50">
         {{ isAnalyzing ? '打标中...' : '开始 AI 打标' }}
       </button>
@@ -335,7 +335,7 @@
             </div>
 
             <!-- 6. 开始 AI 打标 -->
-            <button @click="startLabeling" :disabled="isAnalyzing"
+            <button @click="runLabelingBatch" :disabled="isAnalyzing"
               class="w-full py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-bold shadow-md shadow-violet-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
               <Brain class="w-4 h-4" /> {{ isAnalyzing ? '打标中...' : '开始 AI 打标' }}
             </button>
@@ -516,9 +516,10 @@ import StatsPieChart from '../components/common/StatsPieChart.vue'
 import OutputColumnsList from '../components/analysis/OutputColumnsList.vue'
 import { DEMO_DATA } from '../services/excel'
 import { useExport } from '../composables/useExport'
-import { callAI, callAIBatch } from '../services/ai'
+import { useLabeling } from '../composables/useLabeling'
+import { callAI } from '../services/ai'
 import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt, PRESET_TEMPLATES, getPresetPlan, formatIntentContext } from '../services/prompts'
-import { normalizeLabelingPlan, validateLabelingPlan, normalizeRowResult } from '../services/labelingPlan'
+import { normalizeLabelingPlan, validateLabelingPlan } from '../services/labelingPlan'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
 import { useGlobalDataSync } from '../composables/useGlobalDataSync'
@@ -554,12 +555,9 @@ const { handleFile } = useFileUpload({
   }
 })
 
-const actualConcurrency = ref(0)
-
 // 分析范围
 const rangeStart = ref(1)
 const rangeEnd = ref(0)
-const currentProcessingRowIdx = ref(-1)
 
 // 多选参考列
 const selectedInputColumns = ref([])
@@ -578,11 +576,8 @@ const labelingPlan = ref({
 })
 
 // 控制变量
-const isAnalyzing = ref(false)
 const isGeneratingPlan = ref(false)
 const isSyncingPlan = ref(false)
-const processed = ref(0)
-const totalToProcess = ref(0)
 const showAdvanced = ref(false)
 
 // 编辑列弹窗
@@ -595,29 +590,12 @@ const editingHierStr = ref('')
 const analysisMap = ref({})
 
 const displayRows = computed(() => rows.value.slice(0, 20))
-const percentFinished = computed(() => {
-  if (totalToProcess.value <= 0) return 0
-  return Math.round((processed.value / totalToProcess.value) * 100)
-})
 
-const stats = computed(() => {
-  let done = 0, error = 0
-  for (let i = 0; i < rows.value.length; i++) {
-    const res = analysisMap.value[i]
-    if (res?.status === 'done') done++
-    else if (res?.status === 'error') error++
-  }
-  return { done, error }
-})
-
-const chartData = computed(() => {
-  const pending = rows.value.length - stats.value.done - stats.value.error
-  return [
-    { name: '已分析', value: stats.value.done, color: '#10b981' },
-    { name: '错误', value: stats.value.error, color: '#f43f5e' },
-    { name: '待处理', value: Math.max(0, pending), color: '#94a3b8' }
-  ]
-})
+// 打标编排（批量调 AI + 进度管理 + 结果回写）由 composable 统一管理
+const {
+  isAnalyzing, processed, totalToProcess, percentFinished, stats, chartData,
+  actualConcurrency, currentProcessingRowIdx, runLabeling: runLabelingBatch
+} = useLabeling({ headers, rows, labelingPlan, rangeStart, rangeEnd, selectedInputColumns, analysisMap })
 
 
 // 当 outputColumns 变化且 promptDirty 为 false 时自动重编译 prompt
@@ -821,106 +799,6 @@ async function syncPlanFromPrompt() {
 }
 
 // ── 核心：逐行 AI 打标 ──
-async function startLabeling() {
-  if (isAnalyzing.value || !rows.value.length) return
-  const settings = useSettingsStore()
-  const config = settings.getApiConfig()
-  if (!config.key) { settings.showSettings = true; toast.warn('请先配置 API 密钥'); return }
-
-  const plan = labelingPlan.value
-  const validationErr = validateLabelingPlan(plan)
-  if (validationErr) { toast.warn(validationErr); return }
-
-  const inputCols = selectedInputColumns.value.length > 0 ? selectedInputColumns.value : (plan.inputColumns.map(name => headers.value.indexOf(name)).filter(i => i >= 0))
-  if (inputCols.length === 0) { toast.warn('请选择至少一个 AI 参考列'); return }
-
-  if (selectedInputColumns.value.length === 1) {
-    const onlyIdx = selectedInputColumns.value[0]
-    if (onlyIdx !== dataShare.coreColumn && onlyIdx >= 0 && onlyIdx < headers.value.length) {
-      dataShare.setCoreColumn(onlyIdx)
-      toast.info(`核心列已同步为「${headers.value[onlyIdx]}」`)
-    }
-  }
-
-  let start = parseInt(rangeStart.value) || 1
-  let end = parseInt(rangeEnd.value) || rows.value.length
-  if (start < 1) start = 1
-  if (end > rows.value.length) end = rows.value.length
-  if (start > end) { toast.warn('开始行不能大于结束行'); return }
-
-  isAnalyzing.value = true
-  processed.value = 0
-  totalToProcess.value = end - start + 1
-  currentProcessingRowIdx.value = -1
-
-  for (let k = start - 1; k < end; k++) {
-    analysisMap.value[k] = { status: 'pending', values: {}, errorMessage: '' }
-  }
-
-  const systemPrompt = plan.promptDirty
-    ? plan.compiledPrompt
-    : compileLabelingPrompt(plan)
-
-  // 构建任务列表
-  const tasks = []
-  for (let i = start - 1; i < end; i++) {
-    const rowInput = {}
-    inputCols.forEach(ci => {
-      rowInput[headers.value[ci]] = rows.value[i][ci] ?? ''
-    })
-    const hasContent = Object.values(rowInput).some(v => String(v).trim().length > 0)
-    if (!hasContent) {
-      const emptyValues = {}
-      plan.outputColumns.forEach(c => { emptyValues[c.key] = null })
-      analysisMap.value[i] = { status: 'done', values: emptyValues, errorMessage: '' }
-      processed.value++
-    } else {
-      tasks.push({ content: JSON.stringify(rowInput), systemPrompt, index: i })
-    }
-  }
-
-  // 标记待处理行
-  tasks.forEach(t => { analysisMap.value[t.index].status = 'processing' })
-
-  // 并发调用 AI
-  actualConcurrency.value = settings.concurrency
-  const { finalConcurrency } = await callAIBatch(
-    tasks.map(t => ({ content: t.content, systemPrompt: t.systemPrompt })),
-    (batchIdx, result, error, meta) => {
-      const rowIdx = tasks[batchIdx].index
-      if (error) {
-        analysisMap.value[rowIdx] = { status: 'error', values: {}, errorMessage: error.message }
-      } else {
-        const parsed = parseRobustJSON(result)
-        const normalized = normalizeRowResult(parsed, plan.outputColumns)
-        if (normalized) {
-          analysisMap.value[rowIdx] = { status: 'done', values: normalized, errorMessage: '' }
-        } else {
-          analysisMap.value[rowIdx] = { status: 'error', values: {}, errorMessage: 'AI 返回 JSON 格式不规范' }
-        }
-      }
-      processed.value++
-      actualConcurrency.value = meta.concurrency
-    },
-    settings.concurrency
-  )
-
-  if (finalConcurrency < settings.concurrency) {
-    toast.warn(`API 限流，已自动降级并发数: ${settings.concurrency} → ${finalConcurrency}`)
-  }
-
-  isAnalyzing.value = false
-  currentProcessingRowIdx.value = -1
-
-  // 将打标结果写入全局共享，供数据摘要页使用
-  const doneCount = Object.values(analysisMap.value).filter(r => r.status === 'done').length
-  if (doneCount > 0) {
-    dataShare.setLabelingResults(plan.outputColumns, analysisMap.value)
-  }
-
-  toast.success('AI 打标完成！')
-}
-
 // ── 导出 ──
 function exportResults() {
   const plan = labelingPlan.value
