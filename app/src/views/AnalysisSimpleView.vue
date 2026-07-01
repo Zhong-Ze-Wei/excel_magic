@@ -94,6 +94,12 @@
           <p class="text-[10px] text-slate-400">待处理</p>
         </div>
       </div>
+
+      <!-- 导出 -->
+      <button v-if="stats.done > 0" @click="exportResults"
+        class="w-full py-2.5 bg-white border border-violet-200 text-violet-700 rounded-xl text-xs font-bold hover:bg-violet-50 flex items-center justify-center gap-1.5">
+        <Download class="w-3.5 h-3.5" /> 导出打标结果
+      </button>
     </div>
   </div>
 </template>
@@ -101,13 +107,14 @@
 <script setup>
 defineOptions({ name: 'AnalysisSimpleView' })
 import { ref, computed } from 'vue'
-import { Sparkles, UploadCloud, Languages, Heart, Tag } from 'lucide-vue-next'
+import { Sparkles, UploadCloud, Languages, Heart, Tag, Download } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
 import { useGlobalDataSync } from '../composables/useGlobalDataSync'
 import { useFileUpload } from '../composables/useFileUpload'
 import { useLabeling } from '../composables/useLabeling'
+import { useExport } from '../composables/useExport'
 import { useToast } from '../services/toast'
 import { callAI } from '../services/ai'
 import { getLabelingPlanGenerationPrompt, getPresetPlan, PRESET_TEMPLATES, formatIntentContext } from '../services/prompts'
@@ -120,16 +127,30 @@ const settings = useSettingsStore()
 const { isMobile } = useDevice()
 const toast = useToast()
 
-const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({ onInit: () => {} })
+// 数据加载后重置分析范围（修复原 onInit 空回调导致 rangeEnd 不随上传更新）
+const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
+  onInit: (h, r) => {
+    rangeStart.value = 1
+    rangeEnd.value = r.length
+  }
+})
 
 // 文件上传
 const fileInput = ref(null)
 function triggerUpload() { fileInput.value?.click() }
-function onFileChange(e) { handleFile(e.target.files[0], { useGlobal: true }) }
-const { handleFile } = useFileUpload()
+function onFileChange(e) { handleFile(e.target.files[0]) }  // handleFile 只接受单参（内部已写全局），修复原死参数 {useGlobal:true}
+const { handleFile } = useFileUpload({
+  onFileLoaded: (data) => {
+    rangeStart.value = 1
+    rangeEnd.value = data.rows.length
+    analysisMap.value = {}
+  }
+})
 function loadDemo() {
   const d = DEMO_DATA.comments
   dataShare.setSharedData(d.headers, d.rows)
+  rangeStart.value = 1
+  rangeEnd.value = d.rows.length
 }
 
 // 打标方案（共享 dataShare.labelingPlan 单一真源）
@@ -144,6 +165,24 @@ const selectedInputColumns = computed(() => dataShare.coreColumn != null ? [Numb
 const {
   isLabeling, processed, totalToProcess, percentFinished, stats, runLabelingBatch
 } = useLabeling({ headers, rows, labelingPlan, rangeStart, rangeEnd, selectedInputColumns, analysisMap })
+
+// 导出（补齐简易模式缺失的导出能力）
+const { exportData } = useExport({ rows, headers })
+function exportResults() {
+  const plan = labelingPlan.value
+  exportData(() => rows.value.map((row, ri) => {
+    const res = analysisMap.value[ri]
+    const padded = [...row]
+    while (padded.length < headers.value.length) padded.push('')
+    plan.outputColumns.forEach(c => {
+      const val = res?.values?.[c.key]
+      if (val == null) padded.push('')
+      else if (Array.isArray(val)) padded.push(val.join(', '))
+      else padded.push(String(val))
+    })
+    return padded
+  }), 'AI打标结果.xlsx', () => [...headers.value, ...plan.outputColumns.map(c => `${c.name} (AI)`)])
+}
 
 // AI 生成方案
 const isGeneratingPlan = ref(false)
