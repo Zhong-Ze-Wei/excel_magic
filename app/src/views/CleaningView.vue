@@ -1,15 +1,15 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
   <div v-if="isMobile" class="px-3 py-3 space-y-3 pb-20 animate-fade-in">
-    <!-- 全局关联状态 -->
-    <div v-if="hasData && dataShare.hasData"
-      class="bg-emerald-500/10 rounded-lg border border-emerald-500/20 px-3 py-2 flex justify-between items-center text-[10px]">
-      <div class="flex items-center gap-1.5 text-emerald-800 min-w-0">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-        <span class="truncate">已关联 <strong>{{ dataShare.sourceName }}</strong></span>
-      </div>
-      <button @click="disconnectGlobalExcel" class="text-rose-500 font-bold shrink-0 ml-2">断开</button>
-    </div>
+    <!-- 全局关联横幅（带折叠表格预览） -->
+    <GlobalDataBanner
+      :visible="hasData && dataShare.hasData"
+      :source-name="dataShare.sourceName"
+      :headers="headers"
+      :rows="rows"
+      :mobile="true"
+      @disconnect="disconnectGlobalExcel"
+    />
 
     <!-- 折叠面板：文件上传/信息 -->
     <MobileCollapsible title="数据文件" :default-open="!hasData">
@@ -242,20 +242,14 @@
 
   <!-- ===== 桌面端模板（原样保留）===== -->
   <div v-else class="animate-fade-in max-w-7xl mx-auto space-y-6">
-    <!-- 全局活跃 Excel 关联状态横幅 -->
-    <div v-if="hasData && dataShare.hasData" 
-      class="bg-emerald-500/10 rounded-xl border border-emerald-500/20 px-4 py-3 flex justify-between items-center text-xs animate-fade-in">
-      <div class="flex items-center gap-2 text-emerald-800">
-        <span class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-        </span>
-        <span>当前已成功关联全局活跃工作表：<strong class="font-semibold">{{ dataShare.sourceName }}</strong> (全表 {{ rows.length }} 行)</span>
-      </div>
-      <button @click="disconnectGlobalExcel" class="text-rose-500 hover:text-rose-600 font-bold hover:underline">
-        断开全局关联
-      </button>
-    </div>
+    <!-- 全局关联横幅（带折叠表格预览） -->
+    <GlobalDataBanner
+      :visible="hasData && dataShare.hasData"
+      :source-name="dataShare.sourceName"
+      :headers="headers"
+      :rows="rows"
+      @disconnect="disconnectGlobalExcel"
+    />
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       <!-- Left Panel: Rules Configuration -->
@@ -416,6 +410,7 @@ import FileUploader from '../components/common/FileUploader.vue'
 import CleaningRulesPanel from '../components/cleaning/CleaningRulesPanel.vue'
 import CustomFilterForm from '../components/cleaning/CustomFilterForm.vue'
 import CleaningAuditTable from '../components/cleaning/CleaningAuditTable.vue'
+import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'
 import StatsPieChart from '../components/common/StatsPieChart.vue'

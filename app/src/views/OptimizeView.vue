@@ -1,15 +1,15 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
   <div v-if="isMobile" class="px-3 py-3 space-y-3 pb-20 animate-fade-in">
-    <!-- 全局关联状态 -->
-    <div v-if="hasData && dataShare.hasData"
-      class="bg-emerald-500/10 rounded-lg border border-emerald-500/20 px-3 py-2 flex justify-between items-center text-[10px]">
-      <div class="flex items-center gap-1.5 text-emerald-800 min-w-0">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-        <span class="truncate">已关联 <strong>{{ dataShare.sourceName }}</strong></span>
-      </div>
-      <button @click="disconnectGlobalExcel" class="text-rose-500 font-bold shrink-0 ml-2">断开</button>
-    </div>
+    <!-- 全局关联横幅（带折叠表格预览） -->
+    <GlobalDataBanner
+      :visible="hasData && dataShare.hasData"
+      :source-name="dataShare.sourceName"
+      :headers="headers"
+      :rows="rows"
+      :mobile="true"
+      @disconnect="disconnectGlobalExcel"
+    />
 
     <!-- 数据上传 -->
     <MobileCollapsible title="数据文件" :default-open="!hasData">
@@ -140,18 +140,14 @@
 
   <!-- ===== 桌面端模板 ===== -->
   <div v-else class="animate-fade-in max-w-7xl mx-auto space-y-6">
-    <!-- 全局关联状态 -->
-    <div v-if="hasData && dataShare.hasData"
-      class="bg-emerald-500/10 rounded-xl border border-emerald-500/20 px-4 py-3 flex justify-between items-center text-xs animate-fade-in">
-      <div class="flex items-center gap-2 text-emerald-800">
-        <span class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-        </span>
-        <span>已关联全局工作表：<strong>{{ dataShare.sourceName }}</strong> ({{ rows.length }} 行)</span>
-      </div>
-      <button @click="disconnectGlobalExcel" class="text-rose-500 hover:text-rose-600 font-bold">断开</button>
-    </div>
+    <!-- 全局关联横幅（带折叠表格预览） -->
+    <GlobalDataBanner
+      :visible="hasData && dataShare.hasData"
+      :source-name="dataShare.sourceName"
+      :headers="headers"
+      :rows="rows"
+      @disconnect="disconnectGlobalExcel"
+    />
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       <!-- Left Panel: Upload + AI Intent -->
@@ -340,6 +336,7 @@ import { useFileUpload } from '../composables/useFileUpload'
 import { useExport } from '../composables/useExport'
 import { useShare } from '../composables/useShare'
 import { useCleaningPipeline } from '../composables/useCleaningPipeline'
+import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
 import { useToast } from '../services/toast'
 import { DEFAULT_RULES_CONFIG } from '../config/defaultSettings'
 
