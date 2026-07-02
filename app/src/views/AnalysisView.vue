@@ -338,7 +338,7 @@
         </div>
 
         <!-- 数据表格 -->
-        <div v-if="hasData" class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[520px] overflow-hidden relative animate-fade-in">
+        <div v-if="hasData" class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[620px] overflow-hidden relative animate-fade-in">
           <div v-if="isAnalyzing" class="w-full h-1 bg-slate-100 overflow-hidden relative">
             <div class="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-300" :style="{ width: percentFinished + '%' }"></div>
           </div>
@@ -347,7 +347,7 @@
             <div class="flex items-center gap-2">
               <BarChart2 class="w-4 h-4 text-slate-400" />
               <span class="text-xs font-bold text-slate-700">预览与打标结果</span>
-              <span class="text-[10px] text-slate-400">(前 20 行)</span>
+              <span class="text-[10px] text-slate-400">{{ displayRows.length }} / {{ rows.length }} 行</span>
               <span v-if="isAnalyzing" class="text-xs text-violet-600 font-bold ml-3 animate-pulse">
                 {{ processed }}/{{ totalToProcess }} ({{ percentFinished }}%) 并发{{ actualConcurrency }}
               </span>
@@ -358,7 +358,7 @@
             </button>
           </div>
 
-          <div class="flex-1 overflow-auto relative">
+          <div class="flex-1 overflow-auto relative" @scroll="onTableScroll" ref="tableScrollRef">
             <table class="w-full text-left border-collapse min-w-[800px]">
               <thead class="bg-slate-50 sticky top-0 z-10 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 shadow-sm">
                 <tr>
@@ -505,7 +505,23 @@ const editingColumnIdx = ref(-1)
 // 分析结果映射表 { [rowIdx]: { status, values: {key: val}, errorMessage } }
 const analysisMap = ref({})
 
-const displayRows = computed(() => rows.value.slice(0, 20))
+// 懒加载：初始 50 行，滚到底自动加 30 行
+const displayLimit = ref(50)
+const displayRows = computed(() => rows.value.slice(0, displayLimit.value))
+function loadMoreRows() {
+  if (displayLimit.value < rows.value.length) {
+    displayLimit.value = Math.min(displayLimit.value + 30, rows.value.length)
+  }
+}
+
+// 表格滚动到底部时懒加载更多行
+const tableScrollRef = ref(null)
+function onTableScroll(e) {
+  const el = e.target
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) {
+    loadMoreRows()
+  }
+}
 
 // 打标编排（批量调 AI + 进度管理 + 结果回写）由 composable 统一管理
 const {

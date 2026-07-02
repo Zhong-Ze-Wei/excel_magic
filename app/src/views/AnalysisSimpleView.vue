@@ -26,38 +26,58 @@
         @disconnect="disconnectGlobalExcel"
       />
 
-      <!-- 任务目标 -->
+      <!-- 方案来源：AI 生成 / 模板快选（二选一 tab） -->
       <section class="bg-white rounded-xl border border-slate-200/60 p-4">
-        <label class="block text-[10px] font-bold text-slate-500 mb-1.5">任务目标</label>
-        <textarea v-model="userGoal" rows="2" placeholder="例：把评论翻译成英文，并打上情感标签"
-          class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-violet-500 resize-none"></textarea>
-        <button @click="generatePlanWithAI" :disabled="isGeneratingPlan"
-          class="mt-2 w-full py-2 bg-violet-50 text-violet-700 rounded-lg text-xs font-bold hover:bg-violet-100 disabled:opacity-50 flex items-center justify-center gap-1">
-          <Sparkles class="w-3.5 h-3.5" /> {{ isGeneratingPlan ? 'AI 生成中...' : 'AI 根据数据生成方案' }}
-        </button>
-      </section>
-
-      <!-- 模板快选 -->
-      <section class="bg-white rounded-xl border border-slate-200/60 p-4">
-        <p class="text-[10px] font-bold text-slate-500 mb-2">或选预设模板</p>
-        <div class="grid grid-cols-2 gap-2">
-          <button v-for="tpl in PRESET_TEMPLATES" :key="tpl.id" @click="applyTemplate(tpl.id)"
-            :class="['p-2.5 rounded-lg border-2 text-left transition-all',
-              labelingPlan.outputColumns.length && labelingPlan.taskName === tpl.label
-                ? 'border-violet-500 bg-violet-50/50'
-                : 'border-slate-200 hover:border-violet-300 hover:bg-violet-50/30']">
-            <component :is="templateIcon(tpl.icon)" class="w-3.5 h-3.5 mb-1" :class="templateColor(tpl.color)" />
-            <p class="text-xs font-bold text-slate-700">{{ tpl.label }}</p>
+        <!-- Tab 切换 -->
+        <div class="flex gap-1 mb-3 p-0.5 bg-slate-100 rounded-lg">
+          <button @click="planSource = 'ai'" :class="['flex-1 py-1.5 rounded-md text-xs font-bold transition-all', planSource === 'ai' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500']">
+            <Sparkles class="w-3 h-3 inline mr-0.5" /> AI 生成
           </button>
+          <button @click="planSource = 'template'" :class="['flex-1 py-1.5 rounded-md text-xs font-bold transition-all', planSource === 'template' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500']">
+            <LayoutGrid class="w-3 h-3 inline mr-0.5" /> 模板快选
+          </button>
+        </div>
+
+        <!-- AI 生成模式 -->
+        <div v-if="planSource === 'ai'">
+          <textarea v-model="userGoal" rows="2" placeholder="例：把评论翻译成英文，并打上情感标签"
+            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-violet-500 resize-none"></textarea>
+          <button @click="generatePlanWithAI" :disabled="isGeneratingPlan"
+            class="mt-2 w-full py-2 bg-violet-50 text-violet-700 rounded-lg text-xs font-bold hover:bg-violet-100 disabled:opacity-50 flex items-center justify-center gap-1">
+            <Sparkles class="w-3.5 h-3.5" /> {{ isGeneratingPlan ? 'AI 生成中...' : 'AI 根据数据生成方案' }}
+          </button>
+        </div>
+
+        <!-- 模板快选模式 -->
+        <div v-if="planSource === 'template'">
+          <div class="grid grid-cols-2 gap-2">
+            <button v-for="tpl in PRESET_TEMPLATES" :key="tpl.id" @click="applyTemplate(tpl.id)"
+              :class="['p-2.5 rounded-lg border-2 text-left transition-all',
+                labelingPlan.outputColumns.length && labelingPlan.taskName === tpl.label
+                  ? 'border-violet-500 bg-violet-50/50'
+                  : 'border-slate-200 hover:border-violet-300 hover:bg-violet-50/30']">
+              <component :is="templateIcon(tpl.icon)" class="w-3.5 h-3.5 mb-1" :class="templateColor(tpl.color)" />
+              <p class="text-xs font-bold text-slate-700">{{ tpl.label }}</p>
+            </button>
+          </div>
         </div>
       </section>
 
       <!-- 当前方案预览 -->
-      <section v-if="labelingPlan.outputColumns.length" class="bg-violet-50/30 rounded-2xl border border-violet-200/50 p-4"><!-- 保留主题色 -->
+      <section v-if="labelingPlan.outputColumns.length" class="bg-violet-50/30 rounded-2xl border border-violet-200/50 p-4">
         <div class="flex items-center justify-between mb-2">
           <span class="text-[10px] font-bold text-slate-500">当前方案</span>
           <span class="text-[10px] text-violet-600">{{ labelingPlan.outputColumns.length }} 个输出列</span>
         </div>
+        <!-- 参考列（AI 分析时看哪些列） -->
+        <div class="mb-2">
+          <span class="text-[10px] text-slate-500 mr-1">参考列：</span>
+          <span v-for="idx in activeInputColumns" :key="idx"
+            class="inline-block px-1.5 py-0.5 mr-1 rounded text-[10px] bg-blue-50 border border-blue-200 text-blue-700">
+            {{ headers[idx] }}
+          </span>
+        </div>
+        <!-- 输出列 -->
         <div class="flex flex-wrap gap-1.5">
           <span v-for="col in labelingPlan.outputColumns" :key="col.key"
             class="px-2 py-1 rounded-md text-[10px] bg-white border border-violet-200 text-slate-600">
@@ -111,7 +131,7 @@
 <script setup>
 defineOptions({ name: 'AnalysisSimpleView' })
 import { ref, computed } from 'vue'
-import { Sparkles, UploadCloud, Languages, Heart, Tag, Download } from 'lucide-vue-next'
+import { Sparkles, UploadCloud, Languages, Heart, Tag, Download, LayoutGrid } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import { useSettingsStore } from '../stores/settings'
 import { useImportIntentStore } from '../stores/importIntent'
@@ -178,12 +198,21 @@ function loadDemo() {
 // 打标方案（共享 dataShare.labelingPlan 单一真源）
 const labelingPlan = computed(() => dataShare.labelingPlan)
 const userGoal = ref('')
+// 方案来源：AI 生成 / 模板快选（二选一）
+const planSource = ref('ai')
+
+// 参考列：优先用 AI 预演的多列方案，否则回退核心列
+const activeInputColumns = computed(() => {
+  const pp = intent.pipelinePlan?.process
+  if (pp?.inputColumns?.length) return pp.inputColumns
+  return dataShare.coreColumn != null ? [Number(dataShare.coreColumn)] : []
+})
 
 // 打标编排（复用 composable）
 const analysisMap = ref({})
 const rangeStart = ref(1)
 const rangeEnd = ref(0)
-const selectedInputColumns = computed(() => dataShare.coreColumn != null ? [Number(dataShare.coreColumn)] : [])
+const selectedInputColumns = activeInputColumns
 const {
   isLabeling, processed, totalToProcess, percentFinished, stats, runLabelingBatch
 } = useLabeling({ headers, rows, labelingPlan, rangeStart, rangeEnd, selectedInputColumns, analysisMap })
