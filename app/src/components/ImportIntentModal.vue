@@ -68,7 +68,7 @@
           <!-- 候选 radio 列表（可组合：点选填入主输入 + 同步列/任务） -->
           <div v-else-if="suggestions.length" class="space-y-1.5">
             <button v-for="(s, i) in suggestions" :key="i" type="button"
-              @click="adoptSuggestion(s, i)"
+              @click="selectSuggestion(s, i)"
               :class="[
                 'w-full text-left p-2.5 rounded-lg border transition-all',
                 adoptedIdx === i
@@ -386,8 +386,8 @@ async function runAnalysis() {
     if (suggestions.value.length) {
       // 首次分析：默认采纳推荐项（填入主输入），用户可改
       adoptSuggestion(suggestions.value[0], 0)
-      // 采纳后自动触发三步方案预演（目标确定了，AI 可以规划具体方案）
-      if (!pipelinePlan.value) runPipelinePlan()
+      // 注意：不在这里触发 runPipelinePlan——等用户主动点选候选确认目标后再规划
+      // （adoptSuggestion 只是预填，用户可能换成其他候选或编辑目标）
     } else {
       toast.info('AI 暂无候选，请手动填写目标')
     }
@@ -400,14 +400,22 @@ async function runAnalysis() {
 }
 
 // 采纳候选：goal 填入主输入 + 同步列/任务（用户可在主输入继续编辑文字）
+// adoptSuggestion 只填充表单（不触发规划），分两种调用场景：
+// - 首次自动预填（runAnalysis 里）：只填入，用户还没确认目标
+// - 用户主动点选（模板 @click）：填入 + 触发三步规划（用户确认了这个目标）
 function adoptSuggestion(s, idx) {
-  form.goal = s.goal          // ← 修复：原代码丢弃了 goal，现在填入主输入
+  form.goal = s.goal
   form.coreColumnIdx = s.coreColumnIdx
   form.tasks = { ...s.tasks }
   adoptedIdx.value = typeof idx === 'number' ? idx : suggestions.value.indexOf(s)
 }
 
-// 采纳候选后自动触发三步规划（目标确定了，AI 可以规划具体方案了）
+// 用户主动点选候选 → 确认目标 → 触发三步规划
+function selectSuggestion(s, idx) {
+  adoptSuggestion(s, idx)
+  pipelinePlan.value = null  // 换了目标，旧方案作废
+  runPipelinePlan()
+}
 async function runPipelinePlan() {
   const goal = form.goal.trim()
   if (!goal || !hasAnyTask.value) return
