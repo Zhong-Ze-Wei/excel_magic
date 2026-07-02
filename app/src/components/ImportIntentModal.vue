@@ -2,7 +2,7 @@
   <div v-if="intent.showModal"
     class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
     @click.self="intent.close()">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-fade-in flex flex-col max-h-[90vh]">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-fade-in flex flex-col max-h-[90vh]">
       <!-- Header -->
       <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
         <h3 class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
@@ -15,32 +15,16 @@
 
       <!-- Body -->
       <div class="p-5 space-y-4 overflow-y-auto">
-        <!-- ① 数据快照 -->
-        <section v-if="snapshot" class="bg-slate-50 rounded-xl p-3 border border-slate-200/60">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">表格快照</span>
-            <span class="text-[10px] text-slate-400">{{ intent.pendingFileMeta?.name }}</span>
-          </div>
-          <div class="flex items-center gap-3 text-xs text-slate-600 mb-2">
-            <span class="font-bold text-slate-800">{{ snapshot.rowCount }}</span> 行
-            <span class="text-slate-300">×</span>
-            <span class="font-bold text-slate-800">{{ snapshot.colCount }}</span> 列
-            <span v-if="snapshot.dominantType" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700">
-              {{ snapshot.dominantType }}
-            </span>
-          </div>
-          <div class="flex flex-wrap gap-1">
-            <span v-for="(p, i) in snapshot.profiles.slice(0, 8)" :key="i"
-              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] bg-white border border-slate-200 text-slate-500"
-              :title="p.header + '：' + typeLabel(p.type)">
-              <span class="font-mono">{{ typeIcon(p.type) }}</span>
-              <span class="truncate max-w-[60px]">{{ p.header }}</span>
-            </span>
-            <span v-if="snapshot.profiles.length > 8" class="text-[9px] text-slate-400 self-center">
-              +{{ snapshot.profiles.length - 8 }}
-            </span>
-          </div>
-        </section>
+        <!-- ① 数据概览（可折叠，含 chart 可视化） -->
+        <DataOverview
+          v-if="snapshot"
+          :profiles="snapshot.profiles"
+          :row-count="snapshot.rowCount"
+          :col-count="snapshot.colCount"
+        />
+        <div v-if="intent.pendingFileMeta?.name" class="text-[10px] text-slate-400 -mt-2 truncate">
+          📄 {{ intent.pendingFileMeta.name }}
+        </div>
 
         <!-- ② 主输入：你想做什么（合并了原任务说明，AI 候选填入它，用户可自由编辑） -->
         <section>
@@ -264,6 +248,7 @@ import { useSettingsStore } from '../stores/settings'
 import { useToast } from '../services/toast'
 import { buildTableSnapshot, analyzeTableIntent } from '../services/intentAnalysis'
 import { planPipeline } from '../services/pipelinePlanner'
+import DataOverview from '../components/common/DataOverview.vue'
 
 const intent = useImportIntentStore()
 const dataShare = useDataShareStore()
@@ -475,7 +460,5 @@ function onSubmit() {
 }
 
 const TYPE_LABELS = { number: '数值', text: '文本', enum: '枚举', boolean: '布尔', date: '日期', identifier: '标识', empty: '空' }
-const TYPE_ICONS = { number: '#', text: 'T', enum: 'E', boolean: 'B', date: 'D', identifier: 'ID', empty: '·' }
 function typeLabel(t) { return TYPE_LABELS[t] || t }
-function typeIcon(t) { return TYPE_ICONS[t] || '?' }
 </script>
