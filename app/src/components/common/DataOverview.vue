@@ -17,7 +17,7 @@
 
     <!-- 展开态：chart 可视化 -->
     <div class="overflow-hidden transition-all duration-300 ease-in-out" :style="{ maxHeight: isOpen ? '500px' : '0px' }">
-      <div v-if="isOpen" class="px-3 pb-3 space-y-3 border-t border-slate-100 pt-3">
+      <div v-show="isOpen" class="px-3 pb-3 space-y-3 border-t border-slate-100 pt-3">
         <!-- 左右双栏：列类型分布 + 填充率 TOP -->
         <div class="grid grid-cols-2 gap-3">
           <!-- 列类型分布环形图 -->
@@ -141,7 +141,18 @@ const textStats = computed(() => {
 
 function toggle() {
   isOpen.value = !isOpen.value
-  if (isOpen.value) nextTick(renderChart)
+  if (isOpen.value) {
+    // 展开后等动画完成再渲染 chart（此时容器有真实宽高）
+    nextTick(() => {
+      if (chartInstance) {
+        chartInstance.resize()
+        renderChart()
+      } else if (typeChartRef.value) {
+        chartInstance = echarts.init(typeChartRef.value)
+        renderChart()
+      }
+    })
+  }
 }
 
 function renderChart() {
