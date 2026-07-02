@@ -123,6 +123,11 @@ export function getIntentAnalysisPrompt() {
 2. 每个目标要具体到能指导后续动作，但不要替用户规划到操作步骤。
 3. 不同目标应覆盖不同的诉求方向（如：清洗导出 / 深度分析 / 内容加工），不要给出三个雷同的变体。
 4. 第一个目标应是你最有把握的「主推测」，confidence 设 high。
+5. tasks 必须与 goal 语义一致：只有 goal 确实需要该任务时才设 true。
+   - goal 侧重"清洗/去噪/去重"→ clean:true
+   - goal 侧重"分析/打标/翻译/分类"→ process:true
+   - goal 侧重"总结/洞察/报告"→ summary:true
+   不要无脑全选 true，要让 tasks 真实反映 goal 的需要。
 
 返回纯 JSON，不要 markdown 代码块，不要解释：
 {
@@ -139,7 +144,7 @@ export function getIntentAnalysisPrompt() {
 字段说明：
 - goal：任务目标，10-30 字，动词开头，聚焦「想达成什么」而非「怎么做」
 - coreColumnIdx：最该作为处理对象的核心列索引（从 0 开始）
-- tasks：建议启用的任务，clean=数据清洗、process=智能加工(翻译/打标)、summary=数据摘要
+- tasks：建议启用的任务，clean=数据清洗、process=智能加工(翻译/打标)、summary=数据摘要。必须与 goal 语义匹配
 - confidence：推测把握，high/medium/low`
 }
 
