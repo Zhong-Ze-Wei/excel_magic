@@ -240,9 +240,15 @@
           class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-md">
           取消
         </button>
-        <button @click="onSubmit" :disabled="form.coreColumnIdx == null"
+        <button @click="onSubmit" :disabled="form.coreColumnIdx == null || planningPipeline"
           class="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1">
-          <Check class="w-3.5 h-3.5" /> 确认
+          <Loader2 v-if="planningPipeline" class="w-3.5 h-3.5 animate-spin" />
+          <Check v-else class="w-3.5 h-3.5" />
+          {{ planningPipeline ? '方案生成中...' : '确认' }}
+        </button>
+        <button v-if="planningPipeline" @click="onSubmitSkipPlan"
+          class="px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100 rounded-md">
+          跳过方案
         </button>
       </div>
     </div>
@@ -440,6 +446,13 @@ async function runPipelinePlan() {
   } finally {
     planningPipeline.value = false
   }
+}
+
+// 跳过三步方案直接确认（用户不想等 AI 规划，各模块回退到自己生成）
+function onSubmitSkipPlan() {
+  pipelinePlan.value = null
+  planningPipeline.value = false
+  onSubmit()
 }
 
 function onSubmit() {
