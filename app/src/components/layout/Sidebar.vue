@@ -28,6 +28,10 @@
         class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
         <Wand2 class="w-4 h-4" /> 智能加工
       </button>
+      <button @click="$router.push('/aggregate')" :class="navClass('aggregate')"
+        class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
+        <BarChart3 class="w-4 h-4" /> 分组对比
+      </button>
       <button @click="$router.push('/summary')" :class="navClass('summary')"
         class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors">
         <FileBarChart class="w-4 h-4" /> 数据摘要
@@ -49,14 +53,14 @@
 <script setup>
 import { useRoute } from 'vue-router'
 import { useSettingsStore } from '../../stores/settings'
-import { Wand2, LayoutGrid, FileBarChart, Eraser, Settings } from 'lucide-vue-next'
+import { Wand2, LayoutGrid, FileBarChart, Eraser, Settings, BarChart3 } from 'lucide-vue-next'
 
 const route = useRoute()
 const settings = useSettingsStore()
 
 const routeMap = {
   home: '/', cleaning: '/cleaning',
-  process: '/process', summary: '/summary'
+  process: '/process', aggregate: '/aggregate', summary: '/summary'
 }
 
 function navClass(name) {

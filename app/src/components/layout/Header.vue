@@ -28,6 +28,7 @@ const settings = useSettingsStore()
 const titles = {
   '/': '功能主页',
   '/process': '智能加工',
+  '/aggregate': '分组对比',
   '/summary': '数据摘要',
   '/cleaning': '数据清洗'
 }
