@@ -4,16 +4,12 @@
     <PageHeader :icon="Sparkles" theme="process" title="智能加工（简易）" subtitle="选模板或让 AI 生成方案，一键批量打标、翻译、分类。" />
 
     <!-- 无数据 -->
-    <div v-if="!hasData" :class="CARD.base + ' p-6 text-center'">
-      <Sparkles class="w-8 h-8 text-violet-500 mx-auto mb-3" />
-      <p class="text-xs text-slate-400 mb-4">上传表格后开始</p>
-      <button @click="triggerUpload" class="px-4 py-2 bg-violet-600 text-white rounded-lg text-xs font-bold active:bg-violet-700">
-        上传表格
+    <div v-if="!hasData" class="space-y-3">
+      <FileUploader label="上传表格" :icon="Sparkles" iconBg="bg-violet-50" iconColor="text-violet-600" @file="handleFile" />
+      <button @click="loadDemo"
+        class="w-full py-2.5 bg-white border border-violet-200 text-violet-600 rounded-xl text-xs font-bold active:bg-violet-50 flex items-center justify-center gap-1.5">
+        <Sparkles class="w-3.5 h-3.5" /> 试试示例数据
       </button>
-      <button @click="loadDemo" class="ml-2 px-3 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs active:bg-slate-50">
-        试试示例
-      </button>
-      <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" @change="onFileChange" />
     </div>
 
     <!-- 有数据 -->
@@ -38,17 +34,14 @@
       subtitle="选模板或让 AI 根据数据生成方案，一键批量打标、翻译、分类。" />
 
     <!-- 无数据 -->
-    <div v-if="!hasData" :class="CARD.base + ' p-8 text-center'">
-      <Sparkles class="w-8 h-8 text-violet-500 mx-auto mb-3" />
-      <p class="text-sm font-bold text-slate-700 mb-1">AI 智能加工</p>
-      <p class="text-xs text-slate-400 mb-4">翻译、打标、分类——选个模板一键开始</p>
-      <button @click="triggerUpload" class="px-4 py-2 bg-violet-600 text-white rounded-lg text-xs font-bold hover:bg-violet-700">
-        <UploadCloud class="w-3.5 h-3.5 inline mr-1" /> 上传表格
-      </button>
-      <button @click="loadDemo" class="ml-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-50">
-        试试示例
-      </button>
-      <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" @change="onFileChange" />
+    <div v-if="!hasData" class="space-y-3">
+      <FileUploader label="上传 Excel/CSV 表格" :icon="Sparkles" iconBg="bg-violet-50" iconColor="text-violet-600" @file="handleFile" />
+      <div class="flex justify-center">
+        <button @click="loadDemo"
+          class="px-5 py-2.5 bg-white hover:bg-violet-50 border border-violet-200 text-violet-600 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2">
+          <Sparkles class="w-3.5 h-3.5" /> 试试示例数据
+        </button>
+      </div>
     </div>
 
     <!-- 有数据 -->
@@ -71,7 +64,7 @@
 <script setup>
 defineOptions({ name: 'AnalysisSimpleView' })
 import { ref, computed } from 'vue'
-import { Sparkles, UploadCloud, Languages, Heart, Tag, Download, LayoutGrid } from 'lucide-vue-next'
+import { Sparkles, Languages, Heart, Tag, Download, LayoutGrid } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import { useSettingsStore } from '../stores/settings'
 import { useImportIntentStore } from '../stores/importIntent'
@@ -82,6 +75,7 @@ import { useLabeling } from '../composables/useLabeling'
 import { useExport } from '../composables/useExport'
 import { useShare } from '../composables/useShare'
 import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
+import FileUploader from '../components/common/FileUploader.vue'
 import PageHeader from '../components/common/PageHeader.vue'
 import AiPlanBanner from '../components/common/AiPlanBanner.vue'
 import AnalysisSimpleBody from '../components/analysis/AnalysisSimpleBody.vue'
@@ -122,9 +116,6 @@ const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
 })
 
 // 文件上传
-const fileInput = ref(null)
-function triggerUpload() { fileInput.value?.click() }
-function onFileChange(e) { handleFile(e.target.files[0]) }  // handleFile 只接受单参（内部已写全局），修复原死参数 {useGlobal:true}
 const { handleFile } = useFileUpload({
   onFileLoaded: (data) => {
     rangeStart.value = 1
