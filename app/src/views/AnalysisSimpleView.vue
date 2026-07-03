@@ -27,7 +27,7 @@
         :is-labeling="isLabeling" :processed="processed" :total-to-process="totalToProcess"
         :percent-finished="percentFinished" :stats="stats" :rows="rows"
         @update:plan-source="v => planSource = v" @update:user-goal="v => userGoal = v"
-        @generate="generatePlanWithAI" @apply-template="applyTemplate" @run="runLabelingBatch" @export="exportResults"
+        @generate="generatePlanWithAI" @apply-template="applyTemplate" @run="runLabelingBatch" @apply="applyToGlobal"
       />
     </template>
   </div>
@@ -62,7 +62,7 @@
         :is-labeling="isLabeling" :processed="processed" :total-to-process="totalToProcess"
         :percent-finished="percentFinished" :stats="stats" :rows="rows"
         @update:plan-source="v => planSource = v" @update:user-goal="v => userGoal = v"
-        @generate="generatePlanWithAI" @apply-template="applyTemplate" @run="runLabelingBatch" @export="exportResults"
+        @generate="generatePlanWithAI" @apply-template="applyTemplate" @run="runLabelingBatch" @apply="applyToGlobal"
       />
     </template>
   </div>
@@ -80,6 +80,7 @@ import { useGlobalDataSync } from '../composables/useGlobalDataSync'
 import { useFileUpload } from '../composables/useFileUpload'
 import { useLabeling } from '../composables/useLabeling'
 import { useExport } from '../composables/useExport'
+import { useShare } from '../composables/useShare'
 import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
 import PageHeader from '../components/common/PageHeader.vue'
 import AiPlanBanner from '../components/common/AiPlanBanner.vue'
@@ -173,6 +174,7 @@ const {
 
 // 导出（补齐简易模式缺失的导出能力）
 const { exportData } = useExport({ rows, headers })
+const { applyToGlobal: applyGlobal } = useShare({ rows, headers })
 function exportResults() {
   const plan = labelingPlan.value
   exportData(() => rows.value.map((row, ri) => {
@@ -187,6 +189,26 @@ function exportResults() {
     })
     return padded
   }), 'AI打标结果.xlsx', () => [...headers.value, ...plan.outputColumns.map(c => `${c.name} (AI)`)])
+}
+
+// ── 应用到全局：把 AI 新增列物理合并进全局工作表 ──
+function applyToGlobal() {
+  const plan = labelingPlan.value
+  if (!plan.outputColumns.length || !Object.keys(analysisMap.value).length) return
+  const newHeaders = [...headers.value, ...plan.outputColumns.map(c => `${c.name} (AI)`)]
+  const newRows = rows.value.map((row, ri) => {
+    const res = analysisMap.value[ri]
+    const padded = [...row]
+    while (padded.length < headers.value.length) padded.push('')
+    plan.outputColumns.forEach(c => {
+      const val = res?.values?.[c.key]
+      if (val == null) padded.push('')
+      else if (Array.isArray(val)) padded.push(val.join(', '))
+      else padded.push(String(val))
+    })
+    return padded
+  })
+  applyGlobal(() => ({ headers: newHeaders, rows: newRows }), '已加工数据.xlsx')
 }
 
 // AI 生成方案

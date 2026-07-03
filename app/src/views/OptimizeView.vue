@@ -91,18 +91,18 @@
         </div>
       </div>
       <div class="space-y-2">
-        <button @click="exportCleanedOnly"
+        <button @click="applyToGlobal"
           class="w-full py-2.5 bg-orange-600 text-white rounded-lg text-xs font-bold active:bg-orange-700 flex items-center justify-center gap-1">
-          <Download class="w-3.5 h-3.5" /> 导出保留数据
+          <Save class="w-3.5 h-3.5" /> 💾 应用到全局
         </button>
         <div class="grid grid-cols-2 gap-2">
           <button @click="shareDataTo('/analysis')"
             class="py-2 bg-violet-600 text-white rounded-lg text-[10px] font-bold active:bg-violet-700">
             发送至分析
           </button>
-          <button @click="applyToGlobal"
-            class="py-2 bg-emerald-600 text-white rounded-lg text-[10px] font-bold active:bg-emerald-700">
-            应用到全局
+          <button @click="exportCleanedOnly"
+            class="py-2 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold active:bg-slate-200 flex items-center justify-center gap-1">
+            <Download class="w-3 h-3" /> 导出
           </button>
         </div>
       </div>
@@ -269,10 +269,11 @@
             </div>
             <!-- Actions -->
             <div class="flex items-center gap-1.5">
-              <button @click="exportCleanedOnly"
-                class="px-3 py-1 bg-orange-600 text-white rounded-md text-xs font-medium hover:bg-orange-700 transition-all flex items-center gap-1">
-                <Download class="w-3.5 h-3.5" /> 导出保留数据
+              <button @click="applyToGlobal" v-if="dataShare.hasData"
+                class="px-3 py-1.5 bg-orange-600 text-white rounded-md text-xs font-bold hover:bg-orange-700 transition-all flex items-center gap-1 shadow-sm">
+                <Save class="w-3.5 h-3.5" /> 💾 应用到全局
               </button>
+              <span class="w-px h-4 bg-slate-200 mx-1"></span>
               <button @click="shareDataTo('/analysis')"
                 class="px-3 py-1 text-violet-600 hover:bg-violet-50 rounded-md text-xs font-medium transition-all">
                 发送至分析
@@ -281,10 +282,9 @@
                 class="px-3 py-1 text-violet-600 hover:bg-violet-50 rounded-md text-xs font-medium transition-all">
                 数据摘要
               </button>
-              <span class="w-px h-4 bg-slate-200 mx-1"></span>
-              <button @click="applyToGlobal" v-if="dataShare.hasData"
-                class="px-3 py-1 text-emerald-600 hover:bg-emerald-50 rounded-md text-xs font-medium transition-all">
-                应用到全局
+              <button @click="exportCleanedOnly"
+                class="px-3 py-1 text-slate-500 hover:bg-slate-100 rounded-md text-xs font-medium transition-all flex items-center gap-1">
+                <Download class="w-3 h-3" /> 导出
               </button>
             </div>
           </div>
@@ -327,7 +327,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Sparkles, Download, SlidersHorizontal } from 'lucide-vue-next'
+import { Sparkles, Download, SlidersHorizontal, Save } from 'lucide-vue-next'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'

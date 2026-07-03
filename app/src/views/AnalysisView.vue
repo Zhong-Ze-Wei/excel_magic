@@ -113,9 +113,9 @@
         </div>
       </div>
       <StatsPieChart :data="chartData" :height="160" />
-      <button v-if="Object.keys(analysisMap).length > 0" @click="exportResults"
-        class="w-full mt-2 py-2 bg-white border border-violet-200 text-violet-600 rounded-lg text-xs font-bold active:bg-violet-50">
-        导出结果
+      <button v-if="Object.keys(analysisMap).length > 0" @click="applyToGlobal"
+        class="w-full mt-2 py-2 bg-violet-600 text-white rounded-lg text-xs font-bold active:bg-violet-700 flex items-center justify-center gap-1">
+        💾 应用到全局
       </button>
     </MobileCollapsible>
 
@@ -341,9 +341,9 @@
                 {{ processed }}/{{ totalToProcess }} ({{ percentFinished }}%) 并发{{ actualConcurrency }}
               </span>
             </div>
-            <button v-if="Object.keys(analysisMap).length > 0" @click="exportResults"
-              class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-violet-600 hover:border-violet-400 transition-all flex items-center gap-1 shadow-sm">
-              <Download class="w-3 h-3" /> 导出打标结果.xlsx
+            <button v-if="Object.keys(analysisMap).length > 0" @click="applyToGlobal"
+              class="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-medium hover:bg-violet-700 transition-all flex items-center gap-1 shadow-sm">
+              <Save class="w-3 h-3" /> 💾 应用到全局
             </button>
           </div>
 
@@ -414,7 +414,7 @@
 <script setup>
 defineOptions({ name: 'AnalysisExpertView' })
 import { ref, computed, watch } from 'vue'
-import { UploadCloud, SlidersHorizontal, Plus, X, Brain, BarChart2, Download, Sparkles, ChevronDown, Sliders, Trash2, Check, Pencil, Languages, Heart, Tag } from 'lucide-vue-next'
+import { UploadCloud, SlidersHorizontal, Plus, X, Brain, BarChart2, Download, Sparkles, ChevronDown, Sliders, Trash2, Check, Pencil, Languages, Heart, Tag, Save } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import FileUploader from '../components/common/FileUploader.vue'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
@@ -427,6 +427,7 @@ import PageHeader from '../components/common/PageHeader.vue'
 import { PAGE, TWO_COL } from '../styles/tokens'
 import { DEMO_DATA } from '../services/excel'
 import { useExport } from '../composables/useExport'
+import { useShare } from '../composables/useShare'
 import { useLabeling } from '../composables/useLabeling'
 import { callAI } from '../services/ai'
 import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt, PRESET_TEMPLATES, getPresetPlan, formatIntentContext } from '../services/prompts'
@@ -453,6 +454,7 @@ const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
 })
 
 const { exportData } = useExport({ rows, headers })
+const { applyToGlobal: applyGlobal } = useShare({ rows, headers })
 
 const { handleFile } = useFileUpload({
   onFileLoaded: (data) => {
@@ -713,5 +715,25 @@ function exportResults() {
     })
     return padded
   }), 'AI打标结果.xlsx', () => [...headers.value, ...plan.outputColumns.map(c => `${c.name} (AI)`)])
+}
+
+// ── 应用到全局：把 AI 新增列物理合并进全局工作表 ──
+function applyToGlobal() {
+  const plan = labelingPlan.value
+  if (!plan.outputColumns.length || !Object.keys(analysisMap.value).length) return
+  const newHeaders = [...headers.value, ...plan.outputColumns.map(c => `${c.name} (AI)`)]
+  const newRows = rows.value.map((row, ri) => {
+    const res = analysisMap.value[ri]
+    const padded = [...row]
+    while (padded.length < headers.value.length) padded.push('')
+    plan.outputColumns.forEach(c => {
+      const val = res?.values?.[c.key]
+      if (val == null) padded.push('')
+      else if (Array.isArray(val)) padded.push(val.join(', '))
+      else padded.push(String(val))
+    })
+    return padded
+  })
+  applyGlobal(() => ({ headers: newHeaders, rows: newRows }), '已加工数据.xlsx')
 }
 </script>
