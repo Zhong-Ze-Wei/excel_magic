@@ -54,7 +54,7 @@
           <p class="text-[11px] text-slate-500 leading-relaxed line-clamp-2">{{ steps.process.summary }}</p>
         </div>
 
-        <div v-if="steps.process && steps.summary" class="flex items-center text-slate-300 text-xl shrink-0">→</div>
+        <div v-if="steps.process && (steps.aggregate || steps.summary)" class="flex items-center text-slate-300 text-xl shrink-0">→</div>
 
         <!-- 聚合（对比类任务） -->
         <div v-if="steps.aggregate" @click="$emit('step', 'aggregate')"

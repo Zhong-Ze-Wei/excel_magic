@@ -75,7 +75,7 @@
 
     <!-- 开始打标 -->
     <button @click="$emit('run')" :disabled="isLabeling || !labelingPlan.outputColumns.length"
-      class="w-full py-3 bg-violet-600 text-white rounded-xl text-sm font-bold hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed">
+      class="w-full py-2.5 bg-violet-600 text-white rounded-lg text-xs font-bold hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm">
       {{ isLabeling ? '处理中...' : '开始打标' }}
     </button>
 
@@ -97,7 +97,7 @@
 
     <!-- 应用到全局 -->
     <button v-if="stats.done > 0" @click="$emit('apply')"
-      class="w-full py-2.5 bg-violet-600 text-white rounded-xl text-xs font-bold hover:bg-violet-700 flex items-center justify-center gap-1.5">
+      class="w-full py-2.5 bg-violet-50 text-violet-700 border border-violet-200 rounded-lg text-xs font-bold hover:bg-violet-100 flex items-center justify-center gap-1.5">
       <Save class="w-3.5 h-3.5" /> 💾 应用到全局
     </button>
   </div>

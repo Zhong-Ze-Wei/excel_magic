@@ -78,7 +78,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { BarChart3 } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import { useImportIntentStore } from '../stores/importIntent'
@@ -103,15 +103,24 @@ const dataShare = useDataShareStore()
 const intent = useImportIntentStore()
 
 const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
-  onInit: (h) => {
-    const plan = intent.pipelinePlan?.aggregate
-    if (plan && h.length) {
-      groupColIdx.value = plan.groupColIdx ?? null
-      valueColIdx.value = plan.valueColIdx ?? null
-      aggOp.value = plan.op || 'sum'
-    }
-  }
+  onInit: () => applyAggregatePlan()
 })
+
+// 独立读取 AI 预规划方案，解决 keep-alive 下 onMounted 不重复触发的时序问题：
+// 用户从首页确认意图后进对比页，rows/headers 未变 → useGlobalDataSync 的 watch 不触发
+// → onInit 不执行 → 方案读不到。改为用 watch 显式监听 pipelinePlan 变化。
+function applyAggregatePlan() {
+  const plan = intent.pipelinePlan?.aggregate
+  if (plan && headers.value.length) {
+    // 仅在用户尚未手动配置时预填（避免覆盖用户已选的配置）
+    if (groupColIdx.value === null) groupColIdx.value = plan.groupColIdx ?? null
+    if (valueColIdx.value === null) valueColIdx.value = plan.valueColIdx ?? null
+    if (aggOp.value === 'sum' && plan.op) aggOp.value = plan.op
+  }
+}
+
+// pipelinePlan 写入或页面激活时，主动应用方案
+watch(() => intent.pipelinePlan?.aggregate, () => applyAggregatePlan(), { immediate: true })
 
 const { handleFile } = useFileUpload()
 const { exportData } = useExport({ rows, headers })
