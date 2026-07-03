@@ -143,7 +143,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Wand2, FileBarChart, Eraser, UploadCloud, X, FileSpreadsheet, RefreshCw, Target } from 'lucide-vue-next'
+import { Wand2, FileBarChart, Eraser, UploadCloud, X, FileSpreadsheet, RefreshCw, Target, BarChart3 } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import { useImportIntentStore } from '../stores/importIntent'
 import { useDevice } from '../composables/useDevice'
@@ -183,6 +183,12 @@ const planSteps = computed(() => {
     const summary = plan?.summary?.theme || 'AI 规划中…'
     steps.summary = { summary, feasible: 'yes' }
   }
+  if (tasks.aggregate) {
+    const summary = plan?.aggregate
+      ? `${dataShare.headers[plan.aggregate.groupColIdx] ?? '分组'} → ${dataShare.headers[plan.aggregate.valueColIdx] ?? '值'}（${(plan.aggregate.op || 'sum').toUpperCase()}）`
+      : 'AI 规划中…'
+    steps.aggregate = { summary, feasible: 'yes' }
+  }
   return steps
 })
 
@@ -192,12 +198,13 @@ function onStartFirst() {
   if (t.clean) return router.push('/cleaning')
   if (t.process || t.translate || t.analyze) return router.push('/process')
   if (t.summary) return router.push('/summary')
+  if (t.aggregate) return router.push('/aggregate')
   toast.warning('请先选择至少一个任务')
 }
 
 // 点击某个步骤卡：直接跳对应模块
 function onStepClick(key) {
-  const routeMap = { clean: '/cleaning', process: '/process', summary: '/summary' }
+  const routeMap = { clean: '/cleaning', process: '/process', summary: '/summary', aggregate: '/aggregate' }
   const route = routeMap[key]
   if (route) router.push(route)
 }
@@ -252,6 +259,7 @@ function clearGlobalExcel() {
 const cards = [
   { route: '/cleaning', title: '数据清洗', icon: Eraser, iconColor: 'text-orange-600' },
   { route: '/process', title: '智能加工', icon: Wand2, iconColor: 'text-violet-600' },
+  { route: '/aggregate', title: '分组对比', icon: BarChart3, iconColor: 'text-blue-600' },
   { route: '/summary', title: '数据摘要', icon: FileBarChart, iconColor: 'text-emerald-600' }
 ]
 </script>

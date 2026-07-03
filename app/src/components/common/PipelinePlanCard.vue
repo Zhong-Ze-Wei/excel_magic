@@ -56,6 +56,20 @@
 
         <div v-if="steps.process && steps.summary" class="flex items-center text-slate-300 text-xl shrink-0">→</div>
 
+        <!-- 聚合（对比类任务） -->
+        <div v-if="steps.aggregate" @click="$emit('step', 'aggregate')"
+          class="step-card group flex-1 min-w-[140px] bg-white border rounded-xl p-3 cursor-pointer transition-all hover:shadow-md hover:border-blue-300"
+          :class="steps.aggregate.feasible === 'no' ? 'border-rose-200 bg-rose-50/30' : 'border-slate-200'">
+          <div class="flex items-center gap-1.5 mb-1.5">
+            <span class="text-lg">{{ icons.aggregate }}</span>
+            <span class="text-xs font-bold text-slate-700">对比</span>
+            <FeasibleTag v-if="steps.aggregate.feasible" :level="steps.aggregate.feasible" />
+          </div>
+          <p class="text-[11px] text-slate-500 leading-relaxed line-clamp-2">{{ steps.aggregate.summary }}</p>
+        </div>
+
+        <div v-if="steps.aggregate && steps.summary" class="flex items-center text-slate-300 text-xl shrink-0">→</div>
+
         <!-- 摘要 -->
         <div v-if="steps.summary" @click="$emit('step', 'summary')"
           class="step-card group flex-1 min-w-[140px] bg-white border rounded-xl p-3 cursor-pointer transition-all hover:shadow-md hover:border-emerald-300"
@@ -92,5 +106,5 @@ defineProps({
 })
 defineEmits(['edit', 'start', 'step'])
 
-const icons = { clean: '🧹', process: '🏷️', summary: '📊' }
+const icons = { clean: '🧹', process: '🏷️', aggregate: '📊', summary: '📋' }
 </script>

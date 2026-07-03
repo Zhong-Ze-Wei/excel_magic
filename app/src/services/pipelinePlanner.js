@@ -1,10 +1,11 @@
 /**
- * 三步方案预演引擎 — 根据意图目标，并行调用 AI 规划清洗/加工/摘要的基础配置
+ * 方案预演引擎 — 根据意图目标，并行调用 AI 规划清洗/加工/对比/摘要的基础配置
  *
  * 设计原则：
- * - 多次小调用（清洗/加工/摘要各一次），Promise.all 并行，质量优先于成本
+ * - 多次小调用（各模块各一次），Promise.all 并行，质量优先于成本
  * - 每段独立 try/catch，单个失败不影响其他（返回 null，调用方降级为"进页面手动配"）
  * - 复用现有 prompt 函数 + 规范化函数，不重复造轮子
+ * - 每段 systemPrompt 注入对应模块的能力边界（getCapabilityConstraint），AI 不会越界规划
  */
 import { callAI } from './ai'
 import { parseRobustJSON } from './jsonParser'
@@ -13,29 +14,30 @@ import { normalizeLabelingPlan } from './labelingPlan'
 import { DEFAULT_RULES_CONFIG } from '../config/defaultSettings'
 
 /**
- * 并行规划三步方案。
+ * 并行规划各模块方案。
  * @param {{
  *   goal: string,            // 用户确认的任务目标
  *   headers: Array,          // 表头
  *   rows: Array,             // 全表数据（内部会抽样）
- *   tasks: {clean,process,summary},  // 用户选的任务
+ *   tasks: {clean,process,summary,aggregate},  // 用户选的任务
  *   coreColumnIdx: number,   // 主列索引（清洗用）
  *   workModel: string        // 模型 ID
  * }} params
- * @returns {Promise<{clean:Object|null, process:Object|null, summary:Object|null}>}
+ * @returns {Promise<{clean,process,summary,aggregate}>}
  *   每段失败时为 null；成功时为该模块的基础配置对象
  */
 export async function planPipeline({ goal, headers, rows, tasks, coreColumnIdx, workModel }) {
   const ctx = { goal, headers, rows, tasks, coreColumnIdx, workModel }
 
   // 按用户选的任务并行规划，没选的任务跳过（返回 null）
-  const [clean, process, summary] = await Promise.all([
+  const [clean, process, summary, aggregate] = await Promise.all([
     tasks.clean ? planClean(ctx).catch(() => null) : Promise.resolve(null),
     tasks.process ? planProcess(ctx).catch(() => null) : Promise.resolve(null),
-    tasks.summary ? planSummary(ctx).catch(() => null) : Promise.resolve(null)
+    tasks.summary ? planSummary(ctx).catch(() => null) : Promise.resolve(null),
+    tasks.aggregate ? planAggregate(ctx).catch(() => null) : Promise.resolve(null)
   ])
 
-  return { clean, process, summary }
+  return { clean, process, summary, aggregate }
 }
 
 // ── 清洗方案：AI 生成 rulesConfig ──
@@ -126,4 +128,61 @@ async function planSummary({ goal, headers, rows, workModel }) {
   const theme = parsed?.analysisTheme || parsed?.theme || goal
 
   return { theme, focusColumns }
+}
+
+// ── 对比方案：AI 推荐分组列 + 值列 + 聚合方式 ──
+async function planAggregate({ goal, headers, rows, workModel }) {
+  // 轻量列画像：列名 + 样本 + 简单类型判断
+  const colSummary = headers.map((h, i) => {
+    const vals = rows.slice(0, 30).map(r => r[i]).filter(v => v != null && v !== '').map(String)
+    const nums = vals.filter(v => !isNaN(Number(v)) && v.trim() !== '').length
+    const isNumeric = nums / Math.max(vals.length, 1) > 0.7
+    return `- 列${i} "${h}"：${isNumeric ? '数值' : '文本/枚举'}，样本 ${JSON.stringify(vals.slice(0, 3))}`
+  }).join('\n')
+
+  const prompt = `用户希望对数据做"分组对比"，请根据任务目标和列结构，推荐最合适的分组列、值列和聚合方式。
+
+【用户的任务目标】
+"${goal}"
+
+【全表列结构】
+${colSummary}
+
+【支持的操作】
+- 聚合方式：sum（求和）/ avg（均值）/ count（计数，不需要值列）/ min（最小）/ max（最大）
+
+【判断要点】
+1. 分组列（groupColIdx）：通常是分类/枚举/文本列，如"站点""地区""类别"等，值的种类不宜过多（建议 < 50）。
+2. 值列（valueColIdx）：通常是数值列，如"互动量""销售额""数量"。count 模式下可为 null。
+3. 聚合方式（op）：根据用户目标语义推断。如"总互动量"→sum，"平均客单价"→avg，"各有多少条"→count。
+4. 如果数据中没有合适的分组列或值列（如全是文本无数值列），请在 feasibility 标注"insufficient_data"。
+
+【返回格式】
+必须返回纯 JSON，不要 markdown 代码块，不要解释。
+{
+  "groupColIdx": 0,
+  "valueColIdx": 1,
+  "op": "sum",
+  "reason": "简要说明为什么这样选",
+  "feasibility": "ok"
+}`
+
+  const systemPrompt = `你是一个数据分析顾问。你必须严格服从用户的任务目标：「${goal}」，为其推荐最合适的分组对比方案。${getCapabilityConstraint('aggregate')}`
+  const raw = await callAI(prompt, systemPrompt, workModel)
+  const parsed = parseRobustJSON(raw)
+  if (!parsed) return null
+
+  // 校验索引合法性
+  const gIdx = Number(parsed.groupColIdx)
+  const vIdx = Number(parsed.valueColIdx)
+  const validOps = ['sum', 'avg', 'count', 'min', 'max']
+
+  const groupColIdx = (Number.isInteger(gIdx) && gIdx >= 0 && gIdx < headers.length) ? gIdx : null
+  const valueColIdx = (parsed.op === 'count' || !Number.isInteger(vIdx) || vIdx < 0 || vIdx >= headers.length)
+    ? null : vIdx
+  const op = validOps.includes(parsed.op) ? parsed.op : 'sum'
+
+  if (groupColIdx === null) return null
+
+  return { groupColIdx, valueColIdx, op, reason: parsed.reason || '', feasibility: parsed.feasibility || 'ok' }
 }
