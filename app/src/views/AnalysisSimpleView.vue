@@ -1,7 +1,44 @@
 <template>
-  <div :class="isMobile ? PAGE.mobile : PAGE.desktop">
-    <!-- 无数据：上传引导 -->
-    <div v-if="!hasData" class="bg-white rounded-2xl border border-slate-200/60 p-8 text-center">
+  <!-- ===== 移动端模板 ===== -->
+  <div v-if="isMobile" :class="PAGE.mobile + ' animate-fade-in'">
+    <PageHeader :icon="Sparkles" theme="process" title="智能加工（简易）" subtitle="选模板或让 AI 生成方案，一键批量打标、翻译、分类。" />
+
+    <!-- 无数据 -->
+    <div v-if="!hasData" :class="CARD.base + ' p-6 text-center'">
+      <Sparkles class="w-8 h-8 text-violet-500 mx-auto mb-3" />
+      <p class="text-xs text-slate-400 mb-4">上传表格后开始</p>
+      <button @click="triggerUpload" class="px-4 py-2 bg-violet-600 text-white rounded-lg text-xs font-bold active:bg-violet-700">
+        上传表格
+      </button>
+      <button @click="loadDemo" class="ml-2 px-3 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs active:bg-slate-50">
+        试试示例
+      </button>
+      <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" @change="onFileChange" />
+    </div>
+
+    <!-- 有数据 -->
+    <template v-else>
+      <AiPlanBanner :visible="hasProcessPlan" :summary="processPlanSummary" @run="runLabelingBatch" />
+      <GlobalDataBanner :visible="hasData && dataShare.hasData" :source-name="dataShare.sourceName"
+        :headers="headers" :rows="rows" :mobile="true" @disconnect="disconnectGlobalExcel" />
+      <AnalysisSimpleBody
+        :plan-source="planSource" :user-goal="userGoal" :is-generating-plan="isGeneratingPlan"
+        :labeling-plan="labelingPlan" :active-input-columns="activeInputColumns" :headers="headers"
+        :is-labeling="isLabeling" :processed="processed" :total-to-process="totalToProcess"
+        :percent-finished="percentFinished" :stats="stats" :rows="rows"
+        @update:plan-source="v => planSource = v" @update:user-goal="v => userGoal = v"
+        @generate="generatePlanWithAI" @apply-template="applyTemplate" @run="runLabelingBatch" @export="exportResults"
+      />
+    </template>
+  </div>
+
+  <!-- ===== 桌面端模板 ===== -->
+  <div v-else :class="PAGE.desktop">
+    <PageHeader :icon="Sparkles" theme="process" title="智能加工（简易）"
+      subtitle="选模板或让 AI 根据数据生成方案，一键批量打标、翻译、分类。" />
+
+    <!-- 无数据 -->
+    <div v-if="!hasData" :class="CARD.base + ' p-8 text-center'">
       <Sparkles class="w-8 h-8 text-violet-500 mx-auto mb-3" />
       <p class="text-sm font-bold text-slate-700 mb-1">AI 智能加工</p>
       <p class="text-xs text-slate-400 mb-4">翻译、打标、分类——选个模板一键开始</p>
@@ -15,116 +52,19 @@
     </div>
 
     <!-- 有数据 -->
-    <div v-else class="space-y-4">
-      <!-- 全局关联横幅（带折叠表格预览） -->
-      <GlobalDataBanner
-        :visible="hasData && dataShare.hasData"
-        :source-name="dataShare.sourceName"
-        :headers="headers"
-        :rows="rows"
-        :mobile="isMobile"
-        @disconnect="disconnectGlobalExcel"
+    <template v-else>
+      <AiPlanBanner :visible="hasProcessPlan" :summary="processPlanSummary" @run="runLabelingBatch" />
+      <GlobalDataBanner :visible="hasData && dataShare.hasData" :source-name="dataShare.sourceName"
+        :headers="headers" :rows="rows" @disconnect="disconnectGlobalExcel" />
+      <AnalysisSimpleBody
+        :plan-source="planSource" :user-goal="userGoal" :is-generating-plan="isGeneratingPlan"
+        :labeling-plan="labelingPlan" :active-input-columns="activeInputColumns" :headers="headers"
+        :is-labeling="isLabeling" :processed="processed" :total-to-process="totalToProcess"
+        :percent-finished="percentFinished" :stats="stats" :rows="rows"
+        @update:plan-source="v => planSource = v" @update:user-goal="v => userGoal = v"
+        @generate="generatePlanWithAI" @apply-template="applyTemplate" @run="runLabelingBatch" @export="exportResults"
       />
-
-      <!-- 方案来源：AI 生成 / 模板快选（二选一 tab） -->
-      <section class="bg-white rounded-xl border border-slate-200/60 p-4">
-        <!-- Tab 切换 -->
-        <div class="flex gap-1 mb-3 p-0.5 bg-slate-100 rounded-lg">
-          <button @click="planSource = 'ai'" :class="['flex-1 py-1.5 rounded-md text-xs font-bold transition-all', planSource === 'ai' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500']">
-            <Sparkles class="w-3 h-3 inline mr-0.5" /> AI 生成
-          </button>
-          <button @click="planSource = 'template'" :class="['flex-1 py-1.5 rounded-md text-xs font-bold transition-all', planSource === 'template' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500']">
-            <LayoutGrid class="w-3 h-3 inline mr-0.5" /> 模板快选
-          </button>
-        </div>
-
-        <!-- AI 生成模式 -->
-        <div v-if="planSource === 'ai'">
-          <textarea v-model="userGoal" rows="2" placeholder="例：把评论翻译成英文，并打上情感标签"
-            class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-violet-500 resize-none"></textarea>
-          <button @click="generatePlanWithAI" :disabled="isGeneratingPlan"
-            class="mt-2 w-full py-2 bg-violet-50 text-violet-700 rounded-lg text-xs font-bold hover:bg-violet-100 disabled:opacity-50 flex items-center justify-center gap-1">
-            <Sparkles class="w-3.5 h-3.5" /> {{ isGeneratingPlan ? 'AI 生成中...' : 'AI 根据数据生成方案' }}
-          </button>
-        </div>
-
-        <!-- 模板快选模式 -->
-        <div v-if="planSource === 'template'">
-          <div class="grid grid-cols-2 gap-2">
-            <button v-for="tpl in PRESET_TEMPLATES" :key="tpl.id" @click="applyTemplate(tpl.id)"
-              :class="['p-2.5 rounded-lg border-2 text-left transition-all',
-                labelingPlan.outputColumns.length && labelingPlan.taskName === tpl.label
-                  ? 'border-violet-500 bg-violet-50/50'
-                  : 'border-slate-200 hover:border-violet-300 hover:bg-violet-50/30']">
-              <component :is="templateIcon(tpl.icon)" class="w-3.5 h-3.5 mb-1" :class="templateColor(tpl.color)" />
-              <p class="text-xs font-bold text-slate-700">{{ tpl.label }}</p>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <!-- 当前方案预览 -->
-      <section v-if="labelingPlan.outputColumns.length" class="bg-violet-50/30 rounded-2xl border border-violet-200/50 p-4">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-[10px] font-bold text-slate-500">当前方案</span>
-          <span class="text-[10px] text-violet-600">{{ labelingPlan.outputColumns.length }} 个输出列</span>
-        </div>
-        <!-- 参考列（AI 分析时看哪些列） -->
-        <div class="mb-2">
-          <span class="text-[10px] text-slate-500 mr-1">参考列：</span>
-          <span v-for="idx in activeInputColumns" :key="idx"
-            class="inline-block px-1.5 py-0.5 mr-1 rounded text-[10px] bg-blue-50 border border-blue-200 text-blue-700">
-            {{ headers[idx] }}
-          </span>
-        </div>
-        <!-- 输出列 -->
-        <div class="flex flex-wrap gap-1.5">
-          <span v-for="col in labelingPlan.outputColumns" :key="col.key"
-            class="px-2 py-1 rounded-md text-[10px] bg-white border border-violet-200 text-slate-600">
-            {{ col.name }} <span class="text-slate-400">({{ col.type }})</span>
-          </span>
-        </div>
-      </section>
-
-      <!-- 进度 -->
-      <div v-if="isLabeling" class="bg-white rounded-2xl border border-slate-200/60 p-4">
-        <div class="flex items-center justify-between text-xs mb-2">
-          <span class="font-bold text-slate-700">打标中</span>
-          <span class="text-slate-500">{{ processed }}/{{ totalToProcess }} ({{ percentFinished }}%)</span>
-        </div>
-        <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-          <div class="h-full bg-violet-500 transition-all" :style="{ width: percentFinished + '%' }"></div>
-        </div>
-      </div>
-
-      <!-- 开始打标 -->
-      <button @click="runLabelingBatch" :disabled="isLabeling || !labelingPlan.outputColumns.length"
-        class="w-full py-3 bg-violet-600 text-white rounded-xl text-sm font-bold hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed">
-        {{ isLabeling ? '处理中...' : '开始打标' }}
-      </button>
-
-      <!-- 结果统计 -->
-      <div v-if="stats.done > 0" class="grid grid-cols-3 gap-2">
-        <div class="bg-white rounded-xl border border-slate-200/60 p-3 text-center">
-          <p class="text-lg font-bold text-emerald-600">{{ stats.done }}</p>
-          <p class="text-[10px] text-slate-400">已分析</p>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-200/60 p-3 text-center">
-          <p class="text-lg font-bold text-rose-500">{{ stats.error }}</p>
-          <p class="text-[10px] text-slate-400">错误</p>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-200/60 p-3 text-center">
-          <p class="text-lg font-bold text-slate-400">{{ Math.max(0, rows.length - stats.done - stats.error) }}</p>
-          <p class="text-[10px] text-slate-400">待处理</p>
-        </div>
-      </div>
-
-      <!-- 导出 -->
-      <button v-if="stats.done > 0" @click="exportResults"
-        class="w-full py-2.5 bg-white border border-violet-200 text-violet-700 rounded-xl text-xs font-bold hover:bg-violet-50 flex items-center justify-center gap-1.5">
-        <Download class="w-3.5 h-3.5" /> 导出打标结果
-      </button>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -141,8 +81,11 @@ import { useFileUpload } from '../composables/useFileUpload'
 import { useLabeling } from '../composables/useLabeling'
 import { useExport } from '../composables/useExport'
 import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
+import PageHeader from '../components/common/PageHeader.vue'
+import AiPlanBanner from '../components/common/AiPlanBanner.vue'
+import AnalysisSimpleBody from '../components/analysis/AnalysisSimpleBody.vue'
 import { useToast } from '../services/toast'
-import { PAGE } from '../styles/tokens'
+import { PAGE, CARD } from '../styles/tokens'
 import { callAI } from '../services/ai'
 import { getLabelingPlanGenerationPrompt, getPresetPlan, PRESET_TEMPLATES, formatIntentContext } from '../services/prompts'
 import { normalizeLabelingPlan } from '../services/labelingPlan'
@@ -206,6 +149,17 @@ const activeInputColumns = computed(() => {
   const pp = intent.pipelinePlan?.process
   if (pp?.inputColumns?.length) return pp.inputColumns
   return dataShare.coreColumn != null ? [Number(dataShare.coreColumn)] : []
+})
+
+// AI 方案引导条派生：存在预规划加工方案且尚未应用时显示
+const hasProcessPlan = computed(() =>
+  !!intent.pipelinePlan?.process?.outputColumns?.length && !labelingPlan.value.outputColumns.length && hasData.value
+)
+const processPlanSummary = computed(() => {
+  const pp = intent.pipelinePlan?.process
+  if (!pp) return ''
+  const cols = pp.outputColumns.map(c => c.name).join(' + ')
+  return `AI 已规划输出列：${cols}，点击执行即可应用`
 })
 
 // 打标编排（复用 composable）

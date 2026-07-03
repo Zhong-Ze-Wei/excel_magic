@@ -1,6 +1,9 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
   <div v-if="isMobile" :class="PAGE.mobile + ' animate-fade-in'">
+    <PageHeader :icon="Sparkles" theme="clean" title="数据清洗" subtitle="AI 一句话清洗或手动规则精调，去除噪声数据。" />
+    <AiPlanBanner :visible="hasCleanPlan" :summary="cleanPlanSummary" @run="runWithPlan" />
+
     <!-- 全局关联横幅（带折叠表格预览） -->
     <GlobalDataBanner
       :visible="hasData && dataShare.hasData"
@@ -140,6 +143,10 @@
 
   <!-- ===== 桌面端模板 ===== -->
   <div v-else :class="PAGE.desktop">
+    <PageHeader :icon="Sparkles" theme="clean" title="数据清洗"
+      subtitle="AI 一句话清洗或手动规则精调，两种模式自由切换。" />
+    <AiPlanBanner :visible="hasCleanPlan" :summary="cleanPlanSummary" @run="runWithPlan" />
+
     <!-- 全局关联横幅（带折叠表格预览） -->
     <GlobalDataBanner
       :visible="hasData && dataShare.hasData"
@@ -340,6 +347,8 @@ import { useCleaningPipeline } from '../composables/useCleaningPipeline'
 import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
 import { useToast } from '../services/toast'
 import { PAGE, TWO_COL } from '../styles/tokens'
+import PageHeader from '../components/common/PageHeader.vue'
+import AiPlanBanner from '../components/common/AiPlanBanner.vue'
 import { DEFAULT_RULES_CONFIG } from '../config/defaultSettings'
 
 const toast = useToast()
@@ -369,6 +378,25 @@ const sourceCol = computed(() => dataShare.coreColumn)
 // 简易模式的 AI 规则配置：独立内存态，不写 settings.rulesConfig（用完即弃，不持久化，不污染专家模式）
 // null 表示尚未跑过 AI；跑过后承载 AI 生成的 rulesConfig 副本
 const aiRulesConfig = ref(null)
+
+// AI 方案引导条派生：是否存在预规划方案 + 摘要文案
+const hasCleanPlan = computed(() => !!intent.pipelinePlan?.clean?.aiRulesConfig && !aiRulesConfig.value && hasData.value)
+const cleanPlanSummary = computed(() => {
+  const plan = intent.pipelinePlan?.clean
+  if (!plan) return ''
+  const col = headers.value[plan.sourceCol] || '主列'
+  return `AI 已规划对「${col}」的清洗方案，点击执行即可应用`
+})
+
+// 按 AI 方案一键执行：应用预规划配置并跑清洗
+function runWithPlan() {
+  const planCfg = intent.pipelinePlan?.clean?.aiRulesConfig
+  if (!planCfg) return
+  aiRulesConfig.value = planCfg
+  aiSummary.value = planCfg._aiSummary || '已应用 AI 预规划的清洗方案'
+  runCleaning()
+  toast.info('已应用 AI 预规划的清洗方案，可调整')
+}
 
 // 清洗管道：全量跑，结果带 displayDecision（suspect → delete 展示层转换）
 const { cleanedRows: rawCleanedRows, runPipeline: runCleaning, clear: clearCleaned, getCleanRows } = useCleaningPipeline({

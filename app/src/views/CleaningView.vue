@@ -1,6 +1,7 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
   <div v-if="isMobile" :class="PAGE.mobile + ' animate-fade-in'">
+    <PageHeader :icon="Eraser" theme="clean" title="数据清洗" subtitle="10 条原子规则 + 自定义列级过滤，逐行决策保留或删除。" />
     <!-- 全局关联横幅（带折叠表格预览） -->
     <GlobalDataBanner
       :visible="hasData && dataShare.hasData"
@@ -242,6 +243,8 @@
 
   <!-- ===== 桌面端模板（原样保留）===== -->
   <div v-else :class="PAGE.desktop">
+    <PageHeader :icon="Eraser" theme="clean" title="数据清洗"
+      subtitle="10 条原子规则 + 自定义列级过滤，逐行决策保留或删除。" />
     <!-- 全局关联横幅（带折叠表格预览） -->
     <GlobalDataBanner
       :visible="hasData && dataShare.hasData"
@@ -411,6 +414,7 @@ import CleaningRulesPanel from '../components/cleaning/CleaningRulesPanel.vue'
 import CustomFilterForm from '../components/cleaning/CustomFilterForm.vue'
 import CleaningAuditTable from '../components/cleaning/CleaningAuditTable.vue'
 import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
+import PageHeader from '../components/common/PageHeader.vue'
 import { PAGE, TWO_COL } from '../styles/tokens'
 import MobileCollapsible from '../components/common/MobileCollapsible.vue'
 import MobileTableWrapper from '../components/common/MobileTableWrapper.vue'

@@ -1,12 +1,7 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
   <div v-if="isMobile" :class="PAGE.mobile + ' animate-fade-in'">
-    <div class="bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 rounded-xl border border-violet-200/50 p-3">
-      <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-        <Brain class="w-5 h-5 text-violet-600" /> AI 打标
-      </h2>
-      <p class="text-[10px] text-slate-500 mt-0.5">自然语言描述需求 → AI 生成方案 → 批量打标。</p>
-    </div>
+    <PageHeader :icon="Brain" theme="process" title="AI 打标" subtitle="自然语言描述需求 → AI 生成方案 → 批量打标。" />
 
     <GlobalDataBanner
       :visible="hasData && dataShare.hasData"
@@ -170,17 +165,11 @@
   <!-- ===== 桌面端模板（原样保留）===== -->
   <div v-else :class="PAGE.desktop">
     <!-- Header -->
-    <div class="bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 rounded-2xl border border-violet-200/50 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div>
-        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <Brain class="w-6 h-6 text-violet-600" /> AI 表格打标
-        </h2>
-        <p class="text-xs text-slate-500 mt-1">
-          用自然语言描述分析目标，自动生成新增列方案，批量打标、分类、摘要与判断。
-        </p>
-      </div>
-      <button v-if="!hasData" @click="loadDemo"
-        class="px-4 py-2 bg-white hover:bg-violet-50 border border-violet-200 text-violet-600 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0">
+    <PageHeader :icon="Brain" theme="process" title="AI 表格打标"
+      subtitle="用自然语言描述分析目标，自动生成新增列方案，批量打标、分类、摘要与判断。" />
+    <div v-if="!hasData">
+      <button @click="loadDemo"
+        class="px-4 py-2 bg-white hover:bg-violet-50 border border-violet-200 text-violet-600 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5">
         <Brain class="w-3.5 h-3.5" /> 加载示例数据
       </button>
     </div>
@@ -434,6 +423,7 @@ import StatsPieChart from '../components/common/StatsPieChart.vue'
 import OutputColumnsList from '../components/analysis/OutputColumnsList.vue'
 import EditColumnDialog from '../components/analysis/EditColumnDialog.vue'
 import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
+import PageHeader from '../components/common/PageHeader.vue'
 import { PAGE, TWO_COL } from '../styles/tokens'
 import { DEMO_DATA } from '../services/excel'
 import { useExport } from '../composables/useExport'
