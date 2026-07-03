@@ -8,6 +8,8 @@ const routes = [
   { path: '/translate', redirect: '/process' },
   { path: '/analysis', redirect: '/process' },
   { path: '/summary', name: 'summary', component: () => import('../views/SummaryView.vue') },
+  // 分组对比：按某列分组对另一列做 SUM/AVG/COUNT/MIN/MAX，独立第四模块
+  { path: '/aggregate', name: 'aggregate', component: () => import('../views/AggregateView.vue') },
   // 数据清洗 = 简易模式（OptimizeView）+ 专家模式（CleaningView），统一入口在 CleaningHub
   { path: '/cleaning', name: 'cleaning', component: () => import('../views/CleaningHub.vue') },
   { path: '/optimize', redirect: '/cleaning' }

@@ -81,7 +81,7 @@
                 <Check v-else-if="adoptedIdx === i" class="shrink-0 w-3.5 h-3.5 text-blue-600" />
               </div>
               <div class="flex items-center gap-1.5 mt-1">
-                <span class="text-[9px] text-slate-400">{{ ['清洗','加工','摘要'].filter((_, idx) => [s.tasks.clean, s.tasks.process, s.tasks.summary][idx]).join('+') }}</span>
+                <span class="text-[9px] text-slate-400">{{ ['清洗','加工','对比','摘要'].filter((_, idx) => [s.tasks.clean, s.tasks.process, s.tasks.aggregate, s.tasks.summary][idx]).join('+') }}</span>
                 <span class="text-slate-200">·</span>
                 <span class="text-[9px] text-slate-400">核心列：{{ headers[s.coreColumnIdx] }}</span>
               </div>
@@ -119,7 +119,7 @@
             <span class="w-1 h-3.5 bg-blue-500 rounded-full"></span>
             打算做什么
           </h4>
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-2 gap-2">
             <div v-for="t in taskOptions" :key="t.key" class="relative group">
               <button type="button"
                 @click="form.tasks[t.key] = !form.tasks[t.key]"
@@ -195,6 +195,21 @@
               <span class="text-[10px] text-slate-400">🏷️ 加工：AI 未能规划，进页面手动配</span>
             </div>
 
+            <!-- 对比（聚合） -->
+            <div v-if="pipelinePlan.aggregate" class="p-2.5 rounded-lg border border-blue-200/60 bg-blue-50/30">
+              <div class="flex items-center gap-1.5 mb-1">
+                <BarChart3 class="w-3 h-3 text-blue-600" />
+                <span class="text-[11px] font-bold text-blue-800">分组对比</span>
+              </div>
+              <p class="text-[10px] text-slate-600 leading-relaxed">
+                按「{{ headers[pipelinePlan.aggregate.groupColIdx] }}」分组，
+                对「{{ pipelinePlan.aggregate.valueColIdx != null ? headers[pipelinePlan.aggregate.valueColIdx] : '行数' }}」做 {{ (pipelinePlan.aggregate.op || 'sum').toUpperCase() }}
+              </p>
+            </div>
+            <div v-else-if="form.tasks.aggregate" class="p-2 rounded-lg border border-slate-200 bg-slate-50">
+              <span class="text-[10px] text-slate-400">📊 对比：AI 未能规划，进页面手动配</span>
+            </div>
+
             <!-- 摘要 -->
             <div v-if="pipelinePlan.summary" class="p-2.5 rounded-lg border border-emerald-200/60 bg-emerald-50/30">
               <div class="flex items-center gap-1.5 mb-1">
@@ -241,7 +256,7 @@
 
 <script setup>
 import { reactive, ref, computed, watch } from 'vue'
-import { X, Check, Sparkles, Repeat, AlignJustify, RefreshCw, Loader2 } from 'lucide-vue-next'
+import { X, Check, Sparkles, Repeat, AlignJustify, RefreshCw, Loader2, BarChart3 } from 'lucide-vue-next'
 import { useImportIntentStore } from '../stores/importIntent'
 import { useDataShareStore } from '../stores/dataShare'
 import { useSettingsStore } from '../stores/settings'
@@ -294,11 +309,13 @@ function finishStepAnimation() {
 }
 
 const taskOptions = [
-  { key: 'clean',   label: '清洗',     desc: '去噪去重',     icon: Sparkles,
+  { key: 'clean',     label: '清洗',     desc: '去噪去重',     icon: Sparkles,
     tooltip: '自动过滤空文本、纯表情、纯符号、重复行、广告、乱码等噪声数据，让后续分析更干净。' },
-  { key: 'process', label: '智能加工', desc: '翻译+打标',    icon: Repeat,
+  { key: 'process',   label: '智能加工', desc: '翻译+打标',    icon: Repeat,
     tooltip: '把核心列翻译成目标语言，或用 AI 给每行打上情感、主题、分类等标签，生成结构化新列。' },
-  { key: 'summary', label: '摘要',     desc: '一键洞察',     icon: AlignJustify,
+  { key: 'aggregate', label: '分组对比', desc: '按组聚合',     icon: BarChart3,
+    tooltip: '按某列分组对另一列做求和/均值/计数，生成对比图表。适合"按地区看销售额""按站点比互动量"等场景。' },
+  { key: 'summary',   label: '摘要',     desc: '一键洞察',     icon: AlignJustify,
     tooltip: 'AI 通读全表，生成数据概况、关键发现、分布统计的总结报告，快速把握数据全貌。' }
 ]
 

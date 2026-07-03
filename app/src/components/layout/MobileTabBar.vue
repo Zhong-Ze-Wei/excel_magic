@@ -13,7 +13,7 @@
 
 <script setup>
 import { useRoute } from 'vue-router'
-import { LayoutGrid, Eraser, Wand2, FileBarChart } from 'lucide-vue-next'
+import { LayoutGrid, Eraser, Wand2, BarChart3, FileBarChart } from 'lucide-vue-next'
 
 const route = useRoute()
 
@@ -21,6 +21,7 @@ const tabs = [
   { route: '/', label: '首页', icon: LayoutGrid },
   { route: '/cleaning', label: '清洗', icon: Eraser },
   { route: '/process', label: '加工', icon: Wand2 },
+  { route: '/aggregate', label: '对比', icon: BarChart3 },
   { route: '/summary', label: '摘要', icon: FileBarChart }
 ]
 
