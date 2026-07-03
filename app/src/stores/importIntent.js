@@ -3,7 +3,7 @@ import { ref } from 'vue'
 
 export const useImportIntentStore = defineStore('importIntent', () => {
   const coreColumnIdx = ref(null)
-  const tasks = ref({ clean: false, process: false, summary: false })
+  const tasks = ref({ clean: false, process: false, summary: false, aggregate: false })
   // 任务目标（合并了原 note 语义）：用户想用这份数据做什么。AI 候选填入它，用户可编辑。
   // 下游（清洗/加工/摘要）通过 dataShare.intentNote 消费，字段名保留 note 以兼容。
   const note = ref('')
@@ -41,7 +41,7 @@ export const useImportIntentStore = defineStore('importIntent', () => {
   // 新文件上传时清空旧意图 + 旧候选 + 旧方案（让弹窗重新跑 AI）
   function reset() {
     coreColumnIdx.value = null
-    tasks.value = { clean: false, process: false, summary: false }
+    tasks.value = { clean: false, process: false, summary: false, aggregate: false }
     note.value = ''
     suggestions.value = null
     pipelinePlan.value = null
