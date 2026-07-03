@@ -8,7 +8,7 @@
  */
 import { callAI } from './ai'
 import { parseRobustJSON } from './jsonParser'
-import { getSmartFilterPrompt, getLabelingPlanGenerationPrompt, getAnalysisThemePrompt } from './prompts'
+import { getSmartFilterPrompt, getLabelingPlanGenerationPrompt, getAnalysisThemePrompt, getCapabilityConstraint } from './prompts'
 import { normalizeLabelingPlan } from './labelingPlan'
 import { DEFAULT_RULES_CONFIG } from '../config/defaultSettings'
 
@@ -50,7 +50,7 @@ async function planClean({ goal, headers, rows, coreColumnIdx, workModel }) {
   const rulesMeta = ATOMIC_RULES_META.map(r => ({ key: r.key, title: r.title, description: r.description }))
 
   const prompt = getSmartFilterPrompt(goal, headers, sourceCol, allColumnSamples, rulesMeta)
-  const systemPrompt = `你是一个数据清洗专家。你的清洗规则必须严格服从用户的任务目标：「${goal}」。`
+  const systemPrompt = `你是一个数据清洗专家。你的清洗规则必须严格服从用户的任务目标：「${goal}」。${getCapabilityConstraint('clean')}`
   const raw = await callAI(prompt, systemPrompt, workModel)
   const parsed = parseRobustJSON(raw)
   if (!parsed) return null
@@ -90,7 +90,7 @@ async function planProcess({ goal, headers, rows, coreColumnIdx, workModel }) {
   const inputColumns = [coreColumnIdx ?? 0]
   const prompt = getLabelingPlanGenerationPrompt(goal, headers, sampleRows, inputColumns)
   // 硬约束：必须服从用户目标，不得自行发散到其他分析方向
-  const systemPrompt = `你是一个数据分析配置专家。你的输出列方案必须严格服从用户的任务目标：「${goal}」。只围绕该目标设计输出列，不要根据数据特征自行发散到其他分析方向。`
+  const systemPrompt = `你是一个数据分析配置专家。你的输出列方案必须严格服从用户的任务目标：「${goal}」。只围绕该目标设计输出列，不要根据数据特征自行发散到其他分析方向。${getCapabilityConstraint('process')}`
   const raw = await callAI(prompt, systemPrompt, workModel)
   const parsed = parseRobustJSON(raw)
   const plan = normalizeLabelingPlan(parsed)
@@ -114,7 +114,7 @@ async function planSummary({ goal, headers, rows, workModel }) {
 
   const prompt = getAnalysisThemePrompt(goal, colSummary, null)
   // 硬约束：分析主题和关注列必须服从用户目标
-  const systemPrompt = `你是一个数据分析顾问。你的分析主题和关注列必须严格服从用户的任务目标：「${goal}」。不要根据数据特征自行发散到其他分析方向。`
+  const systemPrompt = `你是一个数据分析顾问。你的分析主题和关注列必须严格服从用户的任务目标：「${goal}」。不要根据数据特征自行发散到其他分析方向。${getCapabilityConstraint('summary')}`
   const raw = await callAI(prompt, systemPrompt, workModel)
   const parsed = parseRobustJSON(raw)
 

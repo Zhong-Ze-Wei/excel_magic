@@ -304,12 +304,12 @@ const taskOptions = [
 
 const form = reactive({
   coreColumnIdx: null,
-  tasks: { clean: true, process: true, summary: true },
+  tasks: { clean: true, process: true, summary: true, aggregate: false },
   goal: ''  // 主输入：你想做什么（合并了原 note）
 })
 
 // 是否至少选了一个任务（控制三步方案区显隐）
-const hasAnyTask = computed(() => form.tasks.clean || form.tasks.process || form.tasks.summary)
+const hasAnyTask = computed(() => form.tasks.clean || form.tasks.process || form.tasks.summary || form.tasks.aggregate)
 // 清洗规则条数（用于预览展示）
 const cleanRuleCount = computed(() => {
   if (!pipelinePlan.value?.clean?.aiRulesConfig) return 0
@@ -332,9 +332,10 @@ watch(() => intent.showModal, async (v) => {
   const hasSaved = !!intent.confirmedAt
   form.coreColumnIdx = intent.coreColumnIdx ?? dataShare.coreColumn ?? 0
   form.tasks = {
-    clean:   hasSaved ? !!intent.tasks.clean   : true,
-    process: hasSaved ? !!(intent.tasks.process || intent.tasks.translate || intent.tasks.analyze) : true,
-    summary: hasSaved ? !!intent.tasks.summary : true
+    clean:     hasSaved ? !!intent.tasks.clean   : true,
+    process:   hasSaved ? !!(intent.tasks.process || intent.tasks.translate || intent.tasks.analyze) : true,
+    summary:   hasSaved ? !!intent.tasks.summary : true,
+    aggregate: hasSaved ? !!intent.tasks.aggregate : false
   }
   form.goal = intent.note || ''
   // 候选：优先读缓存（已生成过就不重跑），无缓存且开启自动分析才跑

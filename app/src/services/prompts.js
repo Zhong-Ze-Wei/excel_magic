@@ -114,20 +114,31 @@ ${JSON.stringify(sampleRows, null, 2)}
  * 让 AI 读完表格快照后，给出 2-3 个「用户可能想做什么」的任务方案建议。
  * 粒度定位：中等——比"分析这份数据"具体，比"清洗→打标→聚类"宏观。
  * 例：「找出差评原因，定位物流相关的负面评论」是理想粒度。
+ *
+ * 能力感知（v2 新增）：注入模块能力清单，让 AI 推测目标时就知道边界，
+ * 避免推荐清洗/加工模块做不了的任务。
  */
 export function getIntentAnalysisPrompt() {
   return `你是一个数据分析顾问。用户刚导入一张表格，还没告诉你要做什么。你的任务是读完数据快照后，推测用户最可能想完成的 2-3 个任务目标，作为建议供其选择。
 
+【四个模块的真实能力边界（必须基于此判断）】
+- 数据清洗（clean）：删行/留行，基于文本质量或列值过滤。**不能**聚合、对比、求和、排名。
+- 智能加工（process）：逐行新增标签列（情感/分类/翻译/评分）。**不能**聚合、对比、删除行。
+- 数据摘要（summary）：单列统计画像 + AI 文字报告。**不能**分组聚合、生成二维汇总表。
+- 分组聚合（aggregate）：按某列分组对另一列做 SUM/AVG/COUNT/MIN/MAX。**能**做对比、排名、汇总。
+
 判断要点：
 1. 先理解这是什么数据（电商评论？销售流水？问卷反馈？），再推断典型诉求。
 2. 每个目标要具体到能指导后续动作，但不要替用户规划到操作步骤。
-3. 不同目标应覆盖不同的诉求方向（如：清洗导出 / 深度分析 / 内容加工），不要给出三个雷同的变体。
+3. 不同目标应覆盖不同的诉求方向（如：清洗导出 / 深度分析 / 内容加工 / 分组对比），不要给出三个雷同的变体。
 4. 第一个目标应是你最有把握的「主推测」，confidence 设 high。
 5. tasks 必须与 goal 语义一致：只有 goal 确实需要该任务时才设 true。
    - goal 侧重"清洗/去噪/去重"→ clean:true
-   - goal 侧重"分析/打标/翻译/分类"→ process:true
+   - goal 侧重"打标/翻译/分类/情感分析"→ process:true
    - goal 侧重"总结/洞察/报告"→ summary:true
+   - goal 侧重"对比/排名/汇总/按...分组/按...统计"→ aggregate:true
    不要无脑全选 true，要让 tasks 真实反映 goal 的需要。
+   特别注意：不要把"分组对比"类目标错误地塞给 clean/process/summary，这三个模块都做不了聚合对比。
 
 返回纯 JSON，不要 markdown 代码块，不要解释：
 {
@@ -135,7 +146,7 @@ export function getIntentAnalysisPrompt() {
     {
       "goal": "一句话任务目标，具体但不过细，如：分析差评原因，定位物流相关的负面评论",
       "coreColumnIdx": 2,
-      "tasks": { "clean": true, "process": true, "summary": true },
+      "tasks": { "clean": false, "process": true, "summary": true, "aggregate": false },
       "confidence": "high"
     }
   ]
@@ -144,7 +155,7 @@ export function getIntentAnalysisPrompt() {
 字段说明：
 - goal：任务目标，10-30 字，动词开头，聚焦「想达成什么」而非「怎么做」
 - coreColumnIdx：最该作为处理对象的核心列索引（从 0 开始）
-- tasks：建议启用的任务，clean=数据清洗、process=智能加工(翻译/打标)、summary=数据摘要。必须与 goal 语义匹配
+- tasks：建议启用的任务，clean=数据清洗、process=智能加工(翻译/打标)、summary=数据摘要、aggregate=分组聚合(对比/排名/汇总)。必须与 goal 语义匹配
 - confidence：推测把握，high/medium/low`
 }
 
@@ -546,4 +557,72 @@ export function getPresetPlan(templateId, inputColumnIdx) {
   }
   plan.compiledPrompt = compileLabelingPrompt(plan)
   return plan
+}
+
+// ─── 模块能力清单（Capability Manifest）───
+// 设计动机：AI 规划器曾被"只给正向工具箱清单、不给反向能力边界"，
+// 导致面对"比较不同站点互动量差异"这类聚合任务时，
+// 仍硬凑"清洗：总互动量"这种与对比语义无关的方案。
+// 本清单作为硬约束注入每个规划函数的 systemPrompt，让 AI 诚实判断可行性。
+
+export const MODULE_CAPABILITIES = {
+  clean: {
+    name: '数据清洗',
+    canDo: [
+      '行级过滤：删除/保留/标记可疑行',
+      '基于文本质量去噪（空值、重复、乱码、广告等）',
+      '基于列值精确匹配过滤（等于/大于/小于某值、关键词包含、正则）'
+    ],
+    cannotDo: [
+      '跨行聚合（求和 / 均值 / 计数）',
+      '分组对比（按某列分组对另一列统计）',
+      '修改或新增列的数据值（只能删行，不能改值）',
+      '排序、排名、Top N'
+    ],
+    positioning: '本质是"过滤器"：决定每行留还是删，输出仍是逐行明细，绝不产生汇总值。'
+  },
+  process: {
+    name: '智能加工',
+    canDo: [
+      '为每一行新增 1~N 个标签列（情感、分类、翻译、评分等）',
+      '逐行 AI 分析，输出该行的标签值'
+    ],
+    cannotDo: [
+      '跨行聚合（求和 / 均值 / 计数）',
+      '分组对比',
+      '修改原始列的数据值（只能新增列）',
+      '删除行'
+    ],
+    positioning: '本质是"打标器"：每行进、每行出，新增标签列，输出仍是逐行明细，绝不产生汇总值。'
+  },
+  summary: {
+    name: '数据摘要',
+    canDo: [
+      '对每列做统计画像（min / max / mean / 分布 / 频率）',
+      '基于画像生成 AI 文字分析报告'
+    ],
+    cannotDo: [
+      '按 A 列分组对 B 列做 sum / avg / count（分组聚合）',
+      '生成可交互的聚合数据表',
+      '生成柱状对比图'
+    ],
+    positioning: '本质是"画像器"：对单列做统计分布，输出 AI 文字报告，不产生"分组×聚合值"的二维表。'
+  }
+}
+
+/**
+ * 把某个模块的能力边界格式化为可拼进 systemPrompt 的硬约束片段。
+ * @param {string} moduleKey clean / process / summary
+ * @returns {string} 能力约束文本；moduleKey 无效则返回空串
+ */
+export function getCapabilityConstraint(moduleKey) {
+  const cap = MODULE_CAPABILITIES[moduleKey]
+  if (!cap) return ''
+  return `\n\n【${cap.name}模块的能力边界（必须遵守）】
+本模块能做：
+${cap.canDo.map(x => '  - ' + x).join('\n')}
+本模块不能做：
+${cap.cannotDo.map(x => '  - ' + x).join('\n')}
+能力定位：${cap.positioning}
+如果用户的任务目标超出本模块能力（如需要"分组 / 对比 / 汇总 / 排名 / Top N"），请在 analysis 字段中明确标注"本步骤无法完成该任务"，不要硬凑规则假装能做。`
 }
