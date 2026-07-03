@@ -1,21 +1,11 @@
 <template>
   <!-- ===== 移动端模板 ===== -->
   <div v-if="isMobile" :class="PAGE.mobile + ' animate-fade-in'">
-    <div class="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-xl border border-emerald-200/50 p-3">
-      <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-        <FileBarChart class="w-5 h-5 text-emerald-600" /> 数据摘要
-      </h2>
-      <p class="text-[10px] text-slate-500 mt-0.5">AI 分析列级统计画像，生成数据报告。</p>
-    </div>
+    <PageHeader :icon="FileBarChart" theme="summary" title="数据摘要" subtitle="AI 分析列级统计画像，生成数据报告。" />
 
-    <div v-if="hasData && dataShare.hasData"
-      class="bg-emerald-500/10 rounded-lg border border-emerald-500/20 px-3 py-2 flex justify-between items-center text-[10px]">
-      <div class="flex items-center gap-1.5 text-emerald-800 min-w-0">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-        <span class="truncate">已关联 <strong>{{ dataShare.sourceName }}</strong></span>
-      </div>
-      <button @click="disconnectGlobalExcel" class="text-rose-500 font-bold shrink-0 ml-2">断开</button>
-    </div>
+    <GlobalDataBanner :visible="hasData && dataShare.hasData" :source-name="dataShare.sourceName"
+      :headers="headers" :rows="rows" :mobile="true"
+      @disconnect="disconnectGlobalExcel" />
 
     <!-- 文件上传 -->
     <MobileCollapsible title="数据文件" :default-open="!hasData">
@@ -111,33 +101,19 @@
   <!-- ===== 桌面端模板（原样保留）===== -->
   <div v-else :class="PAGE.desktop">
     <!-- Header -->
-    <div class="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-2xl border border-emerald-200/50 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div>
-        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <FileBarChart class="w-6 h-6 text-emerald-600" /> AI 数据摘要
-        </h2>
-        <p class="text-xs text-slate-500 mt-1">
-          自动分析全表列级统计画像，生成数据报告。
-        </p>
-      </div>
-      <button v-if="!hasData" @click="loadDemo"
-        class="px-4 py-2 bg-white hover:bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0">
+    <PageHeader :icon="FileBarChart" theme="summary" title="数据摘要"
+      subtitle="自动分析全表列级统计画像，生成数据报告。" />
+    <div v-if="!hasData">
+      <button @click="loadDemo"
+        class="px-4 py-2 bg-white hover:bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5">
         <FileBarChart class="w-3.5 h-3.5" /> 加载示例数据
       </button>
     </div>
 
-    <!-- 全局关联横幅 -->
-    <div v-if="hasData && dataShare.hasData"
-      class="bg-emerald-500/10 rounded-xl border border-emerald-500/20 px-4 py-3 flex justify-between items-center text-xs animate-fade-in">
-      <div class="flex items-center gap-2 text-emerald-800">
-        <span class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-        </span>
-        <span>已关联：<strong>{{ dataShare.sourceName }}</strong> ({{ rows.length }} 行)</span>
-      </div>
-      <button @click="disconnectGlobalExcel" class="text-rose-500 hover:text-rose-600 font-bold hover:underline">断开</button>
-    </div>
+    <!-- 全局数据条 -->
+    <GlobalDataBanner :visible="hasData && dataShare.hasData" :source-name="dataShare.sourceName"
+      :headers="headers" :rows="rows"
+      @disconnect="disconnectGlobalExcel" />
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       <!-- 左侧配置 -->
@@ -302,6 +278,8 @@ import { useFileUpload } from '../composables/useFileUpload'
 import { computeAllProfiles, computeColumnProfile, formatProfilesForAI, stratifiedSample, formatSampleRows, detectColumnType } from '../services/dataProfiler'
 import { useToast } from '../services/toast'
 import { PAGE } from '../styles/tokens'
+import PageHeader from '../components/common/PageHeader.vue'
+import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
 
 const toast = useToast()
 const dataShare = useDataShareStore()
