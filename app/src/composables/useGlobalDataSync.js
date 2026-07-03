@@ -36,8 +36,9 @@ export function useGlobalDataSync(options = {}) {
   })
 
   // store 数据变化时自动同步（解决 keep-alive 下 onMounted 只触发一次的问题）
-  watch(() => dataShare.rows.length, (newLen) => {
-    if (newLen > 0) {
+  // 同时监听 rows.length 和 headers.length：清洗改行数、加工改列数，都要触发同步
+  watch(() => [dataShare.rows.length, dataShare.headers.length], ([newRowLen]) => {
+    if (newRowLen > 0) {
       importGlobalExcel()
     }
   })
