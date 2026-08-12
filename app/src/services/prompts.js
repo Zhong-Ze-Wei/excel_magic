@@ -21,44 +21,6 @@ export function formatIntentContext(intentNote, stepFocus = '') {
 }
 
 /**
- * 获取评论分析 prompt (废弃/向下兼容)
- */
-export function getAnalysisPrompt(categories) {
-  return getAnalysisSystemPrompt(categories)
-}
-
-/**
- * 获取评论分析详细 System Prompt (支持自定义)
- */
-export function getAnalysisSystemPrompt(taxonomy) {
-  let taxonomyStr = ''
-  if (taxonomy && typeof taxonomy === 'object' && !Array.isArray(taxonomy)) {
-    for (const [parent, children] of Object.entries(taxonomy)) {
-      taxonomyStr += `- ${parent}\n`
-      if (Array.isArray(children)) {
-        children.forEach(child => {
-          taxonomyStr += `  - ${child}\n`
-        })
-      }
-    }
-  } else if (Array.isArray(taxonomy)) {
-    taxonomyStr = taxonomy.map(c => `- ${c}`).join('\n')
-  } else {
-    taxonomyStr = String(taxonomy || '')
-  }
-
-  return `你是一个评论分析专家。请分析用户提供的评论内容，提取出评论的“情感倾向 (sentiment)”和最匹配的“分类标签路径 (category)”。
-可选分类体系如下：
-${taxonomyStr}
-
-【分析规则】
-1. 情感倾向 (sentiment) 必须是以下三者之一: Positive (正面), Negative (负面), Neutral (中性)。
-2. 分类标签路径 (category) 必须严格按照可选分类体系中的路径进行选择，路径格式为：“一级分类 > 二级分类”。例如：“质量 > 很好”。
-3. 如果评论中完全没有涉及分类体系中的内容，或者无法匹配，分类标签路径 (category) 请返回 "-"。
-4. 必须且只能返回纯 JSON 格式，如：{"sentiment": "Positive", "category": "质量 > 很好"}。请勿输出任何 markdown 代码块（如 \`\`\`json）或任何额外的解释。`
-}
-
-/**
  * 获取 AI 自动识别评论列 prompt
  */
 export function getColumnDetectionPrompt(headers, sampleRows) {
@@ -122,63 +84,6 @@ export function getIntentAnalysisPrompt() {
 - coreColumnIdx：最该作为处理对象的核心列索引（从 0 开始）
 - tasks：建议启用的任务，clean=数据清洗、process=智能加工(翻译/打标)、summary=数据摘要、aggregate=分组聚合(对比/排名/汇总)。必须与 goal 语义匹配
 - confidence：推测把握，high/medium/low`
-}
-
-/**
- * 获取 AI 自动生成标签 prompt
- */
-export function getTagGenerationPrompt(samples, taxonomyGoal = '') {
-  const sampleList = samples.map((s, i) => `${i + 1}. ${s}`).join('\n')
-  let goalPrompt = ''
-  if (taxonomyGoal && taxonomyGoal.trim() !== '') {
-    goalPrompt = `\n【核心生成目标与分类侧重】：\n用户对这套分类体系的期望是：“${taxonomyGoal.trim()}”。请你务必围绕该模糊意图，结合样本评论，生成最匹配的分类维度。\n`
-  }
-  return `你是一个评论分类专家。请根据以下用户评论数据样本，以及用户的分类偏好，提炼出一套二级分类标签体系（包含 3 至 5 个一级大类，以及每个大类下对应的 2 至 4 个二级子分类标签）。
-${goalPrompt}
-样本评论：
-${sampleList}
-
-要求：
-1. 分类标签要简短贴切，符合用户设定的期望目标，同时结合样本数据场景（如电商、客户反馈、售后处理等）。
-2. 必须直接返回一个标准的 JSON 对象，格式如下，请勿使用 markdown 代码块包裹，也不要提供任何额外解释：
-{
-  "一级大类1": ["子标签1", "子标签2"],
-  "一级大类2": ["子标签3", "子标签4"]
-}
-3. 必须输出有效的、可被标准 JSON.parse 解析的内容。`
-}
-
-/**
- * 获取根据分析目标优化 System Prompt 的 prompt
- */
-export function getPromptOptimizerPrompt(goal, taxonomy) {
-  let taxonomyStr = ''
-  if (taxonomy && typeof taxonomy === 'object' && !Array.isArray(taxonomy)) {
-    for (const [parent, children] of Object.entries(taxonomy)) {
-      taxonomyStr += `- ${parent}\n`
-      if (Array.isArray(children)) {
-        children.forEach(child => {
-          taxonomyStr += `  - ${child}\n`
-        })
-      }
-    }
-  } else if (Array.isArray(taxonomy)) {
-    taxonomyStr = taxonomy.map(c => `- ${c}`).join('\n')
-  } else {
-    taxonomyStr = String(taxonomy || '')
-  }
-
-  return `你是一个大模型 Prompt 优化专家。用户想要为评论分析工具配置一个 System Prompt。
-用户当前的模糊分析目标为："${goal}"
-可选分类体系如下：
-${taxonomyStr}
-
-请为大模型生成一段精炼、结构化、极具指引性的 System Prompt，用来让大模型更好地对评论运行情感极性和二级分类路径判断。
-要求：
-1. 生成的 System Prompt 中必须明确指导大模型优先侧重分析用户的目标 "${goal}"。
-2. 必须要求大模型在返回结果时严格遵循 JSON 格式，结构为：{"sentiment": "Positive/Negative/Neutral", "category": "一级分类 > 二级分类 (若完全无匹配则为 '-')"}。
-3. 必须在生成的 Prompt 中明文写出当前的分类体系，指导大模型必须在体系路径中挑选。
-4. 仅返回生成的 System Prompt 正文本身，不要包裹 markdown 代码块，也不要包含任何额外解释。`
 }
 
 /**
