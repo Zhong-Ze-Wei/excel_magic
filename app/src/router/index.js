@@ -4,8 +4,7 @@ const routes = [
   { path: '/', name: 'home', component: () => import('../views/HomeView.vue') },
   // 智能加工 = 简易模式（AnalysisSimpleView）+ 专家模式（AnalysisView），统一入口在 AnalysisHub
   { path: '/process', name: 'process', component: () => import('../views/AnalysisHub.vue') },
-  // 过渡期：translate/analysis 重定向到 /process，一周后随 TranslateView 删除一并清理
-  { path: '/translate', redirect: '/process' },
+  // 旧路由 /analysis 重定向到 /process
   { path: '/analysis', redirect: '/process' },
   { path: '/summary', name: 'summary', component: () => import('../views/SummaryView.vue') },
   // 分组对比：按某列分组对另一列做 SUM/AVG/COUNT/MIN/MAX，独立第四模块

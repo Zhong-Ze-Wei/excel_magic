@@ -2,41 +2,6 @@
  * Prompt 模板管理 — 从 v2 HTML 的各种 prompt 逻辑迁移
  */
 
-// 翻译场景选项
-export const TRANSLATE_SCENARIOS = [
-  { value: 'ecommerce_spec', label: '产品参数 (准确/术语)' },
-  { value: 'ecommerce_comment', label: '用户评论 (情感/口语)' },
-  { value: 'ecommerce_title', label: '竞品标题 (SEO优化)' },
-  { value: 'email', label: '邮件沟通 (正式商务)' },
-  { value: 'general', label: '通用翻译' }
-]
-
-// 语言方向选项
-export const LANGUAGE_DIRECTIONS = [
-  { value: 'auto_to_zh', label: '自动检测 -> 中文' },
-  { value: 'zh_to_en', label: '中文 -> 英文' },
-  { value: 'en_to_zh', label: '英文 -> 中文' },
-  { value: 'zh_to_jp', label: '中文 -> 日文' }
-]
-
-/**
- * 获取翻译 system prompt
- */
-export function getTranslatePrompt(scenario, direction) {
-  let targetLang = 'Chinese (Simplified)'
-  if (direction === 'zh_to_en') targetLang = 'English'
-  if (direction === 'zh_to_jp') targetLang = 'Japanese'
-
-  const prompts = {
-    ecommerce_spec: `You are a product translator. Translate specs into ${targetLang}. Keep technical terms (e.g., mAh, IP68) and numbers unchanged. Be concise.`,
-    ecommerce_comment: `Translate user review into ${targetLang}. Keep the original sentiment. Use natural, colloquial language.`,
-    ecommerce_title: `Translate product title into ${targetLang}. Keep key model numbers/brands unchanged. Optimize for search.`,
-    email: `Translate email into ${targetLang}. Maintain a formal, professional business tone.`,
-    general: `Translate text into ${targetLang} accurately. Only return the translation, no explanation.`
-  }
-  return prompts[scenario] || prompts.general
-}
-
 /**
  * 把「数据集整体意图」格式化为可拼进任意 prompt 的参考前缀。
  *
