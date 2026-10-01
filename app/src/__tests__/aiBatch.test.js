@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createSemaphore } from '../services/ai'
+import { describe, it, expect, vi } from 'vitest'
+import { createSemaphore, executeAIBatch } from '../services/ai/batch'
 
 describe('createSemaphore', () => {
   it('限制并发数', async () => {
@@ -33,5 +33,28 @@ describe('createSemaphore', () => {
     sem.release()
     await p
     expect(resolved).toBe(true)
+  })
+})
+
+describe('executeAIBatch', () => {
+  it('单个任务失败后继续执行其余任务，并按输入顺序返回结果', async () => {
+    const failure = new Error('invalid result')
+    const executeTask = vi.fn()
+      .mockRejectedValueOnce(failure)
+      .mockResolvedValueOnce('second result')
+    const onProgress = vi.fn()
+    const tasks = [{ content: 'first' }, { content: 'second' }]
+
+    const result = await executeAIBatch(tasks, executeTask, onProgress, 1)
+
+    expect(executeTask.mock.calls).toEqual([[tasks[0]], [tasks[1]]])
+    expect(result).toEqual({
+      results: [{ ok: false, error: 'invalid result' }, { ok: true, data: 'second result' }],
+      finalConcurrency: 1
+    })
+    expect(onProgress.mock.calls).toEqual([
+      [0, null, failure, { concurrency: 1 }],
+      [1, 'second result', null, { concurrency: 1 }]
+    ])
   })
 })
