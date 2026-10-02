@@ -41,6 +41,120 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals())
 
+function mockStream(chunks, { leaveOpen = false } = {}) {
+  const cancel = vi.fn()
+  const stream = new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(chunk)
+      if (!leaveOpen) controller.close()
+    },
+    cancel
+  })
+  fetch.mockResolvedValue(new Response(stream))
+  return { stream, cancel }
+}
+
+describe('流式协议与取消回归', () => {
+  it('逐字节网络分片保留中文、emoji，兼容 CRLF 和无空格 data 字段', async () => {
+    const bytes = new TextEncoder().encode(': heartbeat\r\nevent: message\r\ndata:{"choices":[{"delta":{"content":"中文😀"}}]}\r\n\r\ndata: [DONE]\r\n\r\n')
+    const { stream } = mockStream(Array.from(bytes, byte => Uint8Array.of(byte)))
+    const chunk = vi.fn()
+    await requestStreamingCompletion(config, 's', 'u', chunk)
+    expect(chunk.mock.calls).toEqual([['中文😀']])
+    expect(stream.locked).toBe(false)
+  })
+
+  it('合并同一事件多行 data，并在 EOF 派发没有末尾换行的事件', async () => {
+    const bytes = new TextEncoder().encode('data: {"choices":\ndata: [{"delta":{"content":"tail"}}]}')
+    const { stream } = mockStream([bytes])
+    const chunk = vi.fn()
+    await requestStreamingCompletion(config, 's', 'u', chunk)
+    expect(chunk.mock.calls).toEqual([['tail']])
+    expect(stream.locked).toBe(false)
+  })
+
+  it('DONE 后忽略后续内容并取消尚未关闭的读取器', async () => {
+    const bytes = new TextEncoder().encode('data: [DONE]\n\ndata: {"choices":[{"delta":{"content":"must ignore"}}]}\n\n')
+    const { stream, cancel } = mockStream([bytes], { leaveOpen: true })
+    const chunk = vi.fn()
+    let timer
+    const outcome = await Promise.race([
+      requestStreamingCompletion(config, 's', 'u', chunk).then(() => 'done'),
+      new Promise(resolve => { timer = setTimeout(() => resolve('stalled'), 100) })
+    ])
+    clearTimeout(timer)
+    expect(outcome).toBe('done')
+    expect(chunk).not.toHaveBeenCalled()
+    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(stream.locked).toBe(false)
+  })
+
+  it.each([
+    ['event: error\ndata: {"error":{"message":"quota exceeded"}}\n\n', 'quota exceeded'],
+    ['data: invalid-json\n\n', 'AI 流式响应不是有效的 JSON']
+  ])('协议错误向调用方传播并释放 reader', async (event, message) => {
+    const { stream } = mockStream([new TextEncoder().encode(event)])
+    await expect(requestStreamingCompletion(config, 's', 'u', vi.fn())).rejects.toThrow(message)
+    expect(stream.locked).toBe(false)
+  })
+
+  it('onChunk 抛错不被解析器吞掉，并清理尚未结束的流', async () => {
+    const { stream, cancel } = mockStream([new TextEncoder().encode('data: {"choices":[{"delta":{"content":"text"}}]}\n\n')], { leaveOpen: true })
+    const error = new Error('render failed')
+    let timer
+    const outcome = await Promise.race([
+      requestStreamingCompletion(config, 's', 'u', () => { throw error }).catch(value => value),
+      new Promise(resolve => { timer = setTimeout(() => resolve('stalled'), 100) })
+    ])
+    clearTimeout(timer)
+    expect(outcome).toBe(error)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(stream.locked).toBe(false)
+  })
+
+  it('流读取失败保留原错误并释放 reader', async () => {
+    const failure = new Error('socket closed')
+    const stream = new ReadableStream({ start(controller) { controller.error(failure) } })
+    fetch.mockResolvedValue(new Response(stream))
+    await expect(requestStreamingCompletion(config, 's', 'u', vi.fn())).rejects.toBe(failure)
+    expect(stream.locked).toBe(false)
+  })
+
+  it('流式取消会结束等待并释放 reader', async () => {
+    const { stream, cancel } = mockStream([], { leaveOpen: true })
+    const controller = new AbortController()
+    const request = callStreamingAI('s', 'u', vi.fn(), undefined, { signal: controller.signal })
+    await vi.waitFor(() => expect(stream.locked).toBe(true))
+    let timer
+    controller.abort()
+    const error = await Promise.race([request.catch(value => value), new Promise(resolve => { timer = setTimeout(() => resolve('stalled'), 100) })])
+    clearTimeout(timer)
+    expect(error).toMatchObject({ name: 'AbortError' })
+    expect(fetch.mock.calls[0][1].signal).toBe(controller.signal)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(stream.locked).toBe(false)
+  })
+
+  it('首段回调触发取消后不再交付同一个 chunk 内的下一段', async () => {
+    const { stream } = mockStream([new TextEncoder().encode('data: {"choices":[{"delta":{"content":"first"}}]}\n\ndata: {"choices":[{"delta":{"content":"late"}}]}\n\n')])
+    const controller = new AbortController()
+    const callback = vi.fn(() => controller.abort())
+    await expect(requestStreamingCompletion(config, 's', 'u', callback, undefined, { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(callback.mock.calls).toEqual([['first']])
+    expect(stream.locked).toBe(false)
+  })
+
+  it('普通请求和批量入口透传 signal，保留 HTTP 状态供调度识别', async () => {
+    const controller = new AbortController()
+    fetch.mockResolvedValue(new Response('{"error":{"message":"请求过于频繁"}}', { status: 429 }))
+    await expect(callAI('u', 's', undefined, { signal: controller.signal })).rejects.toMatchObject({ status: 429, message: '请求过于频繁' })
+    expect(fetch.mock.calls[0][1].signal).toBe(controller.signal)
+    fetch.mockReset().mockResolvedValue(completionResponse())
+    await callAIBatch([{ content: 'u', systemPrompt: 's' }], null, 1, undefined, { signal: controller.signal })
+    expect(fetch.mock.calls[0][1].signal).toBe(controller.signal)
+  })
+})
+
 describe('独立 AI HTTP 客户端', () => {
   it.each([
     { useSystemPrompt: true, modelOverride: undefined, model: 'work-model' },

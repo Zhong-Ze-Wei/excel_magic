@@ -7,23 +7,24 @@ import { executeAIBatch } from './ai/batch'
 
 export { createSemaphore } from './ai/batch'
 
-export async function callAI(content, systemPrompt, modelOverride) {
+export async function callAI(content, systemPrompt, modelOverride, options = {}) {
   const config = useSettingsStore().getApiConfig()
-  return requestCompletion(config, content, systemPrompt, modelOverride)
+  return requestCompletion(config, content, systemPrompt, modelOverride, options)
 }
 
-export async function callStreamingAI(systemPrompt, userPrompt, onChunk, modelOverride) {
+export async function callStreamingAI(systemPrompt, userPrompt, onChunk, modelOverride, options = {}) {
   const config = useSettingsStore().getApiConfig()
-  return requestStreamingCompletion(config, systemPrompt, userPrompt, onChunk, modelOverride)
+  return requestStreamingCompletion(config, systemPrompt, userPrompt, onChunk, modelOverride, options)
 }
 
-export async function callAIBatch(tasks, onProgress, concurrency = 3, modelOverride) {
+export async function callAIBatch(tasks, onProgress, concurrency = 3, modelOverride, options = {}) {
   // 每个任务实际开始请求时再读取设置，保持原有配置读取时机。
   return executeAIBatch(
     tasks,
-    task => callAI(task.content, task.systemPrompt, modelOverride),
+    task => callAI(task.content, task.systemPrompt, modelOverride, options),
     onProgress,
-    concurrency
+    concurrency,
+    options
   )
 }
 

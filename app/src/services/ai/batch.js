@@ -2,6 +2,7 @@
  * 创建信号量，用于限制并发数
  */
 export function createSemaphore(max) {
+  validateConcurrency(max)
   let current = 0
   const queue = []
 
@@ -36,37 +37,90 @@ export function createSemaphore(max) {
  * @param {number} concurrency - 最大并发数，默认 3
  * @returns {Promise<{results: Array, finalConcurrency: number}>}
  */
-export async function executeAIBatch(tasks, executeTask, onProgress, concurrency = 3) {
+export async function executeAIBatch(tasks, executeTask, onProgress, concurrency = 3, { signal } = {}) {
+  validateConcurrency(concurrency)
+  signal?.throwIfAborted()
   let currentConcurrency = concurrency
-  let sem = createSemaphore(currentConcurrency)
   const results = new Array(tasks.length)
   let consecutiveErrors = 0
+  let nextIndex = 0
+  let active = 0
+  let completed = 0
 
-  async function runTask(task, i) {
-    await sem.acquire()
-    try {
-      const result = await executeTask(task)
-      results[i] = { ok: true, data: result }
-      consecutiveErrors = 0
-      if (onProgress) onProgress(i, result, null, { concurrency: currentConcurrency })
-    } catch (e) {
-      results[i] = { ok: false, error: e.message }
-      // 429 或网络错误：自动降级并发数
-      if (e.message.includes('429') || e.message.includes('rate') || e.message.includes('limit') || e.message.includes('Too Many')) {
-        consecutiveErrors++
-        if (currentConcurrency > 1 && consecutiveErrors >= 2) {
-          currentConcurrency = Math.max(1, Math.ceil(currentConcurrency / 2))
-          sem = createSemaphore(currentConcurrency)
-          consecutiveErrors = 0
-        }
-      }
-      if (onProgress) onProgress(i, null, e, { concurrency: currentConcurrency })
-    } finally {
-      sem.release()
+  return new Promise((resolve, reject) => {
+    let settled = false
+
+    function finish(error) {
+      if (settled) return
+      settled = true
+      signal?.removeEventListener('abort', onAbort)
+      if (error) reject(error)
+      else resolve({ results, finalConcurrency: currentConcurrency })
     }
+
+    function onAbort() {
+      finish(signal.reason)
+    }
+
+    function schedule() {
+      if (settled) return
+      if (completed === tasks.length) {
+        finish()
+        return
+      }
+      // 降低容量只影响后续派发，已运行任务和等待任务始终属于同一队列。
+      while (!settled && active < currentConcurrency && nextIndex < tasks.length) {
+        const index = nextIndex++
+        active++
+        runTask(index).catch(finish)
+      }
+    }
+
+    async function runTask(index) {
+      let result, error
+      try {
+        result = await executeTask(tasks[index])
+      } catch (failure) {
+        error = failure
+      }
+      active--
+      if (settled) return
+      if (error?.name === 'AbortError') {
+        finish(error)
+        return
+      }
+
+      if (error) {
+        results[index] = { ok: false, error: error.message }
+        if (error.status === 429 || /429|rate|limit|too many/i.test(error.message)) {
+          consecutiveErrors++
+          if (currentConcurrency > 1 && consecutiveErrors >= 2) {
+            currentConcurrency = Math.max(1, Math.ceil(currentConcurrency / 2))
+            consecutiveErrors = 0
+          }
+        }
+      } else {
+        results[index] = { ok: true, data: result }
+        consecutiveErrors = 0
+      }
+
+      try {
+        if (onProgress) onProgress(index, error ? null : result, error || null, { concurrency: currentConcurrency })
+      } catch (failure) {
+        finish(failure)
+        return
+      }
+      completed++
+      schedule()
+    }
+
+    signal?.addEventListener('abort', onAbort, { once: true })
+    schedule()
+  })
+}
+
+function validateConcurrency(value) {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new RangeError('并发数必须是大于 0 的整数')
   }
-
-  await Promise.all(tasks.map((task, i) => runTask(task, i)))
-
-  return { results, finalConcurrency: currentConcurrency }
 }
