@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeLabelingPlan, validateLabelingPlan, normalizeRowResult } from '../services/labelingPlan'
+import { normalizeLabelingPlan, validateLabelingPlan, normalizeRowResult, normalizeInputColumns } from '../services/labelingPlan'
 
 describe('normalizeLabelingPlan', () => {
   it('规范化基本字段', () => {
@@ -43,6 +43,11 @@ describe('normalizeLabelingPlan', () => {
     expect(plan.outputColumns).toHaveLength(1)
     expect(plan.outputColumns[0].type).toBe('text')
   })
+
+  it('畸形列对象被过滤，全部无效时返回 null', () => {
+    expect(normalizeLabelingPlan({ outputColumns: [null, 42, [], 'text'] })).toBeNull()
+    expect(normalizeLabelingPlan({ outputColumns: [null, { key: 'a', name: '有效列', type: 'text' }] }).outputColumns).toHaveLength(1)
+  })
 })
 
 describe('validateLabelingPlan', () => {
@@ -65,19 +70,26 @@ describe('validateLabelingPlan', () => {
     const plan = { outputColumns: [{ key: 'a', name: 'A', type: 'text' }] }
     expect(validateLabelingPlan(plan)).toBeNull()
   })
+
+  it('畸形方案和空层级选项不会通过校验', () => {
+    expect(validateLabelingPlan({})).toBeTruthy()
+    expect(validateLabelingPlan({ outputColumns: [null] })).toBeTruthy()
+    expect(validateLabelingPlan({ outputColumns: [{ key: 'a', name: 'A', type: 'enum', options: '正面' }] })).toBeTruthy()
+    expect(validateLabelingPlan({ outputColumns: [{ key: 'a', name: 'A', type: 'hierarchical_enum', options: {} }] })).toBeTruthy()
+  })
 })
 
 describe('normalizeRowResult', () => {
   const cols = [
-    { key: 'sentiment', name: '情感', type: 'enum', options: ['正', '负'] },
-    { key: 'tags', name: '标签', type: 'multi_enum' },
-    { key: 'is_valid', name: '有效', type: 'boolean' },
-    { key: 'score', name: '得分', type: 'number' },
-    { key: 'note', name: '备注', type: 'text' }
+    { key: 'sentiment', name: '情感', type: 'enum', options: ['正', '负'], required: false },
+    { key: 'tags', name: '标签', type: 'multi_enum', options: ['a', 'b'], required: false },
+    { key: 'is_valid', name: '有效', type: 'boolean', required: false },
+    { key: 'score', name: '得分', type: 'number', required: false },
+    { key: 'note', name: '备注', type: 'text', required: false }
   ]
 
-  it('enum 非法值回退到首个选项', () => {
-    expect(normalizeRowResult({ sentiment: '不存在' }, cols).sentiment).toBe('正')
+  it('可选 enum 非法值标记为空，不猜测首个选项', () => {
+    expect(normalizeRowResult({ sentiment: '不存在' }, cols).sentiment).toBeNull()
     expect(normalizeRowResult({ sentiment: '负' }, cols).sentiment).toBe('负')
   })
 
@@ -94,6 +106,10 @@ describe('normalizeRowResult', () => {
 
   it('number 字符串转数字', () => {
     expect(normalizeRowResult({ score: '3.5' }, cols).score).toBe(3.5)
+    expect(normalizeRowResult({ score: '0' }, cols).score).toBe(0)
+    expect(normalizeRowResult({ score: 0 }, cols).score).toBe(0)
+    expect(normalizeRowResult({ score: 'Infinity' }, cols).score).toBeNull()
+    expect(normalizeRowResult({ score: false }, cols).score).toBeNull()
   })
 
   it('text 强制转字符串', () => {
@@ -107,5 +123,47 @@ describe('normalizeRowResult', () => {
   it('非对象返回 null', () => {
     expect(normalizeRowResult(null, cols)).toBeNull()
     expect(normalizeRowResult('x', cols)).toBeNull()
+    expect(normalizeRowResult([], cols)).toBeNull()
+  })
+
+  it.each([
+    ['enum', { options: ['正面', '负面'] }, '不存在'],
+    ['multi_enum', { options: ['a', 'b'] }, ['a', '不存在']],
+    ['hierarchical_enum', { options: { 商品: ['质量'] } }, '未知 > 质量'],
+    ['boolean', {}, 'false'],
+    ['number', {}, 'Infinity'],
+    ['text', {}, { text: '错误格式' }]
+  ])('必填 %s 不符合约束时整行失败，可选字段为空', (type, extra, value) => {
+    const required = [{ key: 'value', name: '字段', type, ...extra }]
+    expect(normalizeRowResult({ value }, required)).toBeNull()
+    expect(normalizeRowResult({ value }, [{ ...required[0], required: false }])).toEqual({ value: null })
+  })
+
+  it('必填字段缺失或为 null 时不接受部分成功', () => {
+    const required = [{ key: 'a', name: 'A', type: 'text' }, { key: 'b', name: 'B', type: 'number' }]
+    expect(normalizeRowResult({ a: '完成' }, required)).toBeNull()
+    expect(normalizeRowResult({ a: '完成', b: null }, required)).toBeNull()
+    expect(normalizeRowResult({ a: '完成', b: 0 }, required)).toEqual({ a: '完成', b: 0 })
+  })
+
+  it('层级结果验证真实父子关系并规范化空白', () => {
+    const col = [{ key: 'category', name: '分类', type: 'hierarchical_enum', options: { 商品: ['质量', '价格'], 服务: ['态度'] } }]
+    expect(normalizeRowResult({ category: '商品>质量' }, col)).toEqual({ category: '商品 > 质量' })
+    expect(normalizeRowResult({ category: '商品 > 态度' }, col)).toBeNull()
+  })
+
+  it('对象特殊字段名能作为普通字段保存', () => {
+    const parsed = JSON.parse('{"__proto__":"普通文本"}')
+    const result = normalizeRowResult(parsed, [{ key: '__proto__', name: '普通字段', type: 'text' }])
+    expect(Object.keys(result)).toEqual(['__proto__'])
+    expect(result.__proto__).toBe('普通文本')
+  })
+})
+
+describe('normalizeInputColumns', () => {
+  it('列名和索引引用统一为去重合法索引，数字列名优先按名称匹配', () => {
+    expect(normalizeInputColumns(['内容', 0, '金额', '2', 99, null, '不存在'], ['编号', '内容', '金额']))
+      .toEqual([1, 0, 2])
+    expect(normalizeInputColumns(['2'], ['2', '内容', '金额'])).toEqual([0])
   })
 })

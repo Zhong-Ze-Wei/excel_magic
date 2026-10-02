@@ -67,14 +67,14 @@ export function compileLabelingPrompt(plan) {
   const fieldDescs = plan.outputColumns.map((col, i) => {
     let desc = `${i + 1}. "${col.name}" (key: ${col.key}, 类型: ${col.type})`
     desc += ` — ${col.description || '无描述'}`
-    if (col.required) desc += ' [必填]'
+    desc += col.required !== false ? ' [必填]' : ' [可选]'
 
     if (col.type === 'enum' && col.options?.length) {
       desc += `\n   必须从以下值中选择: ${col.options.join('、')}`
     } else if (col.type === 'multi_enum' && col.options?.length) {
       desc += `\n   从以下值中选择0~多个（返回数组）: ${col.options.join('、')}`
     } else if (col.type === 'hierarchical_enum' && col.options && typeof col.options === 'object') {
-      desc += '\n   从以下二级分类中匹配最合适的路径，格式: "一级 > 二级"，无匹配返回 "-"'
+      desc += '\n   从以下二级分类中匹配最合适的路径，格式: "一级 > 二级"，无匹配返回 null'
       for (const [parent, children] of Object.entries(col.options)) {
         desc += `\n   - ${parent}: ${(children || []).join('、')}`
       }
@@ -115,7 +115,8 @@ ${goalSection}
 【输出格式】
 返回纯 JSON：${JSON.stringify(jsonExample)}
 禁止 markdown 代码块，禁止多余话术，禁止新增未知字段，禁止遗漏必填字段。
-enum 必须从给定选项中选择，hierarchical_enum 返回 "一级 > 二级" 格式，multi_enum 返回数组。`
+enum 必须从给定选项中选择，hierarchical_enum 返回 "一级 > 二级" 格式，multi_enum 返回数组。
+无法确定的字段返回 null，禁止猜测或编造。必填字段为 null 时客户端会把该行标记为失败；可选字段允许 null。`
 }
 
 /**

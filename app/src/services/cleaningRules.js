@@ -270,7 +270,7 @@ export function evaluateCustomFilter(filter, row, normText, sourceColIdx, ctx = 
       return { hit: !result, reason: `不包含关键词: ${kws.join(', ')}`, confidence: 0.90 }
     }
     case 'textEquals': {
-      const val = c.value || ''
+      const val = String(c.value ?? '')
       const text = c.caseSensitive ? cellText : cellText.toLowerCase()
       const target = c.caseSensitive ? val : val.toLowerCase()
       return { hit: text === target, reason: `文本等于: ${val}`, confidence: 0.99 }
@@ -296,7 +296,7 @@ export function evaluateCustomFilter(filter, row, normText, sourceColIdx, ctx = 
         const hit = c.values.some(v => cellVal === String(v))
         return { hit, reason: `列[${c.column}]匹配: ${c.values.join('/')}`, confidence: 0.99 }
       }
-      return { hit: cellVal === (c.value || ''), reason: `列[${c.column}]等于: ${c.value}`, confidence: 0.99 }
+      return { hit: cellVal === String(c.value ?? ''), reason: `列[${c.column}]等于: ${c.value}`, confidence: 0.99 }
     }
     case 'columnGt': {
       const num = parseFloat(row[c.column])
@@ -334,8 +334,8 @@ export function runCleaningPipeline(rows, headers, sourceColIdx, rulesConfig, la
   })
   
   // 2. 全表数据频次统计与首次出现索引构建，辅助去重
-  const textFreq = {}
-  const firstIndices = {}
+  const textFreq = Object.create(null)
+  const firstIndices = Object.create(null)
   normalizedTexts.forEach((t, idx) => {
     textFreq[t] = (textFreq[t] || 0) + 1
     if (firstIndices[t] === undefined) {

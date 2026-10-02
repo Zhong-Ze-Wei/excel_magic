@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { runCleaningPipeline } from '../services/cleaningRules'
 
 /**
@@ -33,7 +33,7 @@ export function useCleaningPipeline({ headers, rows, sourceCol, getConfig, getLa
   const cleanedRows = ref([])
   const fullStats = ref({ keep: 0, delete: 0, suspect: 0 })
 
-  // 预览清洗打标（仅前 N 行，极速渲染）
+  // 先对全表判定，预览只截取结果，确保频次规则与统计、导出一致。
   function runPipeline() {
     if (!rows.value.length) {
       cleanedRows.value = []
@@ -41,22 +41,9 @@ export function useCleaningPipeline({ headers, rows, sourceCol, getConfig, getLa
       return
     }
     const labeling = getLabelingResults ? getLabelingResults() : undefined
-    if (previewLimit > 0) {
-      // 专家模式：仅预览前 N 行，再单独算全量统计
-      const previewRows = rows.value.slice(0, previewLimit)
-      cleanedRows.value = runCleaningPipeline(previewRows, headers.value, sourceCol.value, getConfig(), labeling)
-      calculateFullStats(labeling)
-    } else {
-      // 简易模式：全量跑，cleanedRows 即全量结果
-      cleanedRows.value = runCleaningPipeline(rows.value, headers.value, sourceCol.value, getConfig(), labeling)
-      fullStats.value = countDecisions(cleanedRows.value)
-    }
-  }
-
-  // 全量统计（非响应式，极速）
-  function calculateFullStats(labeling) {
     const fullResult = runCleaningPipeline(rows.value, headers.value, sourceCol.value, getConfig(), labeling)
     fullStats.value = countDecisions(fullResult)
+    cleanedRows.value = previewLimit > 0 ? fullResult.slice(0, previewLimit) : fullResult
   }
 
   // 运行全量清洗 Pipeline（供导出/共享使用）
