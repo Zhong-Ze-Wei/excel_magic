@@ -8,11 +8,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, watch } from 'vue'
 import * as echarts from 'echarts/core'
 import { BarChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
+import { useChartContainer } from '../../composables/useChartContainer'
 
 echarts.use([BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer])
 
@@ -29,11 +30,9 @@ const props = defineProps({
 })
 
 const chartRef = ref(null)
-let chartInstance = null
+const { updateChart } = useChartContainer(chartRef, render)
 
-function render() {
-  if (!chartInstance) return
-
+function render(chartInstance) {
   // 取 TOP N，并反转（echarts Y 轴从下往上，降序需反转后最大的在上）
   const top = props.data.slice(0, props.topN).reverse()
   const groupNames = top.map(d => d.group)
@@ -43,10 +42,11 @@ function render() {
   chartInstance.setOption({
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       axisPointer: { type: 'shadow' },
       formatter: params => {
         const p = params[0]
-        return `${p.name}<br/><b>${props.valueLabel}：${p.value}</b>`
+        return `${p.name}\n${props.valueLabel}：${p.value}`
       }
     },
     grid: {
@@ -98,22 +98,5 @@ function lightenColor(hex) {
   return `rgba(${Math.min(255, r + 40)}, ${Math.min(255, g + 40)}, ${Math.min(255, b + 40)}, 0.8)`
 }
 
-function handleResize() {
-  chartInstance?.resize()
-}
-
-onMounted(() => {
-  chartInstance = echarts.init(chartRef.value)
-  render()
-  window.addEventListener('resize', handleResize)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  chartInstance?.dispose()
-  chartInstance = null
-})
-
-watch(() => props.data, () => render(), { deep: true })
-watch(() => props.topN, () => render())
+watch(() => [props.data, props.topN, props.color, props.valueLabel], updateChart, { deep: true, flush: 'post' })
 </script>
