@@ -40,6 +40,7 @@ export const useImportIntentStore = defineStore('importIntent', () => {
 
   // 新文件上传时清空旧意图 + 旧候选 + 旧方案（让弹窗重新跑 AI）
   function reset() {
+    close()
     coreColumnIdx.value = null
     tasks.value = { clean: false, process: false, summary: false, aggregate: false }
     note.value = ''

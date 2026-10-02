@@ -27,7 +27,7 @@
           <label class="block text-[10px] font-bold text-slate-600 mb-1">分析主题</label>
           <input v-model="analysisTheme" type="text" placeholder="如：客户满意度..."
             class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
-          <button @click="recommendColumns" :disabled="isRecommending || !analysisTheme.trim()"
+          <button @click="recommendColumns" :disabled="isRecommending || !analysisTheme.trim() || selectedCols.length === 0"
             class="w-full mt-1.5 py-1.5 bg-violet-50 border border-violet-200 text-violet-700 rounded-lg text-[10px] font-bold disabled:opacity-40">
             {{ isRecommending ? '推荐中...' : 'AI 推荐分析列' }}
           </button>
@@ -91,7 +91,7 @@
           <div v-html="renderedSummary"></div>
         </div>
       </div>
-      <button v-if="summaryText" @click="summaryText = ''"
+      <button v-if="summaryText" @click="clearReport"
         class="w-full mt-2 py-2 bg-white border border-slate-200 text-slate-500 rounded-lg text-[10px] font-bold active:bg-slate-50">
         清除报告
       </button>
@@ -134,7 +134,7 @@
               <label class="block text-xs font-bold text-slate-600 mb-1.5">分析主题 (可选)</label>
               <input v-model="analysisTheme" type="text" placeholder="如：客户满意度、产品质量、销售趋势..."
                 class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-emerald-500" />
-              <button @click="recommendColumns" :disabled="isRecommending || !analysisTheme.trim()"
+              <button @click="recommendColumns" :disabled="isRecommending || !analysisTheme.trim() || selectedCols.length === 0"
                 class="mt-2 w-full py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 text-violet-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
                 <Wand2 class="w-3 h-3" :class="{ 'animate-spin': isRecommending }" />
                 {{ isRecommending ? 'AI 推荐中...' : 'AI 推荐分析列' }}
@@ -236,7 +236,7 @@
             <span class="text-xs font-bold text-slate-700 flex items-center gap-2">
               <FileBarChart class="w-4 h-4 text-emerald-500" /> AI 数据分析报告
             </span>
-            <button v-if="summaryText" @click="summaryText = ''"
+            <button v-if="summaryText" @click="clearReport"
               class="text-[10px] text-slate-400 hover:text-slate-600">清除报告</button>
           </div>
 
@@ -275,6 +275,7 @@ import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
 import { useGlobalDataSync } from '../composables/useGlobalDataSync'
 import { useFileUpload } from '../composables/useFileUpload'
+import { useDatasetTask } from '../composables/useDatasetTask'
 import { computeAllProfiles, computeColumnProfile, formatProfilesForAI, stratifiedSample, formatSampleRows, detectColumnType } from '../services/dataProfiler'
 import { useToast } from '../services/toast'
 import { PAGE } from '../styles/tokens'
@@ -287,37 +288,40 @@ const intent = useImportIntentStore()
 const settings = useSettingsStore()
 const { isMobile } = useDevice()
 
-const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
-  onInit: (h) => {
-    // 消费 AI 预演的摘要方案：关注列 + 主题（来自意图弹窗三步规划）
-    const plan = intent.pipelinePlan?.summary
-    if (plan?.focusColumns?.length) {
-      selectedCols.value = plan.focusColumns
-    } else {
-      selectedCols.value = h.map((_, i) => i)
-    }
-    if (plan?.theme && !analysisTheme.value) {
-      analysisTheme.value = plan.theme
-    }
-    summaryText.value = ''
-  }
-})
-
-const { handleFile } = useFileUpload({
-  onFileLoaded: (data) => {
-    selectedCols.value = data.headers.map((_, i) => i)
-    summaryText.value = ''
-  }
-})
-
-const isSummarizing = ref(false)
+const summaryTask = useDatasetTask()
+const recommendationTask = useDatasetTask()
+const isSummarizing = summaryTask.isRunning
+const isRecommending = recommendationTask.isRunning
 const summaryText = ref('')
 const selectedCols = ref([])
 const selectedLabelingCols = ref([])
 const analysisTheme = ref('')
-const isRecommending = ref(false)
 const recommendedAngles = ref([])
+
+const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
+  onInit: (h) => {
+    clearReport()
+    recommendationTask.cancel()
+    selectedCols.value = h.map((_, i) => i)
+    analysisTheme.value = ''
+    recommendedAngles.value = []
+    applySummaryPlan()
+  }
+})
+
+const { handleFile } = useFileUpload()
 const renderedSummary = computed(() => renderMarkdown(summaryText.value))
+
+function applySummaryPlan() {
+  const plan = intent.pipelinePlan?.summary
+  if (!plan || !headers.value.length) return
+  const indexes = (plan.focusColumns || []).filter(i => Number.isInteger(i) && i >= 0 && i < headers.value.length)
+  if (indexes.length) selectedCols.value = [...new Set(indexes)]
+  if (plan.theme) analysisTheme.value = plan.theme
+}
+
+// 预规划可能在页面已挂载、数据未变化时才确认。
+watch(() => intent.pipelinePlan?.summary, applySummaryPlan)
 
 const averageFillRate = computed(() => {
   if (!rows.value.length || !headers.value.length) return 0
@@ -357,124 +361,126 @@ function typeChipClass(type) {
   return map[type] || 'bg-slate-100 text-slate-600'
 }
 
-// 全选/取消联动
-watch(() => headers.value.length, () => {
-  if (headers.value.length > 0) selectedCols.value = headers.value.map((_, i) => i)
-})
-
 // AI 打标列就绪时默认全选（保留原"自动纳入"语义，但用户可手动取消）
-watch(() => dataShare.labelingResults?.outputColumns, (cols) => {
-  if (cols?.length) selectedLabelingCols.value = cols.map(c => c.key)
-}, { immediate: true, deep: true })
+watch(() => dataShare.labelingResults, (results) => {
+  selectedLabelingCols.value = results?.outputColumns.map(c => c.key) || []
+  clearReport()
+}, { immediate: true })
+
+// 用户变更分析输入时，正在返回的旧建议和旧报告不再适用。
+watch([selectedCols, selectedLabelingCols, analysisTheme], () => {
+  recommendationTask.cancel()
+  recommendedAngles.value = []
+  clearReport()
+}, { deep: true, flush: 'sync' })
+
+function clearReport() {
+  summaryTask.cancel()
+  summaryText.value = ''
+}
 
 function reset() {
-  headers.value = []
-  rows.value = []
-  summaryText.value = ''
-  selectedCols.value = []
-  selectedLabelingCols.value = []
-  analysisTheme.value = ''
-  recommendedAngles.value = []
+  disconnectGlobalExcel()
 }
 
 async function recommendColumns() {
-  if (!analysisTheme.value.trim() || isRecommending.value) return
+  if (!analysisTheme.value.trim() || isRecommending.value || selectedCols.value.length === 0) return
   if (!settings.isConfigured) { settings.showSettings = true; toast.warn('请先配置 API 密钥'); return }
-  isRecommending.value = true
   recommendedAngles.value = []
 
   try {
-    const allColIndexes = headers.value.map((_, i) => i)
-    const profiles = computeAllProfiles(headers.value, rows.value, allColIndexes)
-    const profilesText = formatProfilesForAI(profiles)
+    const result = await recommendationTask.run(async ({ signal }) => {
+      const inputIndexes = [...selectedCols.value]
+      const profiles = computeAllProfiles(headers.value, rows.value, inputIndexes)
+      const profilesText = formatProfilesForAI(profiles)
+      const labelingInfo = (dataShare.labelingResults?.outputColumns || [])
+        .filter(c => selectedLabelingCols.value.includes(c.key))
+        .map(c => `- ${c.name} (key: ${c.key}, type: ${c.type})`).join('\n')
+      const prompt = getAnalysisThemePrompt(analysisTheme.value.trim(), profilesText, labelingInfo)
+      const res = await callAI(prompt, '你是一个数据分析策略专家。', settings.getApiConfig().workModel, { signal })
+      const parsed = parseRobustJSON(res)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('AI 返回格式无法解析')
+      return { parsed, inputIndexes }
+    })
+    if (result === undefined) return
+    const { parsed, inputIndexes } = result
 
-    let labelingInfo = ''
-    if (dataShare.labelingResults?.outputColumns?.length) {
-      labelingInfo = dataShare.labelingResults.outputColumns.map(c =>
-        `- ${c.name} (key: ${c.key}, type: ${c.type})`
-      ).join('\n')
-    }
-
-    const prompt = getAnalysisThemePrompt(analysisTheme.value.trim(), profilesText, labelingInfo)
-    const res = await callAI(prompt, '你是一个数据分析策略专家。', settings.getApiConfig().workModel)
-    const parsed = parseRobustJSON(res)
-
-    if (parsed.focusColumns?.length) {
-      const validIndexes = parsed.focusColumns
-        .map(c => c.columnIndex)
-        .filter(i => i >= 0 && i < headers.value.length)
+    if (Array.isArray(parsed.focusColumns)) {
+      const validIndexes = parsed.focusColumns.map(c => c.columnIndex)
+        .filter(i => Number.isInteger(i) && i >= 0 && i < inputIndexes.length)
+        .map(i => inputIndexes[i])
       if (validIndexes.length > 0) {
         selectedCols.value = [...new Set(validIndexes)]
       }
     }
-    if (parsed.analysisAngles?.length) {
-      recommendedAngles.value = parsed.analysisAngles
-    }
-    if (parsed.theme) {
+    if (typeof parsed.theme === 'string' && parsed.theme) {
       analysisTheme.value = parsed.theme
+    }
+    if (Array.isArray(parsed.analysisAngles)) {
+      recommendedAngles.value = parsed.analysisAngles.filter(angle => typeof angle === 'string')
     }
     toast.success(`AI 推荐了 ${selectedCols.value.length} 个分析列`)
   } catch (e) {
     toast.error('AI 推荐失败: ' + e.message)
-  } finally {
-    isRecommending.value = false
   }
 }
 
 async function generateSummary() {
   if (isSummarizing.value || selectedCols.value.length === 0) return
-  isSummarizing.value = true
+  if (!settings.isConfigured) { settings.showSettings = true; toast.warn('请先配置 API 密钥'); return }
   summaryText.value = ''
 
   try {
-    // 1. 列画像
-    const profiles = computeAllProfiles(headers.value, rows.value, selectedCols.value)
+    await summaryTask.run(async ({ signal }) => {
+      // 1. 列画像
+      const profiles = computeAllProfiles(headers.value, rows.value, selectedCols.value)
 
-    // 2. AI 打标结果作为虚拟列（仅纳入用户勾选的）
-    const labelingProfiles = []
-    if (dataShare.labelingResults?.analysisMap) {
-      const lr = dataShare.labelingResults
-      const doneRows = Object.values(lr.analysisMap).filter(r => r.status === 'done')
-      for (const col of lr.outputColumns) {
-        if (!selectedLabelingCols.value.includes(col.key)) continue
-        const values = doneRows.map(r => r.values?.[col.key] ?? null)
-        labelingProfiles.push({
-          ...computeColumnProfile(col.name + ' (AI)', values),
-          isAILabel: true
-        })
+      // 2. AI 打标结果作为虚拟列（仅纳入用户勾选的）
+      const labelingProfiles = []
+      if (dataShare.labelingResults?.analysisMap) {
+        const lr = dataShare.labelingResults
+        const doneRows = Object.values(lr.analysisMap).filter(r => r.status === 'done')
+        for (const col of lr.outputColumns) {
+          if (!selectedLabelingCols.value.includes(col.key)) continue
+          const values = doneRows.map(r => r.values?.[col.key] ?? null)
+          labelingProfiles.push({
+            ...computeColumnProfile(col.name + ' (AI)', values),
+            isAILabel: true
+          })
+        }
       }
-    }
-    const allProfiles = [...profiles, ...labelingProfiles]
+      const allProfiles = [...profiles, ...labelingProfiles]
 
-    // 3. 格式化
-    const profilesText = formatProfilesForAI(allProfiles)
-    const datasetMeta = `${rows.value.length} 行 x ${allProfiles.length} 列 (原始 ${headers.value.length} 列${labelingProfiles.length > 0 ? ` + ${labelingProfiles.length} AI打标列` : ''})`
+      // 3. 格式化
+      const profilesText = formatProfilesForAI(allProfiles)
+      const datasetMeta = `${rows.value.length} 行 x ${allProfiles.length} 列 (已选原始 ${selectedCols.value.length} 列${labelingProfiles.length > 0 ? ` + ${labelingProfiles.length} AI打标列` : ''})`
 
-    // 4. 分层样本
-    const sample = stratifiedSample(headers.value, rows.value, 6)
-    const sampleText = formatSampleRows(sample)
+      // 4. 分层样本与画像遵守同一列选择，未勾选数据不会进入请求。
+      const sampleHeaders = selectedCols.value.map(i => headers.value[i])
+      const sampleRows = rows.value.map(row => selectedCols.value.map(i => row[i]))
+      const sample = stratifiedSample(sampleHeaders, sampleRows, 6)
+      const sampleText = formatSampleRows(sample)
 
-    // 5. 调用 AI
-    const { systemPrompt: rawSys, userPrompt } = getDataSummaryPrompt(
-      profilesText, datasetMeta, sampleText,
-      analysisTheme.value.trim() || null,
-      recommendedAngles.value.length > 0 ? recommendedAngles.value : null
-    )
-    // 意图上下文作为参考段追加（不覆盖摘要自己的 theme）
-    const systemPrompt = rawSys + formatIntentContext(dataShare.intentNote, '数据摘要与洞察')
-    await callStreamingAI(systemPrompt, userPrompt, (chunk) => { summaryText.value += chunk })
+      // 5. 调用 AI
+      const { systemPrompt: rawSys, userPrompt } = getDataSummaryPrompt(
+        profilesText, datasetMeta, sampleText,
+        analysisTheme.value.trim() || null,
+        recommendedAngles.value.length > 0 ? recommendedAngles.value : null
+      )
+      // 意图上下文作为参考段追加（不覆盖摘要自己的 theme）
+      const systemPrompt = rawSys + formatIntentContext(dataShare.intentNote, '数据摘要与洞察')
+      await callStreamingAI(systemPrompt, userPrompt, (chunk) => {
+        if (!signal.aborted) summaryText.value += chunk
+      }, undefined, { signal })
+      return true
+    })
   } catch (e) {
     summaryText.value += `\n\n[错误] ${e.message}`
   }
-  isSummarizing.value = false
 }
 
 function loadDemo() {
   const demo = DEMO_DATA.comments
-  headers.value = [...demo.headers]
-  rows.value = demo.rows.map(r => [...r])
-  selectedCols.value = headers.value.map((_, i) => i)
-  summaryText.value = ''
-  dataShare.setSharedData(headers.value, rows.value, '数据摘要示例.xlsx')
+  dataShare.setSharedData(demo.headers, demo.rows, '数据摘要示例.xlsx')
 }
 </script>

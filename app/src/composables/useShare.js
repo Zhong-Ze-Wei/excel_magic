@@ -17,14 +17,14 @@ export function useShare({ rows, headers, importGlobalExcel }) {
   function shareTo(getData, targetPath, sourceName) {
     if (!rows.value.length) return
     const { headers: h, rows: r } = getData()
-    dataShare.setSharedData(h, r, sourceName || '共享数据')
+    dataShare.setSharedData(h, r, sourceName || '共享数据', false, { preserveIntent: true })
     router.push(targetPath)
   }
 
   function applyToGlobal(getData, sourceName) {
     if (!rows.value.length) return
     const { headers: h, rows: r } = getData()
-    dataShare.setSharedData(h, r, sourceName || dataShare.sourceName || '已处理数据')
+    dataShare.setSharedData(h, r, sourceName || dataShare.sourceName || '已处理数据', false, { preserveIntent: true })
     if (importGlobalExcel) importGlobalExcel()
     toast.success('数据已应用到全局')
   }

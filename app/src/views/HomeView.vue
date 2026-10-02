@@ -19,7 +19,7 @@
         <RefreshCw class="w-3.5 h-3.5" /> 加载演示数据
       </button>
     </div>
-    <DataStatusCompact v-else-if="intent.confirmedAt"
+    <DataStatusCompact v-else
       :source-name="dataShare.sourceName"
       :row-count="dataShare.rows.length"
       :col-count="dataShare.headers.length"
@@ -47,15 +47,6 @@
         class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold active:bg-blue-700">
         设置任务目标
       </button>
-    </div>
-
-    <!-- Sheet 选择器（多 Sheet 时独立显示，移动端） -->
-    <div v-if="dataShare.hasData && dataShare.hasMultipleSheets && intent.confirmedAt" class="flex items-center gap-2">
-      <span class="text-[10px] text-slate-500 font-bold shrink-0">Sheet</span>
-      <select :value="dataShare.currentSheet" @change="e => dataShare.setSheet(e.target.value)"
-        class="flex-1 px-2 py-1 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-bold">
-        <option v-for="name in dataShare.sheetNames" :key="name" :value="name">{{ name }}</option>
-      </select>
     </div>
 
     <!-- 第三层：单独使用（轻链接） -->
@@ -199,7 +190,7 @@ function onStartFirst() {
   if (t.process || t.translate || t.analyze) return router.push('/process')
   if (t.summary) return router.push('/summary')
   if (t.aggregate) return router.push('/aggregate')
-  toast.warning('请先选择至少一个任务')
+  toast.warn('请先选择至少一个任务')
 }
 
 // 点击某个步骤卡：直接跳对应模块
@@ -239,9 +230,6 @@ function loadGlobalDemo() {
     ['16', 'User_016', '感觉一般，没有想象中好用，退货了。']
   ]
   dataShare.setSharedData(demoHeaders, demoRows, '社媒评论脏数据全局示例.csv', false)
-  if (intent.pendingFileMeta?.name !== '社媒评论脏数据全局示例.csv') {
-    intent.reset()
-  }
   intent.open({
     name: '社媒评论脏数据全局示例.csv',
     rowCount: demoRows.length,
@@ -253,7 +241,6 @@ function loadGlobalDemo() {
 
 function clearGlobalExcel() {
   dataShare.clearSharedData()
-  intent.reset()
 }
 
 const cards = [

@@ -255,7 +255,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, watch } from 'vue'
+import { reactive, ref, computed, watch, onScopeDispose } from 'vue'
 import { X, Check, Sparkles, Repeat, AlignJustify, RefreshCw, Loader2, BarChart3 } from 'lucide-vue-next'
 import { useImportIntentStore } from '../stores/importIntent'
 import { useDataShareStore } from '../stores/dataShare'
@@ -263,6 +263,7 @@ import { useSettingsStore } from '../stores/settings'
 import { useToast } from '../services/toast'
 import { buildTableSnapshot, analyzeTableIntent } from '../services/intentAnalysis'
 import { planPipeline } from '../services/pipelinePlanner'
+import { useDatasetTask } from '../composables/useDatasetTask'
 import DataOverview from '../components/common/DataOverview.vue'
 
 const intent = useImportIntentStore()
@@ -270,18 +271,21 @@ const dataShare = useDataShareStore()
 const settings = useSettingsStore()
 const toast = useToast()
 
-const headers = computed(() => intent.pendingFileMeta?.headers || dataShare.headers || [])
+const headers = computed(() => dataShare.headers)
 
 // 数据快照（纯前端，弹窗打开时立即算）
 const snapshot = ref(null)
 // AI 候选列表（本地副本，从 intent.suggestions 缓存读取或新跑）
 const suggestions = ref([])
-const analyzing = ref(false)
+const analysisTask = useDatasetTask()
+const analyzing = analysisTask.isRunning
+let analysisRequest = 0
 const adoptedIdx = ref(null)
 
 // 三步方案预演状态
 const pipelinePlan = ref(null)
-const planningPipeline = ref(false)
+const pipelineTask = useDatasetTask()
+const planningPipeline = pipelineTask.isRunning
 
 // 分析阶段（视觉化进度）
 const analysisSteps = ref([
@@ -291,6 +295,7 @@ const analysisSteps = ref([
 ])
 let stepTimer = null
 function startStepAnimation() {
+  if (stepTimer) clearInterval(stepTimer)
   analysisSteps.value.forEach(s => { s.done = false; s.active = false })
   analysisSteps.value[0].active = true
   let i = 0
@@ -307,6 +312,7 @@ function finishStepAnimation() {
   if (stepTimer) { clearInterval(stepTimer); stepTimer = null }
   analysisSteps.value.forEach(s => { s.done = true; s.active = false })
 }
+onScopeDispose(() => { if (stepTimer) clearInterval(stepTimer) })
 
 const taskOptions = [
   { key: 'clean',     label: '清洗',     desc: '去噪去重',     icon: Sparkles,
@@ -324,6 +330,11 @@ const form = reactive({
   tasks: { clean: true, process: true, summary: true, aggregate: false },
   goal: ''  // 主输入：你想做什么（合并了原 note）
 })
+const formSignature = computed(() => JSON.stringify([form.goal, form.coreColumnIdx, form.tasks]))
+watch(formSignature, () => {
+  pipelineTask.cancel()
+  pipelinePlan.value = null
+}, { flush: 'sync' })
 
 // 是否至少选了一个任务（控制三步方案区显隐）
 const hasAnyTask = computed(() => form.tasks.clean || form.tasks.process || form.tasks.summary || form.tasks.aggregate)
@@ -339,9 +350,12 @@ const cleanRuleCount = computed(() => {
 })
 
 // 弹窗打开时的初始化
-watch(() => intent.showModal, async (v) => {
+watch(() => intent.showModal, (v) => {
+  analysisRequest++
+  analysisTask.cancel()
+  pipelineTask.cancel()
+  finishStepAnimation()
   if (!v) return
-  analyzing.value = false
   adoptedIdx.value = null
   // 立即算快照（纯前端，秒级）
   snapshot.value = buildLocalSnapshot()
@@ -356,19 +370,19 @@ watch(() => intent.showModal, async (v) => {
   }
   form.goal = intent.note || ''
   // 候选：优先读缓存（已生成过就不重跑），无缓存且开启自动分析才跑
-  if (intent.suggestions && intent.suggestions.length) {
+  pipelinePlan.value = intent.pipelinePlan || null
+  if (intent.suggestions !== null) {
     suggestions.value = intent.suggestions
     // 默认选中第一个（推荐项）的高亮，但不覆盖用户已编辑的 goal
     adoptedIdx.value = 0
   } else {
     suggestions.value = []
     if (settings.autoIntentAnalysis && settings.isConfigured && headers.value.length) {
-      await runAnalysis()
+      runAnalysis()
     }
   }
   // 三步方案：读缓存（不重跑），用户主动点「重新规划」才重新生成
-  pipelinePlan.value = intent.pipelinePlan || null
-})
+}, { flush: 'sync' })
 
 function buildLocalSnapshot() {
   if (!headers.value.length) return null
@@ -377,8 +391,8 @@ function buildLocalSnapshot() {
   profiles.forEach(p => { typeCount[p.type] = (typeCount[p.type] || 0) + 1 })
   const dominantType = Object.entries(typeCount).sort((a, b) => b[1] - a[1])[0]?.[0]
   return {
-    rowCount: intent.pendingFileMeta?.rowCount ?? dataShare.rows?.length ?? 0,
-    colCount: intent.pendingFileMeta?.colCount ?? headers.value.length,
+    rowCount: dataShare.rows.length,
+    colCount: headers.value.length,
     profiles,
     dominantType: dominantType ? typeLabel(dominantType) + '为主' : null
   }
@@ -386,34 +400,35 @@ function buildLocalSnapshot() {
 
 async function runAnalysis() {
   if (!headers.value.length || !dataShare.rows?.length) {
-    toast.warning('暂无数据可分析')
+    toast.warn('暂无数据可分析')
     return
   }
   if (!settings.isConfigured) {
-    toast.warning('请先在设置中配置 API Key')
+    toast.warn('请先在设置中配置 API Key')
     return
   }
-  analyzing.value = true
+  const request = ++analysisRequest
+  const signature = formSignature.value
   suggestions.value = []
   adoptedIdx.value = null
   startStepAnimation()
   try {
-    const result = await analyzeTableIntent(headers.value, dataShare.rows, settings.workModel)
+    const result = await analysisTask.run(({ signal }) => analyzeTableIntent(headers.value, dataShare.rows, settings.workModel, { signal }))
+    if (!result || !intent.showModal || request !== analysisRequest) return
     finishStepAnimation()
     suggestions.value = result.suggestions || []
-    if (suggestions.value.length) {
+    if (suggestions.value.length && signature === formSignature.value) {
       // 首次分析：默认采纳推荐项（填入主输入），用户可改
       adoptSuggestion(suggestions.value[0], 0)
       // 注意：不在这里触发 runPipelinePlan——等用户主动点选候选确认目标后再规划
       // （adoptSuggestion 只是预填，用户可能换成其他候选或编辑目标）
-    } else {
+    } else if (!suggestions.value.length) {
       toast.info('AI 暂无候选，请手动填写目标')
     }
   } catch (err) {
     toast.error('AI 分析失败：' + (err.message || '未知错误'))
   } finally {
-    if (stepTimer) { clearInterval(stepTimer); stepTimer = null }
-    analyzing.value = false
+    if (request === analysisRequest) finishStepAnimation()
   }
 }
 
@@ -439,36 +454,36 @@ async function runPipelinePlan() {
   if (!goal || !hasAnyTask.value) return
   if (!settings.isConfigured || !headers.value.length || !dataShare.rows?.length) return
 
-  planningPipeline.value = true
   pipelinePlan.value = null
   try {
-    const result = await planPipeline({
+    const signature = formSignature.value
+    const result = await pipelineTask.run(({ signal }) => planPipeline({
       goal,
       headers: headers.value,
       rows: dataShare.rows,
       tasks: { ...form.tasks },
       coreColumnIdx: form.coreColumnIdx ?? 0,
-      workModel: settings.workModel
-    })
+      workModel: settings.workModel,
+      signal
+    }))
+    if (!result || !intent.showModal || signature !== formSignature.value) return
     pipelinePlan.value = result
-    console.log('[三步方案] 规划完成:', result)
   } catch (err) {
     console.error('[三步方案] 规划失败:', err)
-  } finally {
-    planningPipeline.value = false
   }
 }
 
 // 跳过三步方案直接确认（用户不想等 AI 规划，各模块回退到自己生成）
 function onSubmitSkipPlan() {
   pipelinePlan.value = null
-  planningPipeline.value = false
+  pipelineTask.cancel()
   onSubmit()
 }
 
 function onSubmit() {
-  if (form.coreColumnIdx == null) return
-  const trimmedGoal = form.goal.slice(0, 500)
+  if (!Number.isInteger(form.coreColumnIdx) || form.coreColumnIdx < 0 || form.coreColumnIdx >= headers.value.length) return
+  if (!hasAnyTask.value) { toast.warn('请至少选择一个任务'); return }
+  const trimmedGoal = form.goal.trim().slice(0, 500)
   intent.submit({
     coreColumnIdx: form.coreColumnIdx,
     tasks: { ...form.tasks },

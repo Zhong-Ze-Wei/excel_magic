@@ -14,7 +14,7 @@
 
     <!-- 有数据 -->
     <template v-else>
-      <AiPlanBanner :visible="hasProcessPlan" :summary="processPlanSummary" @run="runLabelingBatch" />
+      <AiPlanBanner :visible="hasProcessPlan" :summary="processPlanSummary" @run="runProcessPlan" />
       <GlobalDataBanner :visible="hasData && dataShare.hasData" :source-name="dataShare.sourceName"
         :headers="headers" :rows="rows" :mobile="true" @disconnect="disconnectGlobalExcel" />
       <AnalysisSimpleBody
@@ -23,7 +23,7 @@
         :is-labeling="isLabeling" :processed="processed" :total-to-process="totalToProcess"
         :percent-finished="percentFinished" :stats="stats" :rows="rows"
         @update:plan-source="v => planSource = v" @update:user-goal="v => userGoal = v"
-        @generate="generatePlanWithAI" @apply-template="applyTemplate" @run="runLabelingBatch" @apply="applyToGlobal"
+        @generate="generatePlanWithAI" @apply-template="applyTemplate" @run="runProcessPlan" @apply="applyToGlobal" @export="exportResults"
       />
     </template>
   </div>
@@ -46,7 +46,7 @@
 
     <!-- 有数据 -->
     <template v-else>
-      <AiPlanBanner :visible="hasProcessPlan" :summary="processPlanSummary" @run="runLabelingBatch" />
+      <AiPlanBanner :visible="hasProcessPlan" :summary="processPlanSummary" @run="runProcessPlan" />
       <GlobalDataBanner :visible="hasData && dataShare.hasData" :source-name="dataShare.sourceName"
         :headers="headers" :rows="rows" @disconnect="disconnectGlobalExcel" />
       <AnalysisSimpleBody
@@ -55,7 +55,7 @@
         :is-labeling="isLabeling" :processed="processed" :total-to-process="totalToProcess"
         :percent-finished="percentFinished" :stats="stats" :rows="rows"
         @update:plan-source="v => planSource = v" @update:user-goal="v => userGoal = v"
-        @generate="generatePlanWithAI" @apply-template="applyTemplate" @run="runLabelingBatch" @apply="applyToGlobal"
+        @generate="generatePlanWithAI" @apply-template="applyTemplate" @run="runProcessPlan" @apply="applyToGlobal" @export="exportResults"
       />
     </template>
   </div>
@@ -72,6 +72,7 @@ import { useDevice } from '../composables/useDevice'
 import { useGlobalDataSync } from '../composables/useGlobalDataSync'
 import { useFileUpload } from '../composables/useFileUpload'
 import { useLabeling } from '../composables/useLabeling'
+import { useDatasetTask } from '../composables/useDatasetTask'
 import { useExport } from '../composables/useExport'
 import { useShare } from '../composables/useShare'
 import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
@@ -83,7 +84,7 @@ import { useToast } from '../services/toast'
 import { PAGE, CARD } from '../styles/tokens'
 import { callAI } from '../services/ai'
 import { getLabelingPlanGenerationPrompt, getPresetPlan, PRESET_TEMPLATES, formatIntentContext } from '../services/prompts'
-import { normalizeLabelingPlan } from '../services/labelingPlan'
+import { normalizeLabelingPlan, normalizeInputColumns } from '../services/labelingPlan'
 import { parseRobustJSON } from '../services/jsonParser'
 import { DEMO_DATA } from '../services/excel'
 
@@ -98,6 +99,7 @@ const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
   onInit: (h, r) => {
     rangeStart.value = 1
     rangeEnd.value = r.length
+    userGoal.value = dataShare.labelingPlan.goal || ''
     // 消费 AI 预演的加工方案（来自意图弹窗三步规划）
     if (intent.pipelinePlan?.process?.outputColumns?.length && !labelingPlan.value.outputColumns.length) {
       const pp = intent.pipelinePlan.process
@@ -139,7 +141,8 @@ const planSource = ref('ai')
 // 参考列：优先用 AI 预演的多列方案，否则回退核心列
 const activeInputColumns = computed(() => {
   const pp = intent.pipelinePlan?.process
-  if (pp?.inputColumns?.length) return pp.inputColumns
+  if (labelingPlan.value.inputColumns?.length) return normalizeInputColumns(labelingPlan.value.inputColumns, headers.value)
+  if (pp?.inputColumns?.length) return normalizeInputColumns(pp.inputColumns, headers.value)
   return dataShare.coreColumn != null ? [Number(dataShare.coreColumn)] : []
 })
 
@@ -154,13 +157,22 @@ const processPlanSummary = computed(() => {
   return `AI 已规划输出列：${cols}，点击执行即可应用`
 })
 
+async function runProcessPlan() {
+  const planned = intent.pipelinePlan?.process
+  if (planned && !labelingPlan.value.outputColumns.length) {
+    dataShare.labelingPlan = { ...planned, compiledPrompt: '', promptDirty: false }
+    userGoal.value = planned.goal || ''
+  }
+  await runLabelingBatch()
+}
+
 // 打标编排（复用 composable）
 const analysisMap = ref({})
 const rangeStart = ref(1)
 const rangeEnd = ref(0)
 const selectedInputColumns = activeInputColumns
 const {
-  isLabeling, processed, totalToProcess, percentFinished, stats, runLabelingBatch
+  isLabeling, processed, totalToProcess, percentFinished, stats, runLabeling: runLabelingBatch
 } = useLabeling({ headers, rows, labelingPlan, rangeStart, rangeEnd, selectedInputColumns, analysisMap })
 
 // 导出（补齐简易模式缺失的导出能力）
@@ -203,34 +215,35 @@ function applyToGlobal() {
 }
 
 // AI 生成方案
-const isGeneratingPlan = ref(false)
+const planTask = useDatasetTask()
+const isGeneratingPlan = planTask.isRunning
 async function generatePlanWithAI() {
-  if (!rows.value.length) { toast.warning('请先上传数据'); return }
-  if (!settings.isConfigured) { settings.showSettings = true; toast.warning('请先配置 API 密钥'); return }
-  isGeneratingPlan.value = true
+  if (!rows.value.length) { toast.warn('请先上传数据'); return }
+  if (!settings.isConfigured) { settings.showSettings = true; toast.warn('请先配置 API 密钥'); return }
   try {
     const idx = Number(dataShare.coreColumn) || 0
     const sampleRows = rows.value.slice(0, 6)
     const inputCols = [idx]
     const prompt = getLabelingPlanGenerationPrompt(userGoal.value, headers.value, sampleRows, inputCols)
     const sysPrompt = '你是一个数据分析配置专家。' + formatIntentContext(dataShare.intentNote, '为表格新增列')
-    const res = await callAI(prompt, sysPrompt, settings.getApiConfig().workModel)
+    const goal = userGoal.value
+    const res = await planTask.run(({ signal }) => callAI(prompt, sysPrompt, settings.getApiConfig().workModel, { signal }))
+    if (res === undefined || goal !== userGoal.value) return
     const parsed = parseRobustJSON(res)
     const plan = normalizeLabelingPlan(parsed)
-    if (!plan) { toast.warning('AI 未能生成有效方案，请尝试模板或专家模式'); return }
+    if (!plan) { toast.warn('AI 未能生成有效方案，请尝试模板或专家模式'); return }
     dataShare.labelingPlan = { ...plan, compiledPrompt: '', promptDirty: false }
     if (!userGoal.value) userGoal.value = plan.goal
     toast.success('AI 方案已生成')
   } catch (err) {
     toast.error('AI 生成失败：' + err.message)
-  } finally {
-    isGeneratingPlan.value = false
   }
 }
 
 // 应用预设模板
 function applyTemplate(templateId) {
-  if (!rows.value.length) { toast.warning('请先上传数据'); return }
+  if (!rows.value.length) { toast.warn('请先上传数据'); return }
+  planTask.cancel()
   const idx = Number(dataShare.coreColumn) || 0
   const plan = getPresetPlan(templateId, idx)
   if (!plan) return

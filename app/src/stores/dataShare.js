@@ -1,10 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useImportIntentStore } from './importIntent'
 
 export const useDataShareStore = defineStore('dataShare', () => {
   const headers = ref([])
   const rows = ref([])
   const sourceName = ref('') // 例如: '清洗后数据.xlsx'
+  const datasetVersion = ref(0)
+  const uploadRequestId = ref(0)
+  const labelingStatus = ref({ running: false, runId: 0, processed: 0, total: 0, concurrency: 0 })
+  let sheetRequest = 0
   const coreColumn = ref(0) // 全局共享的核心处理列索引
   const labelingResults = ref(null) // { outputColumns: [...], analysisMap: { [rowIdx]: { values: {...} } } }
   const intentNote = ref('') // 数据集意图的任务说明，作为 AI 模块的共享上下文
@@ -24,21 +29,32 @@ export const useDataShareStore = defineStore('dataShare', () => {
   // 存入共享数据
   // autoDetect 参数保留兼容性，但已不再做启发式判断；越界时兜底为 0（首列）
   function setSharedData(newHeaders, newRows, name = '已清洗的数据', autoDetect = false, options = {}) {
+    sheetRequest++
+    cancelLabelingRun()
+    labelingResults.value = null
+    if (!options.preserveIntent) {
+      intentNote.value = ''
+      labelingPlan.value = { taskName: '', goal: '', inputColumns: [], outputColumns: [], compiledPrompt: '', promptDirty: false }
+      useImportIntentStore().reset()
+      coreColumn.value = 0
+    }
     headers.value = [...newHeaders]
     rows.value = newRows.map(r => [...r])
     sourceName.value = name
-    if (options.sheetNames) sheetNames.value = options.sheetNames
-    if (options.currentSheet) currentSheet.value = options.currentSheet
-    if (options.file) file.value = options.file
+    sheetNames.value = [...(options.sheetNames || [])]
+    currentSheet.value = options.currentSheet || ''
+    file.value = options.file || null
     // 越界保护：列数缩减或未设置时，兜底为 0（首列）
-    if (coreColumn.value == null || coreColumn.value >= newHeaders.length) {
+    if (!Number.isInteger(coreColumn.value) || coreColumn.value < 0 || coreColumn.value >= newHeaders.length) {
       coreColumn.value = 0
     }
+    datasetVersion.value++
   }
 
   // 修改全局核心列
   function setCoreColumn(colIdx) {
-    coreColumn.value = Number(colIdx)
+    const index = Number(colIdx)
+    if (Number.isInteger(index) && index >= 0 && index < headers.value.length) coreColumn.value = index
   }
 
   // 载入数据并立刻清空总线，防范重复载入干扰
@@ -54,30 +70,55 @@ export const useDataShareStore = defineStore('dataShare', () => {
   }
 
   // 存入 AI 打标结果
-  function setLabelingResults(outputColumns, map) {
-    labelingResults.value = { outputColumns, analysisMap: { ...map } }
+  function setLabelingResults(outputColumns, map, expectedVersion = datasetVersion.value) {
+    if (expectedVersion !== datasetVersion.value) return false
+    labelingResults.value = JSON.parse(JSON.stringify({ outputColumns, analysisMap: map }))
+    return true
   }
 
   function clearLabelingResults() {
     labelingResults.value = null
   }
 
+  function beginUpload() {
+    return ++uploadRequestId.value
+  }
+
+  function beginLabelingRun(total, concurrency) {
+    if (labelingStatus.value.running) return null
+    const runId = labelingStatus.value.runId + 1
+    labelingStatus.value = { running: true, runId, processed: 0, total, concurrency }
+    return runId
+  }
+
+  function finishLabelingRun(runId) {
+    if (labelingStatus.value.runId === runId) labelingStatus.value.running = false
+  }
+
+  function cancelLabelingRun() {
+    labelingStatus.value = { running: false, runId: labelingStatus.value.runId + 1, processed: 0, total: 0, concurrency: 0 }
+  }
+
   // 切换 Sheet
   async function setSheet(sheetName) {
-    if (!file.value || sheetName === currentSheet.value) return
+    if (!file.value || !sheetNames.value.includes(sheetName)) return
+    const request = ++sheetRequest
+    if (sheetName === currentSheet.value) return
+    const sourceFile = file.value
+    const sourceSheets = [...sheetNames.value]
+    const name = sourceName.value
     const { readSheet } = await import('../services/excel')
-    const data = await readSheet(file.value, sheetName)
-    headers.value = data.headers
-    rows.value = data.rows
-    currentSheet.value = sheetName
-    // 越界保护：切换 Sheet 后若原核心列越界，兜底为 0
-    if (coreColumn.value == null || coreColumn.value >= data.headers.length) {
-      coreColumn.value = 0
-    }
+    const data = await readSheet(sourceFile, sheetName)
+    if (request !== sheetRequest || sourceFile !== file.value) return
+    setSharedData(data.headers.map(String), data.rows, name, false, {
+      file: sourceFile, sheetNames: sourceSheets, currentSheet: sheetName
+    })
   }
 
   // 清理
   function clearSharedData() {
+    sheetRequest++
+    cancelLabelingRun()
     headers.value = []
     rows.value = []
     sourceName.value = ''
@@ -88,6 +129,8 @@ export const useDataShareStore = defineStore('dataShare', () => {
     file.value = null
     intentNote.value = ''
     labelingPlan.value = { taskName: '', goal: '', inputColumns: [], outputColumns: [], compiledPrompt: '', promptDirty: false }
+    useImportIntentStore().reset()
+    datasetVersion.value++
   }
 
   // 写入数据集意图的任务说明（共享上下文）
@@ -96,9 +139,9 @@ export const useDataShareStore = defineStore('dataShare', () => {
   }
 
   return {
-    headers, rows, sourceName, coreColumn, hasData, labelingResults, intentNote, labelingPlan,
+    headers, rows, sourceName, datasetVersion, uploadRequestId, labelingStatus, coreColumn, hasData, labelingResults, intentNote, labelingPlan,
     sheetNames, currentSheet, hasMultipleSheets, file,
     setSharedData, setCoreColumn, getAndClearSharedData, clearSharedData,
-    setLabelingResults, clearLabelingResults, setSheet, setIntentNote
+    setLabelingResults, clearLabelingResults, beginUpload, beginLabelingRun, finishLabelingRun, cancelLabelingRun, setSheet, setIntentNote
   }
 })

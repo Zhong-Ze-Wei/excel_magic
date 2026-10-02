@@ -36,17 +36,13 @@ export function buildTableSnapshot(headers, rows, sampleCount = 8) {
  * @param {string} modelOverride 模型 ID（settings.getApiConfig().workModel）
  * @returns {Promise<{suggestions: Array<{goal:string, coreColumnIdx:number, tasks:{clean,process,summary,aggregate}, confidence:'high'|'medium'|'low'}>}>}
  */
-export async function analyzeTableIntent(headers, rows, modelOverride) {
+export async function analyzeTableIntent(headers, rows, modelOverride, options = {}) {
   const { profilesText, sampleText } = buildTableSnapshot(headers, rows)
   const systemPrompt = getIntentAnalysisPrompt()
   const userPrompt = `【列画像】\n${profilesText}\n\n【样本数据】\n${sampleText}\n\n【表头】${JSON.stringify(headers)}`
 
-  const raw = await callAI(userPrompt, systemPrompt, modelOverride)
-  // 诊断日志：排查"暂无候选"的根因
-  console.log('[意图分析] AI 原始返回:', raw)
-
+  const raw = await callAI(userPrompt, systemPrompt, modelOverride, options)
   const parsed = parseRobustJSON(raw)
-  console.log('[意图分析] parseRobustJSON 后:', parsed)
 
   // 兼容多种返回结构：{suggestions:[...]} / {data:[...]} / 直接 [...]
   const rawList = Array.isArray(parsed) ? parsed
@@ -58,7 +54,6 @@ export async function analyzeTableIntent(headers, rows, modelOverride) {
     throw new Error('AI 返回格式无法解析（期望对象数组）')
   }
   const result = normalizeSuggestions(rawList, headers)
-  console.log('[意图分析] 规范化后:', result)
   return { suggestions: result }
 }
 
