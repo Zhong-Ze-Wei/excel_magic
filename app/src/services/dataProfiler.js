@@ -1,11 +1,26 @@
 /**
- * 数据画像引擎 — 列级统计分析、交叉分析、分层抽样
+ * 数据画像引擎 — 列级统计分析、分层抽样
  */
 
 // ── 列类型检测 ──
 
-const DATE_REGEX = /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/
+const DATE_REGEX = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?=$|[T\s])/
 const BOOL_VALUES = new Set(['true', 'false', '是', '否', 'yes', 'no', '0', '1'])
+
+function parseDate(value) {
+  const match = DATE_REGEX.exec(value)
+  if (!match) return null
+  const [, year, month, day] = match.map(Number)
+  const date = new Date(0)
+  date.setUTCFullYear(year, month - 1, day)
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null
+  return { time: date.getTime(), text: match[0] }
+}
+
+function roundStatistic(number) {
+  const scaled = number * 100
+  return Number.isFinite(scaled) ? Math.round(scaled) / 100 : number
+}
 
 export function detectColumnType(values) {
   const nonNull = values.filter(v => v != null && String(v).trim() !== '')
@@ -19,11 +34,11 @@ export function detectColumnType(values) {
   if (boolCount / total > 0.8 && new Set(strValues.map(v => v.toLowerCase())).size <= 3) return 'boolean'
 
   // 数值
-  const numValues = strValues.filter(v => !isNaN(Number(v)) && v !== '')
+  const numValues = strValues.filter(v => Number.isFinite(Number(v)) && v !== '')
   if (numValues.length / total > 0.8) return 'number'
 
   // 日期
-  const dateCount = strValues.filter(v => DATE_REGEX.test(v)).length
+  const dateCount = strValues.filter(v => parseDate(v) !== null).length
   if (dateCount / total > 0.8) return 'date'
 
   // 标识符 — 高唯一性 + 短值（排除长文本内容列）
@@ -56,49 +71,62 @@ export function computeColumnProfile(header, values) {
   }
 
   if (type === 'number') {
-    const nums = strValues.map(Number).filter(n => !isNaN(n))
+    const nums = strValues.map(Number).filter(Number.isFinite)
     if (nums.length > 0) {
       nums.sort((a, b) => a - b)
       profile.min = nums[0]
       profile.max = nums[nums.length - 1]
-      profile.mean = Math.round(nums.reduce((s, n) => s + n, 0) / nums.length * 100) / 100
+      const scale = Math.max(Math.abs(profile.min), Math.abs(profile.max))
+      const scaledMean = scale ? nums.reduce((s, n) => s + n / scale, 0) / nums.length : 0
+      const mean = scaledMean * scale
+      profile.mean = roundStatistic(mean)
       profile.median = nums.length % 2 === 0
-        ? (nums[nums.length / 2 - 1] + nums[nums.length / 2]) / 2
+        ? nums[nums.length / 2 - 1] / 2 + nums[nums.length / 2] / 2
         : nums[Math.floor(nums.length / 2)]
-      const variance = nums.reduce((s, n) => s + Math.pow(n - profile.mean, 2), 0) / nums.length
-      profile.stddev = Math.round(Math.sqrt(variance) * 100) / 100
-      // 分位数分布
+      // 先缩放再计算方差，避免有限大数在平方时溢出。
+      const variance = scale ? nums.reduce((s, n) => s + Math.pow(n / scale - scaledMean, 2), 0) / nums.length : 0
+      // 缩放值均在 [-1, 1]，总体标准差上限为 1；消除边界舍入引起的溢出。
+      profile.stddev = roundStatistic(Math.min(Math.sqrt(variance), 1) * scale)
+      // 等宽分布；常量列只有一个桶，小数边界保留精度。
       const buckets = 5
       profile.distribution = {}
-      for (let i = 0; i < buckets; i++) {
-        const lo = profile.min + (profile.max - profile.min) * i / buckets
-        const hi = profile.min + (profile.max - profile.min) * (i + 1) / buckets
-        const count = nums.filter(n => i === buckets - 1 ? (n >= lo && n <= hi) : (n >= lo && n < hi)).length
-        profile.distribution[`${Math.round(lo)}~${Math.round(hi)}`] = count
+      if (profile.min === profile.max) {
+        profile.distribution[`${profile.min}~${profile.max}`] = nums.length
+      } else {
+        const boundaries = Array.from({ length: buckets + 1 }, (_, i) =>
+          profile.min * (1 - i / buckets) + profile.max * (i / buckets))
+        for (let i = 0; i < buckets; i++) {
+          const lo = boundaries[i], hi = boundaries[i + 1]
+          const count = nums.filter(n => i === buckets - 1 ? n >= lo && n <= hi : n >= lo && n < hi).length
+          const key = `${lo}~${hi}`
+          profile.distribution[key] = (profile.distribution[key] || 0) + count
+        }
       }
     }
   }
 
   if (type === 'enum' || type === 'boolean') {
-    const freq = {}
+    const freq = Object.create(null)
     strValues.forEach(v => { freq[v] = (freq[v] || 0) + 1 })
     const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1])
-    profile.valueDistribution = {}
-    sorted.slice(0, 15).forEach(([k, v]) => {
-      profile.valueDistribution[k] = Math.round(v / nonNull.length * 100)
-    })
+    profile.valueDistribution = Object.fromEntries(sorted.slice(0, 15).map(([k, v]) => [k, Math.round(v / nonNull.length * 100)]))
     profile.topValues = sorted.slice(0, 10).map(([k, v]) => `${k}(${Math.round(v / nonNull.length * 100)}%)`)
   }
 
   if (type === 'text') {
-    const lengths = strValues.map(v => v.length)
-    if (lengths.length > 0) {
-      profile.minLength = Math.min(...lengths)
-      profile.maxLength = Math.max(...lengths)
-      profile.avgLength = Math.round(lengths.reduce((s, l) => s + l, 0) / lengths.length)
+    if (strValues.length > 0) {
+      let minLength = Infinity, maxLength = 0, totalLength = 0
+      for (const value of strValues) {
+        minLength = Math.min(minLength, value.length)
+        maxLength = Math.max(maxLength, value.length)
+        totalLength += value.length
+      }
+      profile.minLength = minLength
+      profile.maxLength = maxLength
+      profile.avgLength = Math.round(totalLength / strValues.length)
     }
     // 高频词（简单中文分词：按标点/空格切分，取 2-4 字的片段）
-    const words = {}
+    const words = Object.create(null)
     strValues.forEach(v => {
       const segments = v.split(/[\s,，。.!！?？、；;：:""''\"'\n\r\t]+/).filter(s => s.length >= 2 && s.length <= 8)
       segments.forEach(w => { words[w] = (words[w] || 0) + 1 })
@@ -110,9 +138,9 @@ export function computeColumnProfile(header, values) {
   }
 
   if (type === 'date') {
-    const dates = strValues.filter(v => DATE_REGEX.test(v)).sort()
+    const dates = strValues.map(parseDate).filter(Boolean).sort((a, b) => a.time - b.time)
     if (dates.length > 0) {
-      profile.dateRange = `${dates[0].substring(0, 10)} ~ ${dates[dates.length - 1].substring(0, 10)}`
+      profile.dateRange = `${dates[0].text} ~ ${dates[dates.length - 1].text}`
     }
   }
 
@@ -136,12 +164,15 @@ export function computeAllProfiles(headers, rows, selectedCols = null) {
 // ── 分层抽样（头/中/尾） ──
 
 export function stratifiedSample(headers, rows, count = 6) {
+  if (!Number.isFinite(count) || count <= 0) return []
+  count = Math.floor(count)
+  const toRecord = row => Object.fromEntries(headers.map((header, i) => [header, row[i] ?? '']))
   if (rows.length <= count) {
-    return rows.map(r => headers.reduce((acc, h, i) => { acc[h] = r[i] ?? ''; return acc }, {}))
+    return rows.map(toRecord)
   }
 
   const headN = Math.ceil(count / 3)
-  const midN = Math.ceil(count / 3)
+  const midN = Math.min(Math.ceil(count / 3), count - headN)
   const tailN = count - headN - midN
 
   const mid = Math.floor(rows.length / 2)
@@ -150,9 +181,7 @@ export function stratifiedSample(headers, rows, count = 6) {
   const midRows = rows.slice(mid - Math.floor(midN / 2), mid + Math.ceil(midN / 2))
   const tail = rows.slice(rows.length - tailN)
 
-  return [...head, ...midRows, ...tail].map(r =>
-    headers.reduce((acc, h, i) => { acc[h] = r[i] ?? ''; return acc }, {})
-  )
+  return [...head, ...midRows, ...tail].map(toRecord)
 }
 
 // ── 格式化为 AI 可读文本 ──

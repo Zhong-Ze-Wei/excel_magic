@@ -344,12 +344,14 @@ import { useFileUpload } from '../composables/useFileUpload'
 import { useExport } from '../composables/useExport'
 import { useShare } from '../composables/useShare'
 import { useCleaningPipeline } from '../composables/useCleaningPipeline'
+import { useDatasetTask } from '../composables/useDatasetTask'
 import GlobalDataBanner from '../components/common/GlobalDataBanner.vue'
 import { useToast } from '../services/toast'
 import { PAGE, TWO_COL } from '../styles/tokens'
 import PageHeader from '../components/common/PageHeader.vue'
 import AiPlanBanner from '../components/common/AiPlanBanner.vue'
 import { DEFAULT_RULES_CONFIG } from '../config/defaultSettings'
+import { normalizeRulesConfig } from '../config/settingsConfig'
 
 const toast = useToast()
 const dataShare = useDataShareStore()
@@ -358,7 +360,8 @@ const intent = useImportIntentStore()
 const { isMobile } = useDevice()
 
 const intentInput = ref('')
-const isOptimizing = ref(false)
+const optimizeTask = useDatasetTask()
+const isOptimizing = optimizeTask.isRunning
 const aiSummary = ref('')
 const activeFilter = ref('all')
 
@@ -378,6 +381,7 @@ const sourceCol = computed(() => dataShare.coreColumn)
 // 简易模式的 AI 规则配置：独立内存态，不写 settings.rulesConfig（用完即弃，不持久化，不污染专家模式）
 // null 表示尚未跑过 AI；跑过后承载 AI 生成的 rulesConfig 副本
 const aiRulesConfig = ref(null)
+const decisionOverrides = ref({})
 
 // AI 方案引导条派生：是否存在预规划方案 + 摘要文案
 const hasCleanPlan = computed(() => !!intent.pipelinePlan?.clean?.aiRulesConfig && !aiRulesConfig.value && hasData.value)
@@ -392,6 +396,8 @@ const cleanPlanSummary = computed(() => {
 function runWithPlan() {
   const planCfg = intent.pipelinePlan?.clean?.aiRulesConfig
   if (!planCfg) return
+  optimizeTask.cancel()
+  decisionOverrides.value = {}
   aiRulesConfig.value = planCfg
   aiSummary.value = planCfg._aiSummary || '已应用 AI 预规划的清洗方案'
   runCleaning()
@@ -404,9 +410,10 @@ const { cleanedRows: rawCleanedRows, runPipeline: runCleaning, clear: clearClean
   getConfig: () => aiRulesConfig.value || settings.rulesConfig
 })
 // 展示层：suspect 归入 delete，便于简易模式"保留/过滤"二分展示
-const cleanedRows = computed(() => rawCleanedRows.value.map(r => ({
+const cleanedRows = computed(() => rawCleanedRows.value.map((r, rowIndex) => ({
   ...r,
-  displayDecision: r.decision === 'suspect' ? 'delete' : r.decision
+  rowIndex,
+  displayDecision: decisionOverrides.value[rowIndex] ?? (r.decision === 'suspect' ? 'delete' : r.decision)
 })))
 
 const totalCount = computed(() => rows.value.length)
@@ -471,19 +478,23 @@ watch(() => dataShare.coreColumn, () => {
 })
 
 // 数据变化时，清除旧结果
-watch(() => rows.value.length, (newLen) => {
-  if (newLen === 0) {
-    clearCleaned()
-    aiSummary.value = ''
-    aiRulesConfig.value = null
-  } else if (!aiRulesConfig.value && intent.pipelinePlan?.clean?.aiRulesConfig) {
+watch(() => dataShare.datasetVersion, () => {
+  clearCleaned()
+  aiSummary.value = ''
+  aiRulesConfig.value = null
+  decisionOverrides.value = {}
+  intentInput.value = ''
+  activeFilter.value = 'all'
+})
+watch(() => [rows.value, intent.pipelinePlan?.clean], () => {
+  if (rows.value.length && !aiRulesConfig.value && intent.pipelinePlan?.clean?.aiRulesConfig) {
     // 消费 AI 预演的清洗方案（来自意图弹窗的三步规划）
     aiRulesConfig.value = intent.pipelinePlan.clean.aiRulesConfig
     aiSummary.value = intent.pipelinePlan.clean.aiRulesConfig._aiSummary || '已应用 AI 预规划的清洗方案'
     runCleaning()
     toast.info('已应用 AI 预规划的清洗方案，可调整')
   }
-})
+}, { immediate: true })
 
 async function runAiOptimize() {
   const input = intentInput.value.trim()
@@ -491,7 +502,6 @@ async function runAiOptimize() {
   if (!settings.isConfigured) { settings.showSettings = true; toast.warn('请先配置 API 密钥'); return }
   if (!rows.value.length) { toast.warn('请先上传数据'); return }
 
-  isOptimizing.value = true
   aiSummary.value = ''
   try {
     // 收集列样本
@@ -504,7 +514,8 @@ async function runAiOptimize() {
     const prompt = getSmartFilterPrompt(input, headers.value, sourceCol.value, allColumnSamples, rulesMeta)
     // 意图上下文作为参考段注入（不覆盖本步目标），帮 AI 理解清洗在整体任务中的位置
     const systemPrompt = '你是一个数据清洗专家。' + formatIntentContext(dataShare.intentNote, '数据清洗')
-    const raw = await callAI(prompt, systemPrompt, settings.getApiConfig().workModel)
+    const raw = await optimizeTask.run(({ signal }) => callAI(prompt, systemPrompt, settings.getApiConfig().workModel, { signal }))
+    if (raw === undefined || input !== intentInput.value.trim()) return
     const parsed = parseRobustJSON(raw)
 
     if (!parsed) { toast.error('AI 返回格式异常'); return }
@@ -542,7 +553,8 @@ async function runAiOptimize() {
     }
 
     // AI 方案写入简易模式独立内存态（用完即弃，不持久化，不污染专家模式的 settings.rulesConfig）
-    aiRulesConfig.value = config
+    aiRulesConfig.value = normalizeRulesConfig(config)
+    decisionOverrides.value = {}
     runCleaning()
 
     // 生成摘要
@@ -553,13 +565,11 @@ async function runAiOptimize() {
     toast.success('AI 配置完成')
   } catch (err) {
     toast.error('AI 优化失败: ' + err.message)
-  } finally {
-    isOptimizing.value = false
   }
 }
 
 function toggleDecision(item) {
-  item.displayDecision = item.displayDecision === 'keep' ? 'delete' : 'keep'
+  decisionOverrides.value[item.rowIndex] = item.displayDecision === 'keep' ? 'delete' : 'keep'
 }
 
 function exportCleanedOnly() {

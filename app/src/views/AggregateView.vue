@@ -101,9 +101,19 @@ const { isMobile } = useDevice()
 const toast = useToast()
 const dataShare = useDataShareStore()
 const intent = useImportIntentStore()
+const groupColIdx = ref(null)
+const valueColIdx = ref(null)
+const aggOp = ref('sum')
+const result = ref(null)
 
 const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
-  onInit: () => applyAggregatePlan()
+  onInit: () => {
+    groupColIdx.value = null
+    valueColIdx.value = null
+    aggOp.value = 'sum'
+    result.value = null
+    applyAggregatePlan()
+  }
 })
 
 // 独立读取 AI 预规划方案，解决 keep-alive 下 onMounted 不重复触发的时序问题：
@@ -126,10 +136,7 @@ const { handleFile } = useFileUpload()
 const { exportData } = useExport({ rows, headers })
 
 // 配置状态
-const groupColIdx = ref(null)
-const valueColIdx = ref(null)
-const aggOp = ref('sum')
-const result = ref(null)
+watch([groupColIdx, valueColIdx, aggOp], () => { result.value = null }, { flush: 'sync' })
 
 // AI 方案派生
 const plan = computed(() => intent.pipelinePlan?.aggregate)
@@ -149,7 +156,9 @@ const valueLabel = computed(() => {
   if (aggOp.value === 'count') return `${opText}（行数）`
   return `${opText}·${headers.value[valueColIdx.value] || '值'}`
 })
-const canRun = computed(() => groupColIdx.value !== null && (aggOp.value === 'count' || valueColIdx.value !== null))
+const canRun = computed(() => Number.isInteger(groupColIdx.value) && groupColIdx.value >= 0 && groupColIdx.value < headers.value.length &&
+  AGGREGATE_OPS.some(op => op.key === aggOp.value) && (aggOp.value === 'count' ||
+  (Number.isInteger(valueColIdx.value) && valueColIdx.value >= 0 && valueColIdx.value < headers.value.length)))
 const chartColor = computed(() => {
   const map = { sum: '#3b82f6', avg: '#8b5cf6', count: '#10b981', min: '#f59e0b', max: '#ef4444' }
   return map[aggOp.value] || '#3b82f6'
@@ -174,6 +183,7 @@ function runAggregate() {
     result.value = groupAggregate(rows.value, groupColIdx.value, vCol, aggOp.value)
     toast.success(`已完成 ${result.value.meta.totalGroups} 组对比`)
   } catch (e) {
+    result.value = null
     console.error('[分组对比] 执行失败:', e)
     toast.error('执行失败：' + (e.message || '未知错误'))
   }

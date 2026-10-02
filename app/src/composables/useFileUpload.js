@@ -18,11 +18,16 @@ export function useFileUpload(options = {}) {
   const intent = useImportIntentStore()
   const toast = useToast()
   const isUploading = ref(false)
+  let latestUpload = 0
 
   async function handleFile(file) {
+    const upload = dataShare.beginUpload()
+    latestUpload = upload
+    const datasetVersion = dataShare.datasetVersion
     try {
       isUploading.value = true
       const data = await readFile(file)
+      if (upload !== dataShare.uploadRequestId || datasetVersion !== dataShare.datasetVersion) return
       const mappedHeaders = data.headers.map(String)
 
       dataShare.setSharedData(mappedHeaders, data.rows, file.name, false, {
@@ -32,9 +37,6 @@ export function useFileUpload(options = {}) {
       })
 
       // 新文件重置旧意图，然后打开意图弹窗
-      if (intent.pendingFileMeta?.name !== file.name) {
-        intent.reset()
-      }
       intent.open({
         name: file.name,
         rowCount: data.rows.length,
@@ -46,9 +48,9 @@ export function useFileUpload(options = {}) {
         options.onFileLoaded(data)
       }
     } catch (err) {
-      toast.error(err.message)
+      if (upload === dataShare.uploadRequestId && datasetVersion === dataShare.datasetVersion) toast.error(err.message)
     } finally {
-      isUploading.value = false
+      if (upload === latestUpload) isUploading.value = false
     }
   }
 

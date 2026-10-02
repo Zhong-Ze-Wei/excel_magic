@@ -3,11 +3,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, watch } from 'vue'
 import * as echarts from 'echarts/core'
 import { PieChart } from 'echarts/charts'
 import { TooltipComponent, LegendComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
+import { useChartContainer } from '../../composables/useChartContainer'
 
 echarts.use([PieChart, TooltipComponent, LegendComponent, CanvasRenderer])
 
@@ -17,12 +18,11 @@ const props = defineProps({
 })
 
 const chartRef = ref(null)
-let chartInstance = null
+const { updateChart } = useChartContainer(chartRef, render)
 
-function render() {
-  if (!chartInstance || !props.data.length) return
+function render(chartInstance) {
   chartInstance.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    tooltip: { trigger: 'item', renderMode: 'richText', formatter: '{b}: {c} ({d}%)' },
     legend: { bottom: 0, textStyle: { fontSize: 11, color: '#64748b' } },
     series: [{
       type: 'pie',
@@ -41,20 +41,5 @@ function render() {
   })
 }
 
-onMounted(() => {
-  chartInstance = echarts.init(chartRef.value)
-  render()
-  window.addEventListener('resize', handleResize)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  chartInstance?.dispose()
-})
-
-function handleResize() {
-  chartInstance?.resize()
-}
-
-watch(() => props.data, () => render(), { deep: true })
+watch(() => props.data, updateChart, { deep: true, flush: 'post' })
 </script>

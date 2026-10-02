@@ -48,6 +48,6 @@ const nextModeIcon = computed(() => isSimple.value ? SlidersHorizontal : Sparkle
 function toggleMode() {
   const target = isSimple.value ? 'expert' : 'simple'
   settings.processMode = target
-  toast.success(`已切换到${nextModeLabel.value}`)
+  toast.success(`已切换到${target === 'expert' ? '专家模式' : '简易模式'}`)
 }
 </script>

@@ -69,7 +69,7 @@ const toast = useToast()
 
 // 统一导出：把当前全局工作表完整导出为 Excel
 function exportGlobal() {
-  if (!dataShare.rows.length) { toast.warning('暂无数据可导出'); return }
+  if (!dataShare.rows.length) { toast.warn('暂无数据可导出'); return }
   exportToXlsx([...dataShare.headers], dataShare.rows.map(r => [...r]), dataShare.sourceName || '全局工作表.xlsx')
   toast.success('已导出全局工作表')
 }

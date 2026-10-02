@@ -96,9 +96,13 @@
     </div>
 
     <!-- 应用到全局 -->
-    <button v-if="stats.done > 0" @click="$emit('apply')"
+    <button v-if="stats.done > 0" @click="$emit('apply')" :disabled="isLabeling"
       class="w-full py-2.5 bg-violet-50 text-violet-700 border border-violet-200 rounded-lg text-xs font-bold hover:bg-violet-100 flex items-center justify-center gap-1.5">
       <Save class="w-3.5 h-3.5" /> 💾 应用到全局
+    </button>
+    <button v-if="stats.done > 0" @click="$emit('export')" :disabled="isLabeling"
+      class="w-full py-2 bg-white text-violet-700 border border-violet-200 rounded-lg text-xs font-bold disabled:opacity-50">
+      导出打标结果
     </button>
   </div>
 </template>
@@ -122,7 +126,7 @@ defineProps({
   stats: { type: Object, default: () => ({ done: 0, error: 0 }) },
   rows: { type: Array, default: () => [] }
 })
-defineEmits(['update:plan-source', 'update:user-goal', 'generate', 'apply-template', 'run', 'apply'])
+defineEmits(['update:plan-source', 'update:user-goal', 'generate', 'apply-template', 'run', 'apply', 'export'])
 
 const ICON_MAP = { Languages, Heart, Tag }
 const COLOR_MAP = { blue: 'text-blue-500', rose: 'text-rose-500', green: 'text-emerald-500', violet: 'text-violet-500', amber: 'text-amber-500' }

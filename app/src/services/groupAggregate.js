@@ -4,7 +4,7 @@
  * 设计原则：
  * - 纯函数，无副作用，易测试（参考 dataProfiler.js 风格）
  * - 输入 rows + 列索引 + 聚合方式，输出 [{group, value}] 排序后的数组
- * - 数值列自动转换（兼容字符串数字），非数值按 0 处理（COUNT 除外）
+ * - 数值列自动转换（兼容字符串数字），空值和非数值不参与数值聚合（COUNT 除外）
  */
 
 export const AGGREGATE_OPS = [
@@ -21,7 +21,7 @@ export const AGGREGATE_OPS = [
  * @returns {number|null}
  */
 function toNumber(v) {
-  if (v == null || v === '') return null
+  if (v == null || String(v).trim() === '') return null
   const n = typeof v === 'number' ? v : Number(String(v).trim())
   return Number.isFinite(n) ? n : null
 }
@@ -69,9 +69,8 @@ export function groupAggregate(rows, groupColIdx, valueColIdx, op) {
         break
       }
       case 'avg': {
-        value = bucket.values.length > 0
-          ? bucket.values.reduce((s, v) => s + v, 0) / bucket.values.length
-          : 0
+        const scale = bucket.values.reduce((max, current) => Math.max(max, Math.abs(current)), 0)
+        value = scale ? bucket.values.reduce((s, v) => s + v / scale, 0) / bucket.values.length * scale : 0
         break
       }
       case 'count': {
@@ -79,11 +78,11 @@ export function groupAggregate(rows, groupColIdx, valueColIdx, op) {
         break
       }
       case 'min': {
-        value = bucket.values.length > 0 ? Math.min(...bucket.values) : 0
+        value = bucket.values.length > 0 ? bucket.values.reduce((min, current) => Math.min(min, current), Infinity) : 0
         break
       }
       case 'max': {
-        value = bucket.values.length > 0 ? Math.max(...bucket.values) : 0
+        value = bucket.values.length > 0 ? bucket.values.reduce((max, current) => Math.max(max, current), -Infinity) : 0
         break
       }
       default: {
@@ -106,8 +105,9 @@ export function groupAggregate(rows, groupColIdx, valueColIdx, op) {
  * 数值四舍五入到 2 位小数（避免浮点精度问题）。
  */
 function round(n) {
-  if (!Number.isFinite(n)) return 0
-  return Math.round(n * 100) / 100
+  if (!Number.isFinite(n)) throw new RangeError('聚合结果超出可表示的数值范围')
+  const scaled = n * 100
+  return Number.isFinite(scaled) ? Math.round(scaled) / 100 : n
 }
 
 /**

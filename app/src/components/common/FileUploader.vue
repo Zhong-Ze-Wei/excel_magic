@@ -38,6 +38,7 @@ const isDragging = ref(false)
 function handleSelect(e) {
   const file = e.target.files[0]
   if (file) emit('file', file)
+  e.target.value = ''
 }
 
 function handleDrop(e) {

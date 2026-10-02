@@ -69,12 +69,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ChevronDown } from 'lucide-vue-next'
 import * as echarts from 'echarts/core'
 import { PieChart } from 'echarts/charts'
 import { TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
+import { useChartContainer } from '../../composables/useChartContainer'
 
 echarts.use([PieChart, TooltipComponent, CanvasRenderer])
 
@@ -86,7 +87,7 @@ const props = defineProps({
 
 const isOpen = ref(false)
 const typeChartRef = ref(null)
-let chartInstance = null
+const { updateChart } = useChartContainer(typeChartRef, renderChart)
 
 const TYPE_LABELS = { number: '数值', text: '文本', enum: '枚举', boolean: '布尔', date: '日期', identifier: '标识', empty: '空' }
 const TYPE_COLORS = { number: '#3b82f6', text: '#8b5cf6', enum: '#10b981', boolean: '#f59e0b', date: '#06b6d4', identifier: '#64748b', empty: '#cbd5e1' }
@@ -141,24 +142,11 @@ const textStats = computed(() => {
 
 function toggle() {
   isOpen.value = !isOpen.value
-  if (isOpen.value) {
-    // 展开后等动画完成再渲染 chart（此时容器有真实宽高）
-    nextTick(() => {
-      if (chartInstance) {
-        chartInstance.resize()
-        renderChart()
-      } else if (typeChartRef.value) {
-        chartInstance = echarts.init(typeChartRef.value)
-        renderChart()
-      }
-    })
-  }
 }
 
-function renderChart() {
-  if (!chartInstance || !typeChartData.value.length) return
+function renderChart(chartInstance) {
   chartInstance.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}: {c} 列 ({d}%)' },
+    tooltip: { trigger: 'item', renderMode: 'richText', formatter: '{b}: {c} 列 ({d}%)' },
     series: [{
       type: 'pie',
       radius: ['35%', '65%'],
@@ -171,11 +159,5 @@ function renderChart() {
   })
 }
 
-onMounted(() => {
-  if (typeChartRef.value) {
-    chartInstance = echarts.init(typeChartRef.value)
-  }
-})
-
-watch(typeChartData, () => { if (isOpen.value) nextTick(renderChart) })
+watch(typeChartData, updateChart, { flush: 'post' })
 </script>

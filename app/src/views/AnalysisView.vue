@@ -113,9 +113,13 @@
         </div>
       </div>
       <StatsPieChart :data="chartData" :height="160" />
-      <button v-if="Object.keys(analysisMap).length > 0" @click="applyToGlobal"
+      <button v-if="stats.done > 0" @click="applyToGlobal" :disabled="isAnalyzing"
         class="w-full mt-2 py-2 bg-violet-600 text-white rounded-lg text-xs font-bold active:bg-violet-700 flex items-center justify-center gap-1">
         💾 应用到全局
+      </button>
+      <button v-if="stats.done > 0" @click="exportResults" :disabled="isAnalyzing"
+        class="w-full mt-2 py-2 bg-white text-violet-700 border border-violet-200 rounded-lg text-xs font-bold disabled:opacity-50">
+        导出打标结果
       </button>
     </MobileCollapsible>
 
@@ -341,7 +345,11 @@
                 {{ processed }}/{{ totalToProcess }} ({{ percentFinished }}%) 并发{{ actualConcurrency }}
               </span>
             </div>
-            <button v-if="Object.keys(analysisMap).length > 0" @click="applyToGlobal"
+            <button v-if="stats.done > 0" @click="exportResults" :disabled="isAnalyzing"
+              class="px-3 py-1.5 text-violet-700 bg-white border border-violet-200 rounded-lg text-xs font-medium disabled:opacity-50">
+              导出打标结果
+            </button>
+            <button v-if="stats.done > 0" @click="applyToGlobal" :disabled="isAnalyzing"
               class="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-medium hover:bg-violet-700 transition-all flex items-center gap-1 shadow-sm">
               <Save class="w-3 h-3" /> 💾 应用到全局
             </button>
@@ -429,9 +437,10 @@ import { DEMO_DATA } from '../services/excel'
 import { useExport } from '../composables/useExport'
 import { useShare } from '../composables/useShare'
 import { useLabeling } from '../composables/useLabeling'
+import { useDatasetTask } from '../composables/useDatasetTask'
 import { callAI } from '../services/ai'
 import { getColumnDetectionPrompt, getLabelingPlanGenerationPrompt, compileLabelingPrompt, getPlanFromPromptPrompt, PRESET_TEMPLATES, getPresetPlan, formatIntentContext } from '../services/prompts'
-import { normalizeLabelingPlan, validateLabelingPlan } from '../services/labelingPlan'
+import { normalizeLabelingPlan, validateLabelingPlan, normalizeInputColumns } from '../services/labelingPlan'
 import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
 import { useGlobalDataSync } from '../composables/useGlobalDataSync'
@@ -448,8 +457,11 @@ const { headers, rows, hasData, disconnectGlobalExcel } = useGlobalDataSync({
   onInit: (h, r) => {
     rangeStart.value = 1
     rangeEnd.value = r.length
-    selectedInputColumns.value = dataShare.coreColumn != null ? [Number(dataShare.coreColumn)] : []
-    analysisMap.value = {}
+    userGoal.value = dataShare.labelingPlan.goal || ''
+    displayLimit.value = 50
+    selectedInputColumns.value = dataShare.labelingPlan.inputColumns.length
+      ? normalizeInputColumns(dataShare.labelingPlan.inputColumns, h)
+      : (dataShare.coreColumn != null && h.length ? [Number(dataShare.coreColumn)] : [])
   }
 })
 
@@ -486,8 +498,10 @@ const labelingPlan = computed({
 })
 
 // 控制变量
-const isGeneratingPlan = ref(false)
-const isSyncingPlan = ref(false)
+const planTask = useDatasetTask()
+const syncTask = useDatasetTask()
+const isGeneratingPlan = planTask.isRunning
+const isSyncingPlan = syncTask.isRunning
 const showAdvanced = ref(false)
 
 // 编辑列弹窗
@@ -517,7 +531,7 @@ function onTableScroll(e) {
 
 // 打标编排（批量调 AI + 进度管理 + 结果回写）由 composable 统一管理
 const {
-  isAnalyzing, processed, totalToProcess, percentFinished, stats, chartData,
+  isLabeling: isAnalyzing, processed, totalToProcess, percentFinished, stats, chartData,
   actualConcurrency, currentProcessingRowIdx, runLabeling: runLabelingBatch
 } = useLabeling({ headers, rows, labelingPlan, rangeStart, rangeEnd, selectedInputColumns, analysisMap })
 
@@ -568,6 +582,7 @@ function onSaveColumn({ index, column }) {
 }
 
 function deleteRow(ri) {
+  if (isAnalyzing.value) return
   rows.value.splice(ri, 1)
   if (rangeEnd.value > rows.value.length) rangeEnd.value = rows.value.length
   const newMap = {}
@@ -576,8 +591,10 @@ function deleteRow(ri) {
     if (keyInt < ri) newMap[keyInt] = analysisMap.value[keyInt]
     else if (keyInt > ri) newMap[keyInt - 1] = analysisMap.value[keyInt]
   })
+  const outputColumns = JSON.parse(JSON.stringify(labelingPlan.value.outputColumns))
+  dataShare.setSharedData(headers.value, rows.value, dataShare.sourceName || 'modified.xlsx', false, { preserveIntent: true })
   analysisMap.value = newMap
-  dataShare.setSharedData(headers.value, rows.value, dataShare.sourceName || 'modified.xlsx')
+  if (Object.values(newMap).some(result => result.status === 'done')) dataShare.setLabelingResults(outputColumns, newMap)
 }
 
 function formatCellValue(val, type) {
@@ -601,8 +618,7 @@ function loadDemo() {
 }
 
 function reset() {
-  headers.value = []
-  rows.value = []
+  disconnectGlobalExcel()
   analysisMap.value = {}
   labelingPlan.value = { taskName: '', goal: '', inputColumns: [], outputColumns: [], compiledPrompt: '', promptDirty: false }
   userGoal.value = ''
@@ -614,7 +630,6 @@ async function generateLabelingPlanWithAI() {
   if (!settings.isConfigured) { settings.showSettings = true; toast.warn('请先配置 API 密钥'); return }
   if (!rows.value.length) { toast.warn('请先上传数据'); return }
 
-  isGeneratingPlan.value = true
   try {
     const inputCols = selectedInputColumns.value.length > 0 ? selectedInputColumns.value : (dataShare.coreColumn != null ? [Number(dataShare.coreColumn)] : [0])
     const sampleRows = rows.value.slice(0, 10).map(row => {
@@ -625,7 +640,9 @@ async function generateLabelingPlanWithAI() {
 
     const prompt = getLabelingPlanGenerationPrompt(userGoal.value, headers.value, sampleRows, inputCols)
     const sysPrompt = '你是一个数据分析配置专家。' + formatIntentContext(dataShare.intentNote, '为表格新增列')
-    const res = await callAI(prompt, sysPrompt, settings.getApiConfig().workModel)
+    const goal = userGoal.value
+    const res = await planTask.run(({ signal }) => callAI(prompt, sysPrompt, settings.getApiConfig().workModel, { signal }))
+    if (res === undefined || goal !== userGoal.value) return
     const parsed = parseRobustJSON(res)
 
     const plan = normalizeLabelingPlan(parsed)
@@ -639,13 +656,9 @@ async function generateLabelingPlanWithAI() {
       compiledPrompt: compileLabelingPrompt(plan),
       promptDirty: false
     }
-    selectedInputColumns.value = plan.inputColumns
-      .map(name => headers.value.indexOf(name))
-      .filter(i => i >= 0)
+    selectedInputColumns.value = normalizeInputColumns(plan.inputColumns, headers.value)
   } catch (e) {
     toast.error('AI 生成打标方案失败: ' + e.message)
-  } finally {
-    isGeneratingPlan.value = false
   }
 }
 
@@ -658,6 +671,8 @@ function templateColor(c) {
 }
 function applyTemplate(templateId) {
   if (!rows.value.length) { toast.warn('请先上传数据'); return }
+  planTask.cancel()
+  syncTask.cancel()
   const idx = Number(dataShare.coreColumn)
   if (idx == null || Number.isNaN(idx) || idx < 0 || idx >= headers.value.length) {
     toast.warn('请先选择有效的核心列')
@@ -677,10 +692,11 @@ async function syncPlanFromPrompt() {
   if (!settings.isConfigured) { settings.showSettings = true; toast.warn('请先配置 API 密钥'); return }
   if (!labelingPlan.value.compiledPrompt.trim()) { toast.warn('当前 Prompt 为空'); return }
 
-  isSyncingPlan.value = true
   try {
     const prompt = getPlanFromPromptPrompt(labelingPlan.value.compiledPrompt, labelingPlan.value)
-    const res = await callAI(prompt, '你是一个 Prompt 逆向分析专家。', settings.getApiConfig().workModel)
+    const originalPrompt = labelingPlan.value.compiledPrompt
+    const res = await syncTask.run(({ signal }) => callAI(prompt, '你是一个 Prompt 逆向分析专家。', settings.getApiConfig().workModel, { signal }))
+    if (res === undefined || originalPrompt !== labelingPlan.value.compiledPrompt) return
     const parsed = parseRobustJSON(res)
     const plan = normalizeLabelingPlan(parsed)
     if (!plan) throw new Error('无法从 Prompt 中解析出有效的列配置')
@@ -694,8 +710,6 @@ async function syncPlanFromPrompt() {
     }
   } catch (e) {
     toast.error('同步失败: ' + e.message)
-  } finally {
-    isSyncingPlan.value = false
   }
 }
 

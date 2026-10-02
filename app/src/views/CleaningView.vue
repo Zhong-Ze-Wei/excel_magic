@@ -177,7 +177,7 @@
               共享至...
             </button>
             <div v-show="showShareMenu" class="absolute bottom-full left-0 right-0 mb-1 bg-white border border-slate-200 rounded-lg shadow-lg z-30 py-1 text-xs">
-              <button @click="shareDataTo('/translate')" class="w-full text-left px-3 py-2 active:bg-slate-50 text-slate-700 border-b border-slate-100">批量翻译</button>
+              <button @click="shareDataTo('/process')" class="w-full text-left px-3 py-2 active:bg-slate-50 text-slate-700 border-b border-slate-100">智能加工</button>
               <button @click="shareDataTo('/analysis')" class="w-full text-left px-3 py-2 active:bg-slate-50 text-slate-700 border-b border-slate-100">评论分析</button>
               <button @click="shareDataTo('/summary')" class="w-full text-left px-3 py-2 active:bg-slate-50 text-slate-700">数据摘要</button>
             </div>
@@ -350,8 +350,8 @@
                 
                 <!-- 下拉菜单卡片 -->
                 <div v-show="showShareMenu" class="absolute right-0 mt-1.5 w-40 bg-white border border-slate-200 rounded-lg shadow-lg z-30 py-1 text-xs animate-fade-in">
-                  <button @click="shareDataTo('/translate')" class="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700 flex items-center justify-between border-b border-slate-100">
-                    <span>批量翻译 ➡️</span>
+                  <button @click="shareDataTo('/process')" class="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700 flex items-center justify-between border-b border-slate-100">
+                    <span>智能加工 ➡️</span>
                   </button>
                   <button @click="shareDataTo('/analysis')" class="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700 flex items-center justify-between border-b border-slate-100">
                     <span>评论分析 ➡️</span>
@@ -425,10 +425,12 @@ import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
 import { useGlobalDataSync } from '../composables/useGlobalDataSync'
 import { useFileUpload } from '../composables/useFileUpload'
+import { useDatasetTask } from '../composables/useDatasetTask'
 import { callAI } from '../services/ai'
 import { getSmartFilterPrompt } from '../services/prompts'
 import { parseRobustJSON } from '../services/jsonParser'
 import { useToast } from '../services/toast'
+import { normalizeRulesConfig } from '../config/settingsConfig'
 
 const toast = useToast()
 const dataShare = useDataShareStore()
@@ -486,9 +488,15 @@ const displayCleanedRows = computed(() => cleanedRows.value) // cleanedRows 内�
 
 // 自定义筛选相关状态
 const smartFilterInput = ref('')
-const isGeneratingFilter = ref(false)
+const filterTask = useDatasetTask()
+const isGeneratingFilter = filterTask.isRunning
 const showAddFilterForm = ref(false)
 const editingFilter = ref(null)
+watch(() => dataShare.datasetVersion, () => {
+  smartFilterInput.value = ''
+  showAddFilterForm.value = false
+  editingFilter.value = null
+})
 
 const customFiltersCount = computed(() => (settings.rulesConfig.customFilters || []).filter(f => f.enabled).length)
 
@@ -515,7 +523,6 @@ async function generateSmartFilter() {
   if (!s.isConfigured) { s.showSettings = true; toast.warn('请先配置 API 密钥'); return }
   if (!rows.value.length) { toast.warn('请先上传数据'); return }
 
-  isGeneratingFilter.value = true
   try {
     // 收集每列的样例值（前20行）
     const allColumnSamples = {}
@@ -523,18 +530,21 @@ async function generateSmartFilter() {
       allColumnSamples[c] = rows.value.slice(0, 20).map(r => r[c] != null ? String(r[c]) : '')
     }
     const prompt = getSmartFilterPrompt(input, headers.value, sourceCol.value, allColumnSamples, rulesMeta)
-    const raw = await callAI(prompt, '你是一个数据清洗专家。', s.getApiConfig().workModel)
+    const raw = await filterTask.run(({ signal }) => callAI(prompt, '你是一个数据清洗专家。', s.getApiConfig().workModel, { signal }))
+    if (raw === undefined || input !== smartFilterInput.value.trim()) return
 
     const parsed = parseRobustJSON(raw)
+    if (!parsed || typeof parsed !== 'object') throw new Error('AI 返回的筛选配置无效')
+    const nextConfig = JSON.parse(JSON.stringify(settings.rulesConfig))
 
     // 应用内置规则配置
     if (parsed.builtinConfig) {
       const bc = parsed.builtinConfig
-      if (bc.rulesToEnable) bc.rulesToEnable.forEach(k => { if (settings.rulesConfig[k]) settings.rulesConfig[k].enable = true })
-      if (bc.rulesToDisable) bc.rulesToDisable.forEach(k => { if (settings.rulesConfig[k]) settings.rulesConfig[k].enable = false })
+      if (bc.rulesToEnable) bc.rulesToEnable.forEach(k => { if (nextConfig[k]) nextConfig[k].enable = true })
+      if (bc.rulesToDisable) bc.rulesToDisable.forEach(k => { if (nextConfig[k]) nextConfig[k].enable = false })
       if (bc.paramOverrides) {
         for (const [key, overrides] of Object.entries(bc.paramOverrides)) {
-          if (settings.rulesConfig[key]) Object.assign(settings.rulesConfig[key], overrides)
+          if (nextConfig[key]) Object.assign(nextConfig[key], overrides)
         }
       }
     }
@@ -542,8 +552,7 @@ async function generateSmartFilter() {
     // 添加自定义规则
     if (parsed.customFilters?.length) {
       for (const cf of parsed.customFilters) {
-        if (!settings.rulesConfig.customFilters) settings.rulesConfig.customFilters = []
-        settings.rulesConfig.customFilters.push({
+        nextConfig.customFilters.push({
           id: `cf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           name: cf.name || 'AI 生成规则',
           type: cf.type,
@@ -554,12 +563,11 @@ async function generateSmartFilter() {
       }
     }
 
+    settings.rulesConfig = normalizeRulesConfig(nextConfig)
     smartFilterInput.value = ''
     runPipeline()
   } catch (err) {
     toast.error('AI 生成筛选规则失败: ' + err.message)
-  } finally {
-    isGeneratingFilter.value = false
   }
 }
 
@@ -686,13 +694,13 @@ function loadDemo() {
     ['15', 'User_015', '-'], // 无意义字符 (有效长度 0)
     ['16', 'User_016', '感觉一般，没有想象中好用，退货了。']
   ]
-  sourceCol.value = 2 // 默认清洗评论内容列
+  dataShare.setSharedData(headers.value, rows.value, '清洗示例.csv')
+  dataShare.setCoreColumn(2)
   runPipeline()
 }
 
 function reset() {
-  headers.value = []
-  rows.value = []
+  disconnectGlobalExcel()
   clearCleaned()
 }
 
@@ -736,6 +744,18 @@ function statusLabel(decision) {
   if (decision === 'delete') return '已删除'
   if (decision === 'suspect') return '待确认'
   return '保留'
+}
+
+function rowClass(decision) {
+  return decision === 'delete' ? 'bg-rose-50/20 text-rose-700/90' : decision === 'suspect' ? 'bg-amber-50/20 text-amber-700/90' : ''
+}
+
+function statusBadgeClass(decision) {
+  return decision === 'delete' ? 'bg-rose-100 text-rose-800' : decision === 'suspect' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+}
+
+function ruleClass(decision) {
+  return decision === 'delete' ? 'text-rose-600' : decision === 'suspect' ? 'text-amber-600' : 'text-slate-400'
 }
 
 // 运行全量清洗 Pipeline 并应用用户覆写
@@ -802,16 +822,7 @@ function handleImportConfig(e) {
   reader.onload = (event) => {
     try {
       const parsed = JSON.parse(event.target.result)
-      let success = false
-      
-      if (parsed.rulesConfig) {
-        // 全局配置导入
-        success = settings.importGlobalConfig(parsed)
-      } else if (parsed.tooShort && parsed.duplicate && parsed.shortMeaningless) {
-        // 老版本纯清洗配置导入
-        Object.assign(settings.rulesConfig, parsed)
-        success = true
-      }
+      const success = settings.importGlobalConfig(parsed)
       
       if (success) {
         toast.success('导入规则配置成功！已应用并重新运行数据清洗。')

@@ -24,9 +24,7 @@ export function useGlobalDataSync(options = {}) {
 
   function disconnectGlobalExcel() {
     dataShare.clearSharedData()
-    headers.value = []
-    rows.value = []
-    if (options.onInit) options.onInit([], [])
+    importGlobalExcel()
   }
 
   onMounted(() => {
@@ -37,11 +35,7 @@ export function useGlobalDataSync(options = {}) {
 
   // store 数据变化时自动同步（解决 keep-alive 下 onMounted 只触发一次的问题）
   // 同时监听 rows.length 和 headers.length：清洗改行数、加工改列数，都要触发同步
-  watch(() => [dataShare.rows.length, dataShare.headers.length], ([newRowLen]) => {
-    if (newRowLen > 0) {
-      importGlobalExcel()
-    }
-  })
+  watch(() => dataShare.datasetVersion, importGlobalExcel)
 
   return { headers, rows, hasData, importGlobalExcel, disconnectGlobalExcel }
 }

@@ -1,7 +1,7 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onScopeDispose } from 'vue'
 import { callAIBatch } from '../services/ai'
 import { compileLabelingPrompt } from '../services/prompts'
-import { validateLabelingPlan, normalizeRowResult } from '../services/labelingPlan'
+import { validateLabelingPlan, normalizeRowResult, normalizeInputColumns } from '../services/labelingPlan'
 import { parseRobustJSON } from '../services/jsonParser'
 import { useSettingsStore } from '../stores/settings'
 import { useDataShareStore } from '../stores/dataShare'
@@ -32,13 +32,57 @@ import { useToast } from '../services/toast'
  */
 export function useLabeling({ headers, rows, labelingPlan, rangeStart, rangeEnd, selectedInputColumns, analysisMap }) {
   const toast = useToast()
+  const dataShare = useDataShareStore()
+  let activeController = null
+  let activeRunId = null
+
+  function resetResults() {
+    activeController?.abort()
+    activeController = null
+    dataShare.cancelLabelingRun()
+    currentProcessingRowIdx.value = -1
+    analysisMap.value = {}
+  }
+  watch(() => dataShare.datasetVersion, resetResults, { flush: 'sync' })
+  watch(() => JSON.stringify(labelingPlan.value), () => {
+    resetResults()
+    dataShare.clearLabelingResults()
+  }, { flush: 'sync' })
+  watch(() => JSON.stringify(selectedInputColumns.value), (current, previous) => {
+    const previousColumns = normalizeInputColumns(JSON.parse(previous), headers.value)
+    const currentColumns = normalizeInputColumns(JSON.parse(current), headers.value)
+    if (!previousColumns.length && !activeController) return
+    if (JSON.stringify(previousColumns) === JSON.stringify(currentColumns)) return
+    resetResults()
+    dataShare.clearLabelingResults()
+  }, { flush: 'sync' })
+  watch(() => dataShare.labelingStatus.runId, runId => {
+    if (activeController && activeRunId !== runId) {
+      activeController.abort()
+      activeController = null
+      activeRunId = null
+      analysisMap.value = {}
+      currentProcessingRowIdx.value = -1
+    } else if (!activeController) {
+      analysisMap.value = {}
+    }
+  }, { flush: 'sync' })
+  onScopeDispose(() => {
+    if (activeController) {
+      activeController.abort()
+      dataShare.cancelLabelingRun()
+    }
+  })
 
   // 运行状态
-  const isLabeling = ref(false)
-  const processed = ref(0)
-  const totalToProcess = ref(0)
-  const actualConcurrency = ref(0)
+  const isLabeling = computed(() => dataShare.labelingStatus.running)
+  const processed = computed({ get: () => dataShare.labelingStatus.processed, set: value => { dataShare.labelingStatus.processed = value } })
+  const totalToProcess = computed(() => dataShare.labelingStatus.total)
+  const actualConcurrency = computed({ get: () => dataShare.labelingStatus.concurrency, set: value => { dataShare.labelingStatus.concurrency = value } })
   const currentProcessingRowIdx = ref(-1)
+  watch(() => dataShare.labelingResults, result => {
+    if (!isLabeling.value) analysisMap.value = result ? JSON.parse(JSON.stringify(result.analysisMap)) : {}
+  }, { immediate: true })
 
   // 派生统计
   const percentFinished = computed(() => {
@@ -71,17 +115,15 @@ export function useLabeling({ headers, rows, labelingPlan, rangeStart, rangeEnd,
   async function runLabeling() {
     if (isLabeling.value || !rows.value.length) return
     const settings = useSettingsStore()
-    const dataShare = useDataShareStore()
     const config = settings.getApiConfig()
-    if (!config.key) { settings.showSettings = true; toast.warning('请先配置 API 密钥'); return }
+    if (!config.key) { settings.showSettings = true; toast.warn('请先配置 API 密钥'); return }
 
-    const plan = labelingPlan.value
+    const plan = JSON.parse(JSON.stringify(labelingPlan.value))
     const validationErr = validateLabelingPlan(plan)
-    if (validationErr) { toast.warning(validationErr); return }
+    if (validationErr) { toast.warn(validationErr); return }
 
-    const inputCols = selectedInputColumns.value.length > 0 ? selectedInputColumns.value
-      : (plan.inputColumns.map(name => headers.value.indexOf(name)).filter(i => i >= 0))
-    if (inputCols.length === 0) { toast.warning('请选择至少一个 AI 参考列'); return }
+    const inputCols = normalizeInputColumns(selectedInputColumns.value.length > 0 ? selectedInputColumns.value : plan.inputColumns, headers.value)
+    if (inputCols.length === 0) { toast.warn('请选择至少一个 AI 参考列'); return }
 
     if (selectedInputColumns.value.length === 1) {
       const onlyIdx = selectedInputColumns.value[0]
@@ -95,11 +137,22 @@ export function useLabeling({ headers, rows, labelingPlan, rangeStart, rangeEnd,
     let end = parseInt(rangeEnd.value) || rows.value.length
     if (start < 1) start = 1
     if (end > rows.value.length) end = rows.value.length
-    if (start > end) { toast.warning('开始行不能大于结束行'); return }
+    if (start > end || end < 1) { toast.warn('开始行不能大于结束行'); return }
 
-    isLabeling.value = true
-    processed.value = 0
-    totalToProcess.value = end - start + 1
+    const controller = new AbortController()
+    activeController = controller
+    activeRunId = dataShare.labelingStatus.runId + 1
+    const runId = dataShare.beginLabelingRun(end - start + 1, settings.concurrency)
+    if (runId === null) {
+      activeController = null
+      activeRunId = null
+      return
+    }
+    activeRunId = runId
+    const version = dataShare.datasetVersion
+    const isCurrent = () => activeController === controller && dataShare.datasetVersion === version && dataShare.labelingStatus.runId === runId
+    dataShare.clearLabelingResults()
+
     currentProcessingRowIdx.value = -1
 
     for (let k = start - 1; k < end; k++) {
@@ -113,7 +166,7 @@ export function useLabeling({ headers, rows, labelingPlan, rangeStart, rangeEnd,
     // 构建任务列表（空内容行直接跳过）
     const tasks = []
     for (let i = start - 1; i < end; i++) {
-      const rowInput = {}
+      const rowInput = Object.create(null)
       inputCols.forEach(ci => {
         rowInput[headers.value[ci]] = rows.value[i][ci] ?? ''
       })
@@ -132,9 +185,11 @@ export function useLabeling({ headers, rows, labelingPlan, rangeStart, rangeEnd,
 
     // 并发调用 AI
     actualConcurrency.value = settings.concurrency
-    await callAIBatch(
+    try {
+    const { finalConcurrency } = await callAIBatch(
       tasks.map(t => ({ content: t.content, systemPrompt: t.systemPrompt })),
       (batchIdx, result, error, meta) => {
+        if (!isCurrent()) return
         const rowIdx = tasks[batchIdx].index
         if (error) {
           analysisMap.value[rowIdx] = { status: 'error', values: {}, errorMessage: error.message }
@@ -150,23 +205,36 @@ export function useLabeling({ headers, rows, labelingPlan, rangeStart, rangeEnd,
         processed.value++
         actualConcurrency.value = meta.concurrency
       },
-      settings.concurrency
-    ).then(({ finalConcurrency }) => {
+      settings.concurrency, undefined, { signal: controller.signal }
+    )
+    if (!isCurrent()) return
       if (finalConcurrency < settings.concurrency) {
-        toast.warning(`API 限流，已自动降级并发数: ${settings.concurrency} → ${finalConcurrency}`)
+        toast.warn(`API 限流，已自动降级并发数: ${settings.concurrency} → ${finalConcurrency}`)
       }
-    })
 
-    isLabeling.value = false
-    currentProcessingRowIdx.value = -1
-
-    // 将打标结果写入全局共享，供数据摘要页使用
-    const doneCount = Object.values(analysisMap.value).filter(r => r.status === 'done').length
-    if (doneCount > 0) {
-      dataShare.setLabelingResults(plan.outputColumns, analysisMap.value)
+    if (stats.value.error) toast.warn(`打标完成：${stats.value.done} 行成功，${stats.value.error} 行失败`)
+    else toast.success('AI 打标完成！')
+    } catch (error) {
+      if (!isCurrent() || error.name === 'AbortError') return
+      for (const task of tasks) {
+        if (analysisMap.value[task.index]?.status === 'processing') {
+          analysisMap.value[task.index] = { status: 'error', values: {}, errorMessage: error.message }
+        }
+      }
+      processed.value = totalToProcess.value
+      toast.error('打标失败：' + error.message)
+    } finally {
+      if (activeController === controller) {
+        // 批次意外中断也保留成功行，供另一模式和摘要页继续使用。
+        if (Object.values(analysisMap.value).some(result => result.status === 'done')) {
+          dataShare.setLabelingResults(plan.outputColumns, analysisMap.value, version)
+        }
+        activeController = null
+        activeRunId = null
+        dataShare.finishLabelingRun(runId)
+        currentProcessingRowIdx.value = -1
+      }
     }
-
-    toast.success('AI 打标完成！')
   }
 
   return {
