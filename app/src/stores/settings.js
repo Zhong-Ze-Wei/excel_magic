@@ -1,93 +1,69 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { DEFAULT_API_PLATFORMS, DEFAULT_RULES_CONFIG } from '../config/defaultSettings'
+import { DEFAULT_API_PLATFORMS } from '../config/defaultSettings'
+import { createDefaultSettings, normalizeSettingsImport } from '../config/settingsConfig'
 
 const API_PLATFORMS = DEFAULT_API_PLATFORMS
+const settingStorageKeys = {
+  apiPlatform: 'api_platform',
+  rulesConfig: 'magic_excel_cleaning_rules',
+  concurrency: 'magic_excel_concurrency',
+  autoIntentAnalysis: 'auto_intent_analysis',
+  cleaningMode: 'magic_excel_cleaning_mode',
+  processMode: 'magic_excel_process_mode'
+}
+
+function readSavedSettings() {
+  let config = createDefaultSettings()
+  for (const [field, storageKey] of Object.entries(settingStorageKeys)) {
+    const saved = localStorage.getItem(storageKey)
+    if (saved === null) continue
+    try {
+      const value = ['rulesConfig', 'concurrency', 'autoIntentAnalysis'].includes(field) ? JSON.parse(saved) : saved
+      config = normalizeSettingsImport({ [field]: value }, config)
+    } catch {
+      // 旧备份或损坏存储中的单个字段回退默认，其余用户配置仍可恢复。
+    }
+  }
+  for (const platform of Object.keys(API_PLATFORMS)) {
+    config.apiKeys[platform] = localStorage.getItem(`${platform}_api_key`) || ''
+    for (const [field, suffix] of [['selectedTranslateModel', 'translate_model'], ['selectedWorkModel', 'work_model']]) {
+      const saved = localStorage.getItem(`${platform}_${suffix}`)
+      if (saved?.trim()) config[field][platform] = saved
+    }
+  }
+  return config
+}
 
 export const useSettingsStore = defineStore('settings', () => {
-  // 当前选中的平台
-  const currentPlatform = ref(localStorage.getItem('api_platform') || 'aiping')
-  // 各平台选中的翻译模型 ID
-  const selectedTranslateModel = ref({
-    siliconflow: localStorage.getItem('siliconflow_translate_model') || 'deepseek-ai/DeepSeek-V4-Flash',
-    aiping: (localStorage.getItem('aiping_translate_model') === 'GLM-4.7' || !localStorage.getItem('aiping_translate_model')) ? 'DeepSeek-V4-Flash' : localStorage.getItem('aiping_translate_model')
-  })
-  // 各平台选中的分析模型 ID
-  const selectedWorkModel = ref({
-    siliconflow: localStorage.getItem('siliconflow_work_model') || 'deepseek-ai/DeepSeek-V4-Flash',
-    aiping: (localStorage.getItem('aiping_work_model') === 'GLM-4.7' || !localStorage.getItem('aiping_work_model')) ? 'DeepSeek-V4-Flash' : localStorage.getItem('aiping_work_model')
-  })
-  // 设置弹窗是否打开
+  const initial = readSavedSettings()
+  const currentPlatform = ref(initial.apiPlatform)
+  const apiKeys = ref(initial.apiKeys)
+  const selectedTranslateModel = ref(initial.selectedTranslateModel)
+  const selectedWorkModel = ref(initial.selectedWorkModel)
+  const rulesConfig = ref(initial.rulesConfig)
+  const concurrency = ref(initial.concurrency)
+  const autoIntentAnalysis = ref(initial.autoIntentAnalysis)
+  const cleaningMode = ref(initial.cleaningMode)
+  const processMode = ref(initial.processMode)
   const showSettings = ref(false)
-
-  // 默认的数据清洗配置参数定义与持久化
-  const getLocalRulesConfig = () => {
-    const local = localStorage.getItem('magic_excel_cleaning_rules')
-    if (local) {
-      try {
-        const parsed = JSON.parse(local)
-        // 合并默认配置防缺项
-        return Object.assign({}, DEFAULT_RULES_CONFIG, parsed)
-      } catch (e) {
-        console.warn('解析本地清洗配置失败:', e)
-      }
-    }
-    return JSON.parse(JSON.stringify(DEFAULT_RULES_CONFIG))
-  }
-  const rulesConfig = ref(getLocalRulesConfig())
-
-  watch(rulesConfig, (newVal) => {
-    localStorage.setItem('magic_excel_cleaning_rules', JSON.stringify(newVal))
-  }, { deep: true })
-
-  // 各平台 API Key 的响应式状态
-  const apiKeys = ref({
-    siliconflow: localStorage.getItem('siliconflow_api_key') || '',
-    aiping: localStorage.getItem('aiping_api_key') || ''
-  })
-
-  // AI 并发调用数（持久化）
-  const concurrency = ref(parseInt(localStorage.getItem('magic_excel_concurrency')) || 3)
-  watch(concurrency, (v) => localStorage.setItem('magic_excel_concurrency', String(v)))
-
-  // 导入数据后是否自动调用 AI 分析「数据集意图」（默认开启，用户可在设置关闭改为手动触发）
-  const autoIntentAnalysis = ref(localStorage.getItem('auto_intent_analysis') !== 'false')
-  watch(autoIntentAnalysis, (v) => localStorage.setItem('auto_intent_analysis', String(v)))
-
-  // 数据清洗入口模式: 'simple' (AI 优化) | 'expert' (规则精调)
-  const cleaningMode = ref(localStorage.getItem('magic_excel_cleaning_mode') || 'simple')
-  watch(cleaningMode, (v) => localStorage.setItem('magic_excel_cleaning_mode', v))
-
-  // 智能加工入口模式: 'simple' (模板驱动) | 'expert' (outputColumns 手编)
-  const processMode = ref(localStorage.getItem('magic_excel_process_mode') || 'simple')
-  watch(processMode, (v) => localStorage.setItem('magic_excel_process_mode', v))
-
-  // 最近一次 AI 优化方案的时间戳（会话内有效，null 表示尚未跑过 AI）
   const lastAiConfigAt = ref(null)
 
-  // 当前平台的完整配置
-  const platformConfig = computed(() => API_PLATFORMS[currentPlatform.value])
-  // 当前的 API Key
-  const apiKey = computed(() => apiKeys.value[currentPlatform.value] || '')
-  // 是否已配置
-  const isConfigured = computed(() => !!apiKey.value)
-  // 当前翻译模型
-  const translateModel = computed(() => selectedTranslateModel.value[currentPlatform.value])
-  // 当前分析模型
-  const workModel = computed(() => selectedWorkModel.value[currentPlatform.value])
-  // 是否需要 system prompt
-  const useSystemPrompt = computed(() => {
-    const model = translateModel.value
-    // 腾讯翻译专用模型不需要 system prompt
-    if (model === 'Tencent/Hunyuan-MT-7B') return false
-    return true
-  })
+  watch(rulesConfig, value => localStorage.setItem(settingStorageKeys.rulesConfig, JSON.stringify(value)), { deep: true })
+  for (const [field, state] of Object.entries({ concurrency, autoIntentAnalysis, cleaningMode, processMode })) {
+    watch(state, value => localStorage.setItem(settingStorageKeys[field], String(value)))
+  }
 
-  // 获取完整 API 调用配置
+  const platformConfig = computed(() => API_PLATFORMS[currentPlatform.value])
+  const apiKey = computed(() => apiKeys.value[currentPlatform.value])
+  const isConfigured = computed(() => !!apiKey.value)
+  const translateModel = computed(() => selectedTranslateModel.value[currentPlatform.value])
+  const workModel = computed(() => selectedWorkModel.value[currentPlatform.value])
+  const useSystemPrompt = computed(() => translateModel.value !== 'Tencent/Hunyuan-MT-7B')
+
   function getApiConfig() {
-    const config = API_PLATFORMS[currentPlatform.value]
     return {
-      url: config.url,
+      url: platformConfig.value.url,
       key: apiKey.value,
       translateModel: translateModel.value,
       workModel: workModel.value,
@@ -95,120 +71,96 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  // 切换平台
   function setPlatform(platform) {
+    if (!Object.hasOwn(API_PLATFORMS, platform)) return false
     currentPlatform.value = platform
-    localStorage.setItem('api_platform', platform)
+    localStorage.setItem(settingStorageKeys.apiPlatform, platform)
+    return true
   }
 
-  // 保存 API Key
   function saveApiKey(platform, key) {
-    localStorage.setItem(`${platform}_api_key`, key)
+    if (!Object.hasOwn(API_PLATFORMS, platform) || typeof key !== 'string') return false
     apiKeys.value[platform] = key
+    if (key) localStorage.setItem(`${platform}_api_key`, key)
+    else localStorage.removeItem(`${platform}_api_key`)
+    return true
   }
 
-  // 保存模型选择
   function saveModelSelection(platform, type, modelId) {
-    if (type === 'translate') {
-      selectedTranslateModel.value[platform] = modelId
-      localStorage.setItem(`${platform}_translate_model`, modelId)
-    } else {
-      selectedWorkModel.value[platform] = modelId
-      localStorage.setItem(`${platform}_work_model`, modelId)
-    }
+    if (!Object.hasOwn(API_PLATFORMS, platform) || !['translate', 'work'].includes(type) || typeof modelId !== 'string' || !modelId.trim()) return false
+    const target = type === 'translate' ? selectedTranslateModel : selectedWorkModel
+    target.value[platform] = modelId
+    localStorage.setItem(`${platform}_${type}_model`, modelId)
+    return true
   }
 
-  // 导出全局配置备份 JSON
-  function exportGlobalConfig() {
-    const configData = {
-      version: '1.0.0',
+  function getConfigSnapshot() {
+    return JSON.parse(JSON.stringify({
+      version: '1.1.0',
       apiPlatform: currentPlatform.value,
       apiKeys: apiKeys.value,
       selectedTranslateModel: selectedTranslateModel.value,
       selectedWorkModel: selectedWorkModel.value,
-      rulesConfig: rulesConfig.value
+      rulesConfig: rulesConfig.value,
+      concurrency: concurrency.value,
+      autoIntentAnalysis: autoIntentAnalysis.value,
+      cleaningMode: cleaningMode.value,
+      processMode: processMode.value
+    }))
+  }
+
+  function prepareConfigImport(input, base = getConfigSnapshot()) {
+    try {
+      return normalizeSettingsImport(input, base)
+    } catch {
+      return null
     }
-    const dataStr = JSON.stringify(configData, null, 2)
-    const blob = new Blob([dataStr], { type: 'application/json' })
+  }
+
+  function applyConfig(config) {
+    setPlatform(config.apiPlatform)
+    for (const platform of Object.keys(API_PLATFORMS)) {
+      saveApiKey(platform, config.apiKeys[platform])
+      saveModelSelection(platform, 'translate', config.selectedTranslateModel[platform])
+      saveModelSelection(platform, 'work', config.selectedWorkModel[platform])
+    }
+    rulesConfig.value = config.rulesConfig
+    concurrency.value = config.concurrency
+    autoIntentAnalysis.value = config.autoIntentAnalysis
+    cleaningMode.value = config.cleaningMode
+    processMode.value = config.processMode
+    for (const field of ['rulesConfig', 'concurrency', 'autoIntentAnalysis', 'cleaningMode', 'processMode']) {
+      localStorage.setItem(settingStorageKeys[field], field === 'rulesConfig' ? JSON.stringify(config[field]) : String(config[field]))
+    }
+  }
+
+  function importGlobalConfig(parsed) {
+    const config = prepareConfigImport(parsed)
+    if (!config) return false
+    applyConfig(config)
+    return true
+  }
+
+  function exportGlobalConfig(config = getConfigSnapshot()) {
+    const data = normalizeSettingsImport(config)
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `magic_excel_config_backup.json`
+    link.download = 'magic_excel_config_backup.json'
     link.click()
     URL.revokeObjectURL(url)
   }
 
-  // 导入全局配置备份 JSON
-  function importGlobalConfig(parsed) {
-    if (!parsed) return false
-    
-    if (parsed.apiPlatform) {
-      currentPlatform.value = parsed.apiPlatform
-      localStorage.setItem('api_platform', parsed.apiPlatform)
-    }
-    if (parsed.apiKeys) {
-      Object.assign(apiKeys.value, parsed.apiKeys)
-      for (const key in parsed.apiKeys) {
-        localStorage.setItem(`${key}_api_key`, parsed.apiKeys[key])
-      }
-    }
-    if (parsed.selectedTranslateModel) {
-      Object.assign(selectedTranslateModel.value, parsed.selectedTranslateModel)
-      for (const p in parsed.selectedTranslateModel) {
-        localStorage.setItem(`${p}_translate_model`, parsed.selectedTranslateModel[p])
-      }
-    }
-    if (parsed.selectedWorkModel) {
-      Object.assign(selectedWorkModel.value, parsed.selectedWorkModel)
-      for (const p in parsed.selectedWorkModel) {
-        localStorage.setItem(`${p}_work_model`, parsed.selectedWorkModel[p])
-      }
-    }
-    if (parsed.rulesConfig) {
-      rulesConfig.value = Object.assign({}, DEFAULT_RULES_CONFIG, parsed.rulesConfig)
-      localStorage.setItem('magic_excel_cleaning_rules', JSON.stringify(rulesConfig.value))
-    }
-    return true
-  }
-
-  // 重置系统所有配置为出厂默认值
   function resetAllConfig() {
-    currentPlatform.value = 'aiping'
-    localStorage.setItem('api_platform', 'aiping')
-    
-    apiKeys.value = { siliconflow: '', aiping: '' }
-    localStorage.removeItem('siliconflow_api_key')
-    localStorage.removeItem('aiping_api_key')
-    
-    selectedTranslateModel.value = {
-      siliconflow: 'deepseek-ai/DeepSeek-V4-Flash',
-      aiping: 'DeepSeek-V4-Flash'
-    }
-    localStorage.removeItem('siliconflow_translate_model')
-    localStorage.removeItem('aiping_translate_model')
-
-    selectedWorkModel.value = {
-      siliconflow: 'deepseek-ai/DeepSeek-V4-Flash',
-      aiping: 'DeepSeek-V4-Flash'
-    }
-    localStorage.removeItem('siliconflow_work_model')
-    localStorage.removeItem('aiping_work_model')
-    
-    rulesConfig.value = JSON.parse(JSON.stringify(DEFAULT_RULES_CONFIG))
-    localStorage.setItem('magic_excel_cleaning_rules', JSON.stringify(rulesConfig.value))
-
-    cleaningMode.value = 'simple'
-    processMode.value = 'simple'
-    localStorage.setItem('magic_excel_cleaning_mode', 'simple')
+    applyConfig(createDefaultSettings())
     lastAiConfigAt.value = null
   }
 
   return {
-    currentPlatform, platformConfig, apiKey, isConfigured,
-    translateModel, workModel, useSystemPrompt, showSettings,
-    selectedTranslateModel, selectedWorkModel, rulesConfig, concurrency, autoIntentAnalysis,
-    cleaningMode, processMode, lastAiConfigAt,
+    currentPlatform, platformConfig, apiKey, isConfigured, translateModel, workModel, useSystemPrompt, showSettings,
+    selectedTranslateModel, selectedWorkModel, rulesConfig, concurrency, autoIntentAnalysis, cleaningMode, processMode, lastAiConfigAt,
     API_PLATFORMS, getApiConfig, setPlatform, saveApiKey, saveModelSelection,
-    exportGlobalConfig, importGlobalConfig, resetAllConfig
+    getConfigSnapshot, prepareConfigImport, exportGlobalConfig, importGlobalConfig, resetAllConfig
   }
 })

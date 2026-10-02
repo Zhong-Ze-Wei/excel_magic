@@ -45,7 +45,7 @@
     <div class="space-y-2">
       <div class="flex justify-between items-center">
         <span class="text-xs font-bold text-slate-700">原子清洗规则开关</span>
-        <span class="text-[10px] text-slate-400">已启用 {{ enabledRulesCount }}/9</span>
+        <span class="text-[10px] text-slate-400">已启用 {{ enabledRulesCount }}/{{ rulesMeta.length }}</span>
       </div>
 
       <div class="space-y-2 max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
@@ -180,6 +180,7 @@
 </template>
 
 <script setup>
+import { computed, ref } from 'vue'
 import { Settings2, ChevronDown, Sparkles, Plus, Pencil, X } from 'lucide-vue-next'
 import { useDataShareStore } from '../../stores/dataShare'
 import { useSettingsStore } from '../../stores/settings'
@@ -204,7 +205,8 @@ defineEmits([
 
 const dataShare = useDataShareStore()
 const settings = useSettingsStore()
-const rulesConfig = settings.rulesConfig
+const rulesConfig = computed(() => settings.rulesConfig)
+const configFileRef = ref(null)
 </script>
 
 <style scoped>

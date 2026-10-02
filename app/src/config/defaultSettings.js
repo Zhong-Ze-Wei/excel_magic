@@ -63,3 +63,15 @@ export const DEFAULT_RULES_CONFIG = {
   weakPolicy: 'mark',
   customFilters: []
 }
+
+// 初始化、恢复默认与备份共用的设置默认值。
+export const DEFAULT_SETTINGS = {
+  apiPlatform: 'aiping',
+  apiKeys: { siliconflow: '', aiping: '' },
+  selectedTranslateModel: { siliconflow: 'deepseek-ai/DeepSeek-V4-Flash', aiping: 'DeepSeek-V4-Flash' },
+  selectedWorkModel: { siliconflow: 'deepseek-ai/DeepSeek-V4-Flash', aiping: 'DeepSeek-V4-Flash' },
+  concurrency: 3,
+  autoIntentAnalysis: true,
+  cleaningMode: 'simple',
+  processMode: 'simple'
+}

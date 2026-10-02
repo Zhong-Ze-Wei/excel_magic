@@ -1,7 +1,7 @@
 <template>
   <header class="h-12 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-10">
     <h2 class="text-base font-bold text-slate-800 truncate">{{ title }}</h2>
-    <button @click="settings.showSettings = true"
+    <button @click="settings.showSettings = true" aria-label="API 设置"
       class="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 active:text-slate-600 active:bg-slate-100 transition-colors">
       <Settings class="w-5 h-5" />
     </button>
@@ -21,6 +21,7 @@ const titles = {
   '/': '功能主页',
   '/cleaning': '数据清洗',
   '/process': '智能加工',
+  '/aggregate': '分组对比',
   '/summary': '数据摘要'
 }
 

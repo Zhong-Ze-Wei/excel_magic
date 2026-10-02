@@ -6,6 +6,7 @@ const routes = [
   { path: '/process', name: 'process', component: () => import('../views/AnalysisHub.vue') },
   // 旧路由 /analysis 重定向到 /process
   { path: '/analysis', redirect: '/process' },
+  { path: '/translate', redirect: '/process' },
   { path: '/summary', name: 'summary', component: () => import('../views/SummaryView.vue') },
   // 分组对比：按某列分组对另一列做 SUM/AVG/COUNT/MIN/MAX，独立第四模块
   { path: '/aggregate', name: 'aggregate', component: () => import('../views/AggregateView.vue') },

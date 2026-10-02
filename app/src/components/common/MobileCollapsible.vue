@@ -1,6 +1,6 @@
 <template>
   <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-    <button @click="toggle"
+    <button @click="toggle" :aria-expanded="isOpen"
       class="w-full flex items-center justify-between px-4 py-3 text-left active:bg-slate-50 transition-colors">
       <span class="text-sm font-semibold text-slate-700">{{ title }}</span>
       <div class="flex items-center gap-2">
@@ -9,17 +9,14 @@
           :class="{ 'rotate-180': isOpen }" />
       </div>
     </button>
-    <div class="overflow-hidden transition-all duration-300 ease-in-out"
-      :style="{ maxHeight: isOpen ? contentHeight + 'px' : '0px' }">
-      <div ref="contentRef" class="px-4 pb-4">
-        <slot />
-      </div>
+    <div v-show="isOpen" class="px-4 pb-4">
+      <slot />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref } from 'vue'
 import { ChevronDown } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -28,16 +25,6 @@ const props = defineProps({
 })
 
 const isOpen = ref(props.defaultOpen)
-const contentRef = ref(null)
-const contentHeight = ref(2000)
-
-onMounted(async () => {
-  await nextTick()
-  if (contentRef.value) {
-    contentHeight.value = contentRef.value.scrollHeight
-  }
-})
-
 function toggle() {
   isOpen.value = !isOpen.value
 }
