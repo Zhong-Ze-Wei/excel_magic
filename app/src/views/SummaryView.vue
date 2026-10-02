@@ -261,7 +261,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { marked } from 'marked'
+import { renderMarkdown } from '../services/markdown'
 import { FileBarChart, SlidersHorizontal, Sparkles, Loader2, Lightbulb, Wand2, Tag } from 'lucide-vue-next'
 import { useDataShareStore } from '../stores/dataShare'
 import { useImportIntentStore } from '../stores/importIntent'
@@ -317,10 +317,7 @@ const selectedLabelingCols = ref([])
 const analysisTheme = ref('')
 const isRecommending = ref(false)
 const recommendedAngles = ref([])
-const renderedSummary = computed(() => {
-  if (!summaryText.value) return ''
-  try { return marked(summaryText.value) } catch { return summaryText.value.replace(/\n/g, '<br>') }
-})
+const renderedSummary = computed(() => renderMarkdown(summaryText.value))
 
 const averageFillRate = computed(() => {
   if (!rows.value.length || !headers.value.length) return 0
