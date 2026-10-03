@@ -133,22 +133,21 @@ export function checkPureSymbol(text) {
  * 原子规则 5：判断是否纯网址链接
  */
 export function checkLinkOnly(text) {
-  const noSpace = text.replace(/\s/g, '')
-  if (!noSpace) return { hit: false }
-  
-  if (/[\u4e00-\u9fa5]/.test(noSpace)) {
+  const candidate = text.trim()
+  // 纯网址不能包含正文空格；不能把英文句子拼接后当成域名。
+  if (!candidate || /[\s\u4e00-\u9fa5]/.test(candidate)) {
     return { hit: false }
   }
   
   let isUrl = false
   try {
-    let testStr = noSpace
+    let testStr = candidate
     if (!/^https?:\/\//i.test(testStr)) {
       testStr = 'http://' + testStr
     }
     const parsed = new URL(testStr)
     // 必须包含点号，且必须包含英文字母（防范纯数字如 666 在浏览器中被解析为 IP 包含点号），且不含汉字
-    isUrl = parsed.hostname.includes('.') && /[a-zA-Z]/.test(parsed.hostname) && !/[\u4e00-\u9fa5]/.test(parsed.hostname)
+    isUrl = parsed.hostname.includes('.') && !parsed.hostname.endsWith('.') && /[a-zA-Z]/.test(parsed.hostname) && !/[\u4e00-\u9fa5]/.test(parsed.hostname)
   } catch (e) {
     isUrl = false
   }
