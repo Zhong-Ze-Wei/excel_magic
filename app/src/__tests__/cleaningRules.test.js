@@ -54,6 +54,25 @@ describe('原子规则', () => {
     expect(checkLinkOnly('普通文本').hit).toBe(false)
   })
 
+  it.each([
+    'Sound is clear and pairing is quick, but the case feels a little cheap.',
+    'Comfortable for short calls. The microphone gets noisy outdoors, though.',
+    'More details at https://example.com/review',
+    'Great.'
+  ])('英文正文不会当作纯网址删除：%s', text => {
+    expect(checkLinkOnly(text).hit).toBe(false)
+    expect(runCleaningPipeline([[text]], ['评论'], 0, DEFAULT_RULES_CONFIG)[0].decision).toBe('keep')
+  })
+
+  it.each([
+    '  https://example.com/review?id=1  ',
+    'www.example.com/review',
+    'example.com/review',
+    'http://t.cn/abcde'
+  ])('独立网址仍能识别：%s', text => {
+    expect(checkLinkOnly(text).hit).toBe(true)
+  })
+
   it('checkTopicOnly 纯话题命中', () => {
     expect(checkTopicOnly('#话题#').hit).toBe(true)
     expect(checkTopicOnly('#话题# 这是正文').hit).toBe(false)

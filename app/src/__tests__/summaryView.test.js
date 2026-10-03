@@ -9,6 +9,7 @@ import { useImportIntentStore } from '../stores/importIntent'
 import { useSettingsStore } from '../stores/settings'
 import { useToast } from '../services/toast'
 import { callAI, callStreamingAI } from '../services/ai'
+import { DEMO_DATA } from '../data/demoData'
 
 vi.mock('../services/ai', () => ({ callAI: vi.fn(), callStreamingAI: vi.fn() }))
 vi.mock('../composables/useDevice', () => ({ useDevice: () => ({ isMobile: ref(false) }) }))
@@ -236,7 +237,8 @@ describe('摘要界面数据与安全边界', () => {
     await nextTick()
     view.loadDemo()
     await nextTick()
-    expect(data.sourceName).toBe('数据摘要示例.xlsx')
+    expect(data.sourceName).toBe(DEMO_DATA.comments.name)
+    expect(data.coreColumn).toBe(DEMO_DATA.comments.coreColumn)
     expect(data.rows.length).toBeGreaterThan(0)
     expect(view.rows).toEqual(data.rows)
     expect(view.selectedCols).toEqual(data.headers.map((_, index) => index))

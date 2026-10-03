@@ -481,6 +481,7 @@ async function generateSummary() {
 
 function loadDemo() {
   const demo = DEMO_DATA.comments
-  dataShare.setSharedData(demo.headers, demo.rows, '数据摘要示例.xlsx')
+  dataShare.setSharedData(demo.headers, demo.rows, demo.name)
+  dataShare.setCoreColumn(demo.coreColumn)
 }
 </script>

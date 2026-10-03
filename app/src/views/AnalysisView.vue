@@ -608,7 +608,8 @@ function formatCellValue(val, type) {
 // ── 文件加载 ──
 function loadDemo() {
   const demo = DEMO_DATA.comments
-  dataShare.setSharedData(demo.headers, demo.rows, '用户评论示例.csv', true)
+  dataShare.setSharedData(demo.headers, demo.rows, demo.name)
+  dataShare.setCoreColumn(demo.coreColumn)
   headers.value = [...demo.headers]
   rows.value = demo.rows.map(r => [...r])
   rangeStart.value = 1
