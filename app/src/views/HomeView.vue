@@ -18,6 +18,7 @@
         class="w-full py-2.5 bg-white border border-emerald-200 text-emerald-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2 active:bg-emerald-50">
         <RefreshCw class="w-3.5 h-3.5" /> 加载演示数据
       </button>
+      <p class="text-[11px] text-slate-500 text-center">模拟电商评论：{{ demo.rows.length }} 行 × {{ demo.headers.length }} 列，可体验清洗、加工、对比和摘要。</p>
     </div>
     <DataStatusCompact v-else
       :source-name="dataShare.sourceName"
@@ -87,6 +88,7 @@
           <RefreshCw class="w-3.5 h-3.5" /> 快速加载全局演示示例数据
         </button>
       </div>
+      <p class="mt-3 text-xs text-slate-500 text-center">模拟电商评论：{{ demo.rows.length }} 行 × {{ demo.headers.length }} 列，可体验清洗、加工、对比和摘要。</p>
     </div>
 
     <DataStatusCompact v-else
@@ -139,6 +141,7 @@ import { useDataShareStore } from '../stores/dataShare'
 import { useImportIntentStore } from '../stores/importIntent'
 import { useDevice } from '../composables/useDevice'
 import { useFileUpload } from '../composables/useFileUpload'
+import { DEMO_DATA } from '../data/demoData'
 import FileUploader from '../components/common/FileUploader.vue'
 import PipelinePlanCard from '../components/common/PipelinePlanCard.vue'
 import DataStatusCompact from '../components/common/DataStatusCompact.vue'
@@ -149,6 +152,7 @@ const router = useRouter()
 const toast = useToast()
 const dataShare = useDataShareStore()
 const intent = useImportIntentStore()
+const demo = DEMO_DATA.comments
 
 const { handleFile: handleGlobalFile } = useFileUpload()
 
@@ -210,31 +214,13 @@ function reopenIntent() {
 }
 
 function loadGlobalDemo() {
-  const demoHeaders = ['序号', '用户ID', '评论内容']
-  const demoRows = [
-    ['1', 'User_001', '商品收到，质量非常好，非常喜欢！'],
-    ['2', 'User_002', '[赞][赞][赞][赞][赞][赞][赞][赞][赞][赞]  [赞][赞][赞][赞][赞][赞][赞][赞][赞][赞]'],
-    ['3', 'User_003', '    '],
-    ['4', 'User_004', 'http://t.cn/abcde'],
-    ['5', 'User_005', '666'],
-    ['6', 'User_006', '加微信领取优惠大礼包，微信号 abc123456'],
-    ['7', 'User_007', '#年中大促# #新机首发# 非常期待这款手机的性能！'],
-    ['8', 'User_008', '商品收到，质量非常好，非常喜欢！'],
-    ['9', 'User_009', '商品收到，质量非常好，非常喜欢！'],
-    ['10', 'User_010', '商品收到，质量非常好，非常喜欢！'],
-    ['11', 'User_011', 'ä½ å¥½å•Šæ•°æ ®æ¸…æ´—ä¹±ç  '],
-    ['12', 'User_012', '东西还不错，物流也挺快的，包装完整。'],
-    ['13', 'User_013', '[打call]'],
-    ['14', 'User_014', '求'],
-    ['15', 'User_015', '-'],
-    ['16', 'User_016', '感觉一般，没有想象中好用，退货了。']
-  ]
-  dataShare.setSharedData(demoHeaders, demoRows, '社媒评论脏数据全局示例.csv', false)
+  dataShare.setSharedData(demo.headers, demo.rows, demo.name)
+  dataShare.setCoreColumn(demo.coreColumn)
   intent.open({
-    name: '社媒评论脏数据全局示例.csv',
-    rowCount: demoRows.length,
-    colCount: demoHeaders.length,
-    headers: [...demoHeaders]
+    name: demo.name,
+    rowCount: demo.rows.length,
+    colCount: demo.headers.length,
+    headers: [...demo.headers]
   })
   toast.success('成功加载全局演示示例数据！请在弹窗中选择核心列与任务。')
 }

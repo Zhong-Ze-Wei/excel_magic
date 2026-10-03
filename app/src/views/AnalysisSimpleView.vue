@@ -127,7 +127,8 @@ const { handleFile } = useFileUpload({
 })
 function loadDemo() {
   const d = DEMO_DATA.comments
-  dataShare.setSharedData(d.headers, d.rows)
+  dataShare.setSharedData(d.headers, d.rows, d.name)
+  dataShare.setCoreColumn(d.coreColumn)
   rangeStart.value = 1
   rangeEnd.value = d.rows.length
 }

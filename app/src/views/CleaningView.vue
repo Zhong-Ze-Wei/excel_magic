@@ -260,7 +260,7 @@
         <FileUploader v-if="!hasData" label="上传需要清洗的 Excel/CSV 文件" :icon="Eraser" iconBg="bg-orange-50" iconColor="text-orange-600" @file="handleFile" />
         <button v-if="!hasData" @click="loadDemo"
           class="w-full mt-2 py-2 bg-white hover:bg-orange-50 border border-orange-200 text-orange-600 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
-          <RefreshCw class="w-3.5 h-3.5" /> 加载社媒评论脏数据示例
+          <RefreshCw class="w-3.5 h-3.5" /> 加载电商评论示例
         </button>
 
         <CleaningRulesPanel v-if="hasData"
@@ -425,6 +425,7 @@ import { useSettingsStore } from '../stores/settings'
 import { useDevice } from '../composables/useDevice'
 import { useGlobalDataSync } from '../composables/useGlobalDataSync'
 import { useFileUpload } from '../composables/useFileUpload'
+import { DEMO_DATA } from '../data/demoData'
 import { useDatasetTask } from '../composables/useDatasetTask'
 import { callAI } from '../services/ai'
 import { getSmartFilterPrompt } from '../services/prompts'
@@ -673,29 +674,12 @@ function heuristicDetectCleanColumn(headersList, rowsList) {
   return bestColIdx
 }
 
-// 加载包含各种垃圾特征的高价值 Demo 数据
+// 加载各模块共用的电商评论示例。
 function loadDemo() {
-  headers.value = ['序号', '用户ID', '评论内容']
-  rows.value = [
-    ['1', 'User_001', '商品收到，质量非常好，非常喜欢！'],
-    ['2', 'User_002', '[赞][赞][赞][赞][赞][赞][赞][赞][赞][赞]  [赞][赞][赞][赞][赞][赞][赞][赞][赞][赞]'], // 文字表情
-    ['3', 'User_003', '    '], // 空白
-    ['4', 'User_004', 'http://t.cn/abcde'], // 纯网址
-    ['5', 'User_005', '666'], // 短无意义
-    ['6', 'User_006', '加微信领取优惠大礼包，微信号 abc123456'], // 广告引流
-    ['7', 'User_007', '#年中大促# #新机首发# 非常期待这款手机的性能！'], // 话题
-    ['8', 'User_008', '商品收到，质量非常好，非常喜欢！'], // 重复行 1
-    ['9', 'User_009', '商品收到，质量非常好，非常喜欢！'], // 重复行 2
-    ['10', 'User_010', '商品收到，质量非常好，非常喜欢！'], // 重复行 3
-    ['11', 'User_011', 'ä½ å¥½å•Šæ•°æ ®æ¸…æ´—ä¹±ç  '], // 乱码
-    ['12', 'User_012', '东西还不错，物流也挺快的，包装完整。'],
-    ['13', 'User_013', '[打call]'], // 文字表情 2
-    ['14', 'User_014', '求'], // 字数过短过滤 (有效长度 1)
-    ['15', 'User_015', '-'], // 无意义字符 (有效长度 0)
-    ['16', 'User_016', '感觉一般，没有想象中好用，退货了。']
-  ]
-  dataShare.setSharedData(headers.value, rows.value, '清洗示例.csv')
-  dataShare.setCoreColumn(2)
+  const demo = DEMO_DATA.comments
+  dataShare.setSharedData(demo.headers, demo.rows, demo.name)
+  dataShare.setCoreColumn(demo.coreColumn)
+  importGlobalExcel()
   runPipeline()
 }
 
