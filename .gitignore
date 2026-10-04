@@ -6,3 +6,4 @@ dist
 .env.*
 .claude
 .playwright-mcp
+.pages-dist/

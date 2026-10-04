@@ -1,0 +1,84 @@
+name: Deploy MagicExcel product page
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'site/**'
+      - 'scripts/**'
+      - 'app/**'
+      - '.github/workflows/pages.yml'
+      - 'README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: magic-excel-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      pages_enabled: ${{ steps.pages-check.outputs.enabled }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install application dependencies
+        run: npm ci
+        working-directory: app
+      - name: Test application
+        run: npm test
+        working-directory: app
+      - name: Build application for the app subdirectory
+        run: npm run build:pages
+        working-directory: app
+      - name: Assemble product page and working application
+        run: node scripts/build-pages.mjs
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .pages-dist
+      - name: Check Pages setup
+        id: pages-check
+        env:
+          MAGIC_REPOSITORY: ${{ github.repository }}
+          MAGIC_GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFile } from 'node:fs/promises'
+          const repository = process.env.MAGIC_REPOSITORY
+          const response = await fetch(`https://api.github.com/repos/${repository}`, {
+            headers: { Authorization: `Bearer ${process.env.MAGIC_GITHUB_TOKEN}`, 'User-Agent': 'MagicExcel-Pages' }
+          })
+          if (!response.ok) throw new Error(`Cannot read Pages setup: HTTP ${response.status}`)
+          const metadata = await response.json()
+          await appendFile(process.env.GITHUB_OUTPUT, `enabled=${metadata.has_pages}\n`)
+          if (!metadata.has_pages) {
+            await appendFile(process.env.GITHUB_STEP_SUMMARY,
+              `产品页及工作台构建成功，部署文件已上传。首次发布请打开 [Settings → Pages](https://github.com/${repository}/settings/pages)，将 Source 设为 **GitHub Actions**，再运行本工作流。\n`)
+          }
+          NODE
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.pages_enabled == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
